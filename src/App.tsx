@@ -13,6 +13,8 @@ import Swaps from "./pages/Swaps";
 import Profile from "./pages/Profile";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import VolunteerManagement from "./pages/admin/VolunteerManagement";
+import EventTemplates from "./pages/admin/EventTemplates";
+import EventScheduler from "./pages/admin/EventScheduler";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 
@@ -39,6 +41,8 @@ const App = () => (
               <Route path="/profile" element={<Profile />} />
               <Route path="/admin" element={<AdminDashboard />} />
               <Route path="/admin/volunteers" element={<VolunteerManagement />} />
+              <Route path="/admin/templates" element={<EventTemplates />} />
+              <Route path="/admin/scheduler" element={<EventScheduler />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>
