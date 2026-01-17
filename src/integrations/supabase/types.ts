@@ -79,6 +79,197 @@ export type Database = {
         }
         Relationships: []
       }
+      event_assignments: {
+        Row: {
+          created_at: string
+          event_id: string
+          id: string
+          role: Database["public"]["Enums"]["service_role"]
+          updated_at: string
+          volunteer_id: string
+        }
+        Insert: {
+          created_at?: string
+          event_id: string
+          id?: string
+          role: Database["public"]["Enums"]["service_role"]
+          updated_at?: string
+          volunteer_id: string
+        }
+        Update: {
+          created_at?: string
+          event_id?: string
+          id?: string
+          role?: Database["public"]["Enums"]["service_role"]
+          updated_at?: string
+          volunteer_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_assignments_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      event_roles: {
+        Row: {
+          created_at: string
+          event_id: string
+          id: string
+          quantity: number
+          role: Database["public"]["Enums"]["service_role"]
+        }
+        Insert: {
+          created_at?: string
+          event_id: string
+          id?: string
+          quantity?: number
+          role: Database["public"]["Enums"]["service_role"]
+        }
+        Update: {
+          created_at?: string
+          event_id?: string
+          id?: string
+          quantity?: number
+          role?: Database["public"]["Enums"]["service_role"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_roles_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      event_template_roles: {
+        Row: {
+          created_at: string
+          id: string
+          quantity: number
+          role: Database["public"]["Enums"]["service_role"]
+          template_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          quantity?: number
+          role: Database["public"]["Enums"]["service_role"]
+          template_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          quantity?: number
+          role?: Database["public"]["Enums"]["service_role"]
+          template_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_template_roles_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "event_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      event_templates: {
+        Row: {
+          active: boolean
+          created_at: string
+          created_by: string | null
+          day_of_week: number
+          description: string | null
+          id: string
+          is_recurring: boolean
+          name: string
+          recurrence_count: number | null
+          recurrence_end_date: string | null
+          recurrence_end_type: string | null
+          start_time: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          created_by?: string | null
+          day_of_week: number
+          description?: string | null
+          id?: string
+          is_recurring?: boolean
+          name: string
+          recurrence_count?: number | null
+          recurrence_end_date?: string | null
+          recurrence_end_type?: string | null
+          start_time: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          created_by?: string | null
+          day_of_week?: number
+          description?: string | null
+          id?: string
+          is_recurring?: boolean
+          name?: string
+          recurrence_count?: number | null
+          recurrence_end_date?: string | null
+          recurrence_end_type?: string | null
+          start_time?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      events: {
+        Row: {
+          created_at: string
+          date: string
+          id: string
+          name: string
+          notes: string | null
+          start_time: string
+          status: string
+          template_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          date: string
+          id?: string
+          name: string
+          notes?: string | null
+          start_time: string
+          status?: string
+          template_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          date?: string
+          id?: string
+          name?: string
+          notes?: string | null
+          start_time?: string
+          status?: string
+          template_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "events_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "event_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       family_groups: {
         Row: {
           created_at: string
