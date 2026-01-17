@@ -124,24 +124,39 @@ export function EventTemplateDialog({ open, onOpenChange, template }: EventTempl
   }, [template, form]);
 
   const onSubmit = async (data: FormData) => {
+    // Validate roles have required fields
+    const validRoles = data.roles.filter(r => r.role && r.quantity > 0).map(r => ({
+      role: r.role,
+      quantity: r.quantity,
+    }));
+
     try {
       if (isEditing && template) {
         await updateTemplate.mutateAsync({
           id: template.id,
-          ...data,
+          name: data.name,
           description: data.description || undefined,
+          day_of_week: data.day_of_week,
+          start_time: data.start_time,
+          is_recurring: data.is_recurring,
+          active: data.active,
           recurrence_end_type: data.is_recurring ? data.recurrence_end_type : null,
           recurrence_end_date: data.recurrence_end_type === 'date' ? data.recurrence_end_date : null,
           recurrence_count: data.recurrence_end_type === 'count' ? data.recurrence_count : null,
+          roles: validRoles,
         });
         toast.success('Event template updated');
       } else {
         await createTemplate.mutateAsync({
-          ...data,
+          name: data.name,
           description: data.description || undefined,
+          day_of_week: data.day_of_week,
+          start_time: data.start_time,
+          is_recurring: data.is_recurring,
           recurrence_end_type: data.is_recurring ? data.recurrence_end_type || undefined : undefined,
           recurrence_end_date: data.recurrence_end_type === 'date' ? data.recurrence_end_date || undefined : undefined,
           recurrence_count: data.recurrence_end_type === 'count' ? data.recurrence_count || undefined : undefined,
+          roles: validRoles,
         });
         toast.success('Event template created');
       }
