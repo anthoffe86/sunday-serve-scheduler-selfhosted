@@ -1,0 +1,105 @@
+import { format, parseISO } from 'date-fns';
+import { SundayService, ROLE_LABELS, Role, ROLES_PER_SUNDAY } from '@/types';
+import { RoleBadge } from './RoleBadge';
+import { currentUser } from '@/data/mockData';
+import { cn } from '@/lib/utils';
+
+interface ScheduleTableProps {
+  services: SundayService[];
+}
+
+export function ScheduleTable({ services }: ScheduleTableProps) {
+  const allRoles: Role[] = ROLES_PER_SUNDAY.flatMap(({ role, count }) =>
+    Array(count).fill(role)
+  );
+
+  // Group roles for display
+  const uniqueRoles = [
+    'sidesman-standard',
+    'sidesman-sound',
+    'sidesman-welcome',
+    'reader',
+    'intercessions',
+    'collection',
+  ] as Role[];
+
+  return (
+    <div className="overflow-x-auto rounded-xl border bg-card">
+      <table className="w-full min-w-[640px]">
+        <thead>
+          <tr className="border-b bg-muted/50">
+            <th className="sticky left-0 bg-muted/50 px-4 py-3 text-left text-sm font-semibold">
+              Date
+            </th>
+            {uniqueRoles.map((role) => (
+              <th
+                key={role}
+                className="px-4 py-3 text-left text-sm font-semibold"
+              >
+                {ROLE_LABELS[role]}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody className="divide-y">
+          {services.map((service) => {
+            const dateObj = parseISO(service.date);
+            const getVolunteersForRole = (role: Role) =>
+              service.assignments.filter((a) => a.role === role);
+
+            return (
+              <tr key={service.date} className="hover:bg-muted/30">
+                <td className="sticky left-0 bg-card px-4 py-3">
+                  <div className="flex items-center gap-2">
+                    <div>
+                      <p className="font-serif font-semibold">
+                        {format(dateObj, 'MMM d')}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {format(dateObj, 'EEEE')}
+                      </p>
+                    </div>
+                    {service.status === 'draft' && (
+                      <span className="rounded bg-accent/20 px-1.5 py-0.5 text-[10px] font-medium">
+                        Draft
+                      </span>
+                    )}
+                  </div>
+                </td>
+                {uniqueRoles.map((role) => {
+                  const volunteers = getVolunteersForRole(role);
+                  return (
+                    <td key={role} className="px-4 py-3">
+                      <div className="flex flex-col gap-1">
+                        {volunteers.length > 0 ? (
+                          volunteers.map((v) => (
+                            <span
+                              key={v.volunteerId}
+                              className={cn(
+                                'inline-block rounded-md px-2 py-1 text-sm',
+                                v.volunteerId === currentUser.id
+                                  ? 'bg-primary/10 font-medium text-primary'
+                                  : 'bg-secondary'
+                              )}
+                            >
+                              {v.volunteerName.split(' ')[0]}
+                              {v.volunteerId === currentUser.id && (
+                                <span className="ml-1 text-xs">(You)</span>
+                              )}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="text-sm text-muted-foreground">—</span>
+                        )}
+                      </div>
+                    </td>
+                  );
+                })}
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
