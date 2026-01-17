@@ -1,4 +1,5 @@
-import { Bell, Menu, User } from 'lucide-react';
+import { Bell, Menu, User, LogOut, Shield } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -9,17 +10,30 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { currentUser } from '@/data/mockData';
+import { useAuth } from '@/hooks/useAuth';
+import { useProfile } from '@/hooks/useVolunteerData';
 
 interface AppHeaderProps {
   onMenuClick: () => void;
 }
 
 export function AppHeader({ onMenuClick }: AppHeaderProps) {
-  const initials = currentUser.name
+  const { user, signOut, isAdmin } = useAuth();
+  const { data: profile } = useProfile();
+  const navigate = useNavigate();
+
+  const displayName = profile?.name || user?.email?.split('@')[0] || 'User';
+  const initials = displayName
     .split(' ')
     .map((n) => n[0])
-    .join('');
+    .join('')
+    .toUpperCase()
+    .slice(0, 2);
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate('/auth');
+  };
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-card/80 backdrop-blur-sm">
@@ -45,11 +59,15 @@ export function AppHeader({ onMenuClick }: AppHeaderProps) {
 
         <div className="flex-1" />
 
+        {isAdmin && (
+          <div className="hidden items-center gap-1 rounded-full bg-accent/20 px-2 py-0.5 text-xs font-medium text-accent-foreground md:flex">
+            <Shield className="h-3 w-3" />
+            Admin
+          </div>
+        )}
+
         <Button variant="ghost" size="icon" className="relative">
           <Bell className="h-5 w-5" />
-          <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-accent text-[10px] font-medium text-accent-foreground">
-            2
-          </span>
         </Button>
 
         <DropdownMenu>
@@ -61,26 +79,27 @@ export function AppHeader({ onMenuClick }: AppHeaderProps) {
                 </AvatarFallback>
               </Avatar>
               <span className="hidden text-sm font-medium md:block">
-                {currentUser.name.split(' ')[0]}
+                {displayName.split(' ')[0]}
               </span>
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
             <DropdownMenuLabel>
               <div className="flex flex-col">
-                <span>{currentUser.name}</span>
+                <span>{displayName}</span>
                 <span className="text-xs font-normal text-muted-foreground">
-                  {currentUser.email}
+                  {user?.email}
                 </span>
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>
+            <DropdownMenuItem onClick={() => navigate('/profile')}>
               <User className="mr-2 h-4 w-4" />
               My Profile
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-destructive">
+            <DropdownMenuItem onClick={handleSignOut} className="text-destructive">
+              <LogOut className="mr-2 h-4 w-4" />
               Sign Out
             </DropdownMenuItem>
           </DropdownMenuContent>

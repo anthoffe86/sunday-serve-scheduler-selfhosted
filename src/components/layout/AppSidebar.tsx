@@ -7,10 +7,12 @@ import {
   Settings,
   Users,
   LayoutDashboard,
-  X
+  X,
+  Shield
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { useAuth } from '@/hooks/useAuth';
 
 interface AppSidebarProps {
   isOpen: boolean;
@@ -52,6 +54,8 @@ function NavItem({ to, icon: Icon, label, onClick }: { to: string; icon: typeof 
 }
 
 export function AppSidebar({ isOpen, onClose }: AppSidebarProps) {
+  const { isAdmin } = useAuth();
+
   return (
     <>
       {/* Mobile overlay */}
@@ -84,14 +88,18 @@ export function AppSidebar({ isOpen, onClose }: AppSidebarProps) {
             <NavItem key={item.to} {...item} onClick={onClose} />
           ))}
 
-          <div className="my-4 border-t" />
-
-          <p className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Admin
-          </p>
-          {adminNav.map((item) => (
-            <NavItem key={item.to} {...item} onClick={onClose} />
-          ))}
+          {isAdmin && (
+            <>
+              <div className="my-4 border-t" />
+              <p className="mb-2 flex items-center gap-1.5 px-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                <Shield className="h-3 w-3" />
+                Admin
+              </p>
+              {adminNav.map((item) => (
+                <NavItem key={item.to} {...item} onClick={onClose} />
+              ))}
+            </>
+          )}
         </nav>
       </aside>
     </>

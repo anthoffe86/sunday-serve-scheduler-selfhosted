@@ -4,24 +4,36 @@ import {
   AlertCircle, 
   CheckCircle,
   Clock,
-  TrendingUp
+  TrendingUp,
+  Loader2
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { StatCard } from '@/components/StatCard';
-import { mockVolunteers, mockSchedule, upcomingSundays } from '@/data/mockData';
-import { Link } from 'react-router-dom';
+import { useProfiles, useSundayServices } from '@/hooks/useVolunteerData';
+import { useAuth } from '@/hooks/useAuth';
+import { Link, Navigate } from 'react-router-dom';
 
 const AdminDashboard = () => {
-  const activeVolunteers = mockVolunteers.filter((v) => v.active);
-  const draftSchedules = mockSchedule.filter((s) => s.status === 'draft');
-  const publishedSchedules = mockSchedule.filter((s) => s.status === 'published');
+  const { isAdmin, isLoading: authLoading } = useAuth();
+  const { data: profiles, isLoading: profilesLoading } = useProfiles();
+  const { data: services, isLoading: servicesLoading } = useSundayServices();
 
-  // Check for upcoming Sundays without schedules
-  const scheduledDates = mockSchedule.map((s) => s.date);
-  const unscheduledSundays = upcomingSundays.filter(
-    (date) => !scheduledDates.includes(date)
-  );
+  if (authLoading || profilesLoading || servicesLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!isAdmin) {
+    return <Navigate to="/" replace />;
+  }
+
+  const activeVolunteers = profiles?.filter((v) => v.active) || [];
+  const draftSchedules = services?.filter((s) => s.status === 'draft') || [];
+  const publishedSchedules = services?.filter((s) => s.status === 'published') || [];
 
   return (
     <div className="space-y-8">
@@ -44,7 +56,7 @@ const AdminDashboard = () => {
           label="Active Volunteers"
           value={activeVolunteers.length}
           icon={Users}
-          description={`${mockVolunteers.length} total registered`}
+          description={`${profiles?.length || 0} total registered`}
         />
         <StatCard
           label="Published Schedules"
@@ -58,34 +70,11 @@ const AdminDashboard = () => {
           description="Awaiting publication"
         />
         <StatCard
-          label="Unscheduled Sundays"
-          value={unscheduledSundays.length}
+          label="Total Services"
+          value={services?.length || 0}
           icon={AlertCircle}
-          description="Need attention"
         />
       </div>
-
-      {/* Alerts */}
-      {unscheduledSundays.length > 0 && (
-        <Card className="border-accent/50 bg-accent/10">
-          <CardContent className="flex items-center gap-4 p-4">
-            <div className="rounded-full bg-accent p-2">
-              <AlertCircle className="h-5 w-5 text-accent-foreground" />
-            </div>
-            <div className="flex-1">
-              <p className="font-medium">
-                {unscheduledSundays.length} upcoming Sunday{unscheduledSundays.length > 1 ? 's' : ''} without a schedule
-              </p>
-              <p className="text-sm text-muted-foreground">
-                Click "Generate New Schedule" to automatically assign volunteers
-              </p>
-            </div>
-            <Button variant="outline" size="sm">
-              View Dates
-            </Button>
-          </CardContent>
-        </Card>
-      )}
 
       {/* Quick Links */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -98,7 +87,7 @@ const AdminDashboard = () => {
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              Add, edit, or deactivate volunteers. Manage family groups and role assignments.
+              Add, edit, or deactivate volunteers. Manage family groups.
             </p>
             <Button variant="outline" asChild className="w-full">
               <Link to="/admin/volunteers">Manage Volunteers</Link>
@@ -115,7 +104,7 @@ const AdminDashboard = () => {
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              Review and edit generated schedules. Override assignments when needed.
+              Review and edit generated schedules.
             </p>
             <Button variant="outline" asChild className="w-full">
               <Link to="/schedule">Edit Schedules</Link>
@@ -132,7 +121,7 @@ const AdminDashboard = () => {
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              Export schedules to Excel. Generate service history reports.
+              Export schedules to Excel.
             </p>
             <Button variant="outline" className="w-full">
               Export to Excel
@@ -141,43 +130,34 @@ const AdminDashboard = () => {
         </Card>
       </div>
 
-      {/* Recent Volunteers */}
+      {/* Active Volunteers */}
       <Card>
         <CardHeader>
           <CardTitle className="font-serif">Active Volunteers</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-3">
-            {activeVolunteers.slice(0, 5).map((volunteer) => (
-              <div
-                key={volunteer.id}
-                className="flex items-center justify-between rounded-lg border px-4 py-3"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-sm font-medium text-primary">
-                    {volunteer.name
-                      .split(' ')
-                      .map((n) => n[0])
-                      .join('')}
-                  </div>
-                  <div>
-                    <p className="font-medium">{volunteer.name}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {volunteer.email}
-                    </p>
+          {activeVolunteers.length > 0 ? (
+            <div className="space-y-3">
+              {activeVolunteers.slice(0, 5).map((volunteer) => (
+                <div
+                  key={volunteer.id}
+                  className="flex items-center justify-between rounded-lg border px-4 py-3"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-sm font-medium text-primary">
+                      {volunteer.name.split(' ').map((n) => n[0]).join('').slice(0, 2)}
+                    </div>
+                    <div>
+                      <p className="font-medium">{volunteer.name}</p>
+                      <p className="text-sm text-muted-foreground">{volunteer.email}</p>
+                    </div>
                   </div>
                 </div>
-                <div className="text-right text-sm">
-                  <p className="text-muted-foreground">
-                    {volunteer.serviceHistory.length} services
-                  </p>
-                  {volunteer.familyGroupId && (
-                    <p className="text-xs text-primary">Family group</p>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-center text-muted-foreground py-4">No volunteers yet</p>
+          )}
           <Button variant="ghost" asChild className="mt-4 w-full">
             <Link to="/admin/volunteers">View All Volunteers →</Link>
           </Button>

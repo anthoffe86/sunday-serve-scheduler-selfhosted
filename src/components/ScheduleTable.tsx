@@ -1,19 +1,27 @@
 import { format, parseISO } from 'date-fns';
-import { SundayService, ROLE_LABELS, Role, ROLES_PER_SUNDAY } from '@/types';
-import { RoleBadge } from './RoleBadge';
-import { currentUser } from '@/data/mockData';
+import { useAuth } from '@/hooks/useAuth';
+import { ROLE_LABELS, Role } from '@/types';
 import { cn } from '@/lib/utils';
 
+interface ScheduleService {
+  id: string;
+  date: string;
+  status: 'draft' | 'published';
+  assignments: {
+    id: string;
+    role: string;
+    volunteer_id: string;
+    volunteerName?: string;
+  }[];
+}
+
 interface ScheduleTableProps {
-  services: SundayService[];
+  services: ScheduleService[];
 }
 
 export function ScheduleTable({ services }: ScheduleTableProps) {
-  const allRoles: Role[] = ROLES_PER_SUNDAY.flatMap(({ role, count }) =>
-    Array(count).fill(role)
-  );
+  const { user } = useAuth();
 
-  // Group roles for display
   const uniqueRoles = [
     'sidesman-standard',
     'sidesman-sound',
@@ -21,7 +29,7 @@ export function ScheduleTable({ services }: ScheduleTableProps) {
     'reader',
     'intercessions',
     'collection',
-  ] as Role[];
+  ] as const;
 
   return (
     <div className="overflow-x-auto rounded-xl border bg-card">
@@ -36,7 +44,7 @@ export function ScheduleTable({ services }: ScheduleTableProps) {
                 key={role}
                 className="px-4 py-3 text-left text-sm font-semibold"
               >
-                {ROLE_LABELS[role]}
+                {ROLE_LABELS[role as Role]}
               </th>
             ))}
           </tr>
@@ -44,11 +52,11 @@ export function ScheduleTable({ services }: ScheduleTableProps) {
         <tbody className="divide-y">
           {services.map((service) => {
             const dateObj = parseISO(service.date);
-            const getVolunteersForRole = (role: Role) =>
+            const getVolunteersForRole = (role: string) =>
               service.assignments.filter((a) => a.role === role);
 
             return (
-              <tr key={service.date} className="hover:bg-muted/30">
+              <tr key={service.id} className="hover:bg-muted/30">
                 <td className="sticky left-0 bg-card px-4 py-3">
                   <div className="flex items-center gap-2">
                     <div>
@@ -74,16 +82,16 @@ export function ScheduleTable({ services }: ScheduleTableProps) {
                         {volunteers.length > 0 ? (
                           volunteers.map((v) => (
                             <span
-                              key={v.volunteerId}
+                              key={v.id}
                               className={cn(
                                 'inline-block rounded-md px-2 py-1 text-sm',
-                                v.volunteerId === currentUser.id
+                                v.volunteer_id === user?.id
                                   ? 'bg-primary/10 font-medium text-primary'
                                   : 'bg-secondary'
                               )}
                             >
-                              {v.volunteerName.split(' ')[0]}
-                              {v.volunteerId === currentUser.id && (
+                              {v.volunteerName?.split(' ')[0] || 'Unknown'}
+                              {v.volunteer_id === user?.id && (
                                 <span className="ml-1 text-xs">(You)</span>
                               )}
                             </span>
