@@ -17,6 +17,13 @@ export interface Profile {
   updated_at: string;
 }
 
+export interface FamilyGroup {
+  id: string;
+  name: string;
+  created_by: string | null;
+  created_at: string;
+}
+
 export interface RolePreference {
   id: string;
   user_id: string;
@@ -86,7 +93,21 @@ export function useProfiles() {
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
-        .eq('active', true)
+        .order('name');
+      
+      if (error) throw error;
+      return data as Profile[];
+    },
+  });
+}
+
+export function useAllProfiles() {
+  return useQuery({
+    queryKey: ['profiles', 'all'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
         .order('name');
       
       if (error) throw error;
@@ -124,6 +145,76 @@ export function useUpdateProfile() {
   });
 }
 
+// Admin profile update (can update any user)
+export function useAdminUpdateProfile() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async ({ userId, updates }: { userId: string; updates: Partial<Profile> }) => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .update(updates)
+        .eq('user_id', userId)
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['profile'] });
+      queryClient.invalidateQueries({ queryKey: ['profiles'] });
+      toast.success('Volunteer updated!');
+    },
+    onError: (error) => {
+      toast.error('Failed to update volunteer: ' + error.message);
+    },
+  });
+}
+
+// Family groups hooks
+export function useFamilyGroups() {
+  return useQuery({
+    queryKey: ['family-groups'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('family_groups')
+        .select('*')
+        .order('name');
+      
+      if (error) throw error;
+      return data as FamilyGroup[];
+    },
+  });
+}
+
+export function useCreateFamilyGroup() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+  
+  return useMutation({
+    mutationFn: async (name: string) => {
+      if (!user) throw new Error('Not authenticated');
+      
+      const { data, error } = await supabase
+        .from('family_groups')
+        .insert({ name, created_by: user.id })
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['family-groups'] });
+      toast.success('Family group created!');
+    },
+    onError: (error) => {
+      toast.error('Failed to create family group: ' + error.message);
+    },
+  });
+}
+
 // Role preferences hooks
 export function useRolePreferences() {
   const { user } = useAuth();
@@ -143,6 +234,25 @@ export function useRolePreferences() {
       return data as RolePreference[];
     },
     enabled: !!user,
+  });
+}
+
+export function useUserRolePreferences(userId?: string) {
+  return useQuery({
+    queryKey: ['role-preferences', userId],
+    queryFn: async () => {
+      if (!userId) return [];
+      
+      const { data, error } = await supabase
+        .from('role_preferences')
+        .select('*')
+        .eq('user_id', userId)
+        .order('preference_order');
+      
+      if (error) throw error;
+      return data as RolePreference[];
+    },
+    enabled: !!userId,
   });
 }
 
