@@ -124,11 +124,15 @@ export function EventTemplateDialog({ open, onOpenChange, template }: EventTempl
   }, [template, form]);
 
   const onSubmit = async (data: FormData) => {
-    // Validate roles have required fields
-    const validRoles = data.roles.filter(r => r.role && r.quantity > 0).map(r => ({
-      role: r.role,
-      quantity: r.quantity,
-    }));
+    // Merge duplicate roles (DB has UNIQUE(template_id, role))
+    const mergedRolesMap = new Map<string, number>();
+    for (const r of data.roles) {
+      if (!r.role) continue;
+      const qty = Number(r.quantity) || 0;
+      if (qty <= 0) continue;
+      mergedRolesMap.set(r.role, (mergedRolesMap.get(r.role) || 0) + qty);
+    }
+    const roles = Array.from(mergedRolesMap.entries()).map(([role, quantity]) => ({ role, quantity }));
 
     try {
       if (isEditing && template) {
@@ -143,7 +147,7 @@ export function EventTemplateDialog({ open, onOpenChange, template }: EventTempl
           recurrence_end_type: data.is_recurring ? data.recurrence_end_type : null,
           recurrence_end_date: data.recurrence_end_type === 'date' ? data.recurrence_end_date : null,
           recurrence_count: data.recurrence_end_type === 'count' ? data.recurrence_count : null,
-          roles: validRoles,
+          roles,
         });
         toast.success('Event template updated');
       } else {
@@ -156,13 +160,18 @@ export function EventTemplateDialog({ open, onOpenChange, template }: EventTempl
           recurrence_end_type: data.is_recurring ? data.recurrence_end_type || undefined : undefined,
           recurrence_end_date: data.recurrence_end_type === 'date' ? data.recurrence_end_date || undefined : undefined,
           recurrence_count: data.recurrence_end_type === 'count' ? data.recurrence_count || undefined : undefined,
-          roles: validRoles,
+          roles,
         });
         toast.success('Event template created');
       }
       onOpenChange(false);
-    } catch (error) {
-      toast.error(isEditing ? 'Failed to update template' : 'Failed to create template');
+    } catch (err: any) {
+      // Surface helpful error details
+      if (err?.code === '23505') {
+        toast.error('Duplicate role selected. Please choose each role once (or increase quantity).');
+        return;
+      }
+      toast.error(err?.message || (isEditing ? 'Failed to update template' : 'Failed to create template'));
     }
   };
 
