@@ -14,16 +14,305 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      assignments: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["service_role"]
+          service_id: string
+          updated_at: string
+          volunteer_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["service_role"]
+          service_id: string
+          updated_at?: string
+          volunteer_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["service_role"]
+          service_id?: string
+          updated_at?: string
+          volunteer_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assignments_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "sunday_services"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      availability: {
+        Row: {
+          available: boolean
+          created_at: string
+          date: string
+          id: string
+          notes: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          available?: boolean
+          created_at?: string
+          date: string
+          id?: string
+          notes?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          available?: boolean
+          created_at?: string
+          date?: string
+          id?: string
+          notes?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      family_groups: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          active: boolean
+          created_at: string
+          email: string
+          family_group_id: string | null
+          id: string
+          name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          email: string
+          family_group_id?: string | null
+          id?: string
+          name: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          email?: string
+          family_group_id?: string | null
+          id?: string
+          name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_profiles_family_group"
+            columns: ["family_group_id"]
+            isOneToOne: false
+            referencedRelation: "family_groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      role_preferences: {
+        Row: {
+          created_at: string
+          id: string
+          preference_order: number
+          role: Database["public"]["Enums"]["service_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          preference_order?: number
+          role: Database["public"]["Enums"]["service_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          preference_order?: number
+          role?: Database["public"]["Enums"]["service_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
+      service_history: {
+        Row: {
+          created_at: string
+          date: string
+          id: string
+          role: Database["public"]["Enums"]["service_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          date: string
+          id?: string
+          role: Database["public"]["Enums"]["service_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          date?: string
+          id?: string
+          role?: Database["public"]["Enums"]["service_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
+      sunday_services: {
+        Row: {
+          created_at: string
+          date: string
+          id: string
+          notes: string | null
+          status: Database["public"]["Enums"]["schedule_status"]
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          date: string
+          id?: string
+          notes?: string | null
+          status?: Database["public"]["Enums"]["schedule_status"]
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          date?: string
+          id?: string
+          notes?: string | null
+          status?: Database["public"]["Enums"]["schedule_status"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      swap_requests: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          assignment_id: string
+          created_at: string
+          from_user_id: string
+          id: string
+          notes: string | null
+          status: Database["public"]["Enums"]["swap_status"]
+          to_user_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          assignment_id: string
+          created_at?: string
+          from_user_id: string
+          id?: string
+          notes?: string | null
+          status?: Database["public"]["Enums"]["swap_status"]
+          to_user_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          assignment_id?: string
+          created_at?: string
+          from_user_id?: string
+          id?: string
+          notes?: string | null
+          status?: Database["public"]["Enums"]["swap_status"]
+          to_user_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "swap_requests_assignment_id_fkey"
+            columns: ["assignment_id"]
+            isOneToOne: false
+            referencedRelation: "assignments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      is_admin: { Args: { _user_id: string }; Returns: boolean }
+      is_same_family: {
+        Args: { _user_id1: string; _user_id2: string }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "volunteer" | "admin"
+      schedule_status: "draft" | "published"
+      service_role:
+        | "sidesman-standard"
+        | "sidesman-sound"
+        | "sidesman-welcome"
+        | "reader"
+        | "intercessions"
+        | "collection"
+      swap_status: "pending" | "approved" | "denied"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +439,18 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["volunteer", "admin"],
+      schedule_status: ["draft", "published"],
+      service_role: [
+        "sidesman-standard",
+        "sidesman-sound",
+        "sidesman-welcome",
+        "reader",
+        "intercessions",
+        "collection",
+      ],
+      swap_status: ["pending", "approved", "denied"],
+    },
   },
 } as const
