@@ -29,9 +29,8 @@ const volunteerNav = [
 
 const adminNav = [
   { to: '/admin', icon: LayoutDashboard, label: 'Admin Dashboard' },
+  { to: '/admin/schedule', icon: CalendarDays, label: 'Schedule' },
   { to: '/admin/volunteers', icon: Users, label: 'Volunteers' },
-  { to: '/admin/templates', icon: CalendarDays, label: 'Event Templates' },
-  { to: '/admin/scheduler', icon: CalendarCheck, label: 'Event Scheduler' },
 ];
 
 function NavItem({ to, icon: Icon, label, onClick }: { to: string; icon: typeof Home; label: string; onClick?: () => void }) {

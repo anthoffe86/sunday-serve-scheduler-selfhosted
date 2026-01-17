@@ -2,7 +2,8 @@ import { useEffect } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, Loader2 } from 'lucide-react';
+import { format, addMonths, addWeeks, getDay, nextDay, parseISO, isAfter } from 'date-fns';
 import {
   Dialog,
   DialogContent,
@@ -32,13 +33,16 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { 
-  useCreateEventTemplate, 
-  useUpdateEventTemplate,
+  useCreateEventTemplate,
   DAYS_OF_WEEK,
-  EventTemplateWithRoles
 } from '@/hooks/useEventScheduler';
+import { supabase } from '@/integrations/supabase/client';
+import { useQueryClient } from '@tanstack/react-query';
 import { ROLE_LABELS, Role } from '@/types';
 import { toast } from 'sonner';
+import type { Database } from '@/integrations/supabase/types';
+
+type ServiceRole = Database['public']['Enums']['service_role'];
 
 const formSchema = z.object({
   name: z.string().min(1, 'Name is required'),
@@ -46,10 +50,9 @@ const formSchema = z.object({
   day_of_week: z.number().min(0).max(6),
   start_time: z.string().min(1, 'Start time is required'),
   is_recurring: z.boolean(),
-  recurrence_end_type: z.enum(['indefinite', 'date', 'count']).nullable(),
-  recurrence_end_date: z.string().nullable(),
-  recurrence_count: z.number().nullable(),
-  active: z.boolean(),
+  recurrence_end_type: z.enum(['indefinite', 'date', 'count']),
+  recurrence_end_date: z.string().optional(),
+  recurrence_count: z.number().min(1).max(104).optional(),
   roles: z.array(z.object({
     role: z.string().min(1, 'Role is required'),
     quantity: z.number().min(1, 'Quantity must be at least 1'),
@@ -58,16 +61,14 @@ const formSchema = z.object({
 
 type FormData = z.infer<typeof formSchema>;
 
-interface EventTemplateDialogProps {
+interface CreateEventDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  template?: EventTemplateWithRoles | null;
 }
 
-export function EventTemplateDialog({ open, onOpenChange, template }: EventTemplateDialogProps) {
+export function CreateEventDialog({ open, onOpenChange }: CreateEventDialogProps) {
   const createTemplate = useCreateEventTemplate();
-  const updateTemplate = useUpdateEventTemplate();
-  const isEditing = !!template;
+  const queryClient = useQueryClient();
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -77,10 +78,9 @@ export function EventTemplateDialog({ open, onOpenChange, template }: EventTempl
       day_of_week: 0,
       start_time: '10:00',
       is_recurring: true,
-      recurrence_end_type: 'indefinite',
-      recurrence_end_date: null,
-      recurrence_count: null,
-      active: true,
+      recurrence_end_type: 'count',
+      recurrence_end_date: format(addMonths(new Date(), 3), 'yyyy-MM-dd'),
+      recurrence_count: 12,
       roles: [],
     },
   });
@@ -94,37 +94,56 @@ export function EventTemplateDialog({ open, onOpenChange, template }: EventTempl
   const recurrenceEndType = form.watch('recurrence_end_type');
 
   useEffect(() => {
-    if (template) {
-      form.reset({
-        name: template.name,
-        description: template.description || '',
-        day_of_week: template.day_of_week,
-        start_time: template.start_time,
-        is_recurring: template.is_recurring,
-        recurrence_end_type: template.recurrence_end_type,
-        recurrence_end_date: template.recurrence_end_date,
-        recurrence_count: template.recurrence_count,
-        active: template.active,
-        roles: template.roles.map(r => ({ role: r.role, quantity: r.quantity })),
-      });
-    } else {
+    if (open) {
       form.reset({
         name: '',
         description: '',
         day_of_week: 0,
         start_time: '10:00',
         is_recurring: true,
-        recurrence_end_type: 'indefinite',
-        recurrence_end_date: null,
-        recurrence_count: null,
-        active: true,
+        recurrence_end_type: 'count',
+        recurrence_end_date: format(addMonths(new Date(), 3), 'yyyy-MM-dd'),
+        recurrence_count: 12,
         roles: [],
       });
     }
-  }, [template, form]);
+  }, [open, form]);
+
+  const generateEventDates = (
+    dayOfWeek: number,
+    startDate: Date,
+    endType: 'indefinite' | 'date' | 'count',
+    endDate?: string,
+    count?: number
+  ): string[] => {
+    const dates: string[] = [];
+    let currentDate = startDate;
+    
+    // Find next occurrence of the target day
+    if (getDay(currentDate) !== dayOfWeek) {
+      currentDate = nextDay(currentDate, dayOfWeek as 0 | 1 | 2 | 3 | 4 | 5 | 6);
+    }
+
+    const maxDate = endType === 'date' && endDate 
+      ? parseISO(endDate) 
+      : addMonths(currentDate, 24); // 2 year max for indefinite
+    
+    const maxCount = endType === 'count' && count 
+      ? count 
+      : endType === 'indefinite' 
+        ? 52 // 1 year for indefinite
+        : 104;
+
+    while (dates.length < maxCount && !isAfter(currentDate, maxDate)) {
+      dates.push(format(currentDate, 'yyyy-MM-dd'));
+      currentDate = addWeeks(currentDate, 1);
+    }
+
+    return dates;
+  };
 
   const onSubmit = async (data: FormData) => {
-    // Merge duplicate roles (DB has UNIQUE(template_id, role))
+    // Merge duplicate roles
     const mergedRolesMap = new Map<string, number>();
     for (const r of data.roles) {
       if (!r.role) continue;
@@ -135,60 +154,84 @@ export function EventTemplateDialog({ open, onOpenChange, template }: EventTempl
     const roles = Array.from(mergedRolesMap.entries()).map(([role, quantity]) => ({ role, quantity }));
 
     try {
-      if (isEditing && template) {
-        await updateTemplate.mutateAsync({
-          id: template.id,
-          name: data.name,
-          description: data.description || undefined,
-          day_of_week: data.day_of_week,
-          start_time: data.start_time,
-          is_recurring: data.is_recurring,
-          active: data.active,
-          recurrence_end_type: data.is_recurring ? data.recurrence_end_type : null,
-          recurrence_end_date: data.recurrence_end_type === 'date' ? data.recurrence_end_date : null,
-          recurrence_count: data.recurrence_end_type === 'count' ? data.recurrence_count : null,
-          roles,
-        });
-        toast.success('Event template updated');
-      } else {
-        await createTemplate.mutateAsync({
-          name: data.name,
-          description: data.description || undefined,
-          day_of_week: data.day_of_week,
-          start_time: data.start_time,
-          is_recurring: data.is_recurring,
-          recurrence_end_type: data.is_recurring ? data.recurrence_end_type || undefined : undefined,
-          recurrence_end_date: data.recurrence_end_type === 'date' ? data.recurrence_end_date || undefined : undefined,
-          recurrence_count: data.recurrence_end_type === 'count' ? data.recurrence_count || undefined : undefined,
-          roles,
-        });
-        toast.success('Event template created');
+      // 1. Create the template
+      const template = await createTemplate.mutateAsync({
+        name: data.name,
+        description: data.description || undefined,
+        day_of_week: data.day_of_week,
+        start_time: data.start_time,
+        is_recurring: data.is_recurring,
+        recurrence_end_type: data.is_recurring ? data.recurrence_end_type : undefined,
+        recurrence_end_date: data.recurrence_end_type === 'date' ? data.recurrence_end_date : undefined,
+        recurrence_count: data.recurrence_end_type === 'count' ? data.recurrence_count : undefined,
+        roles,
+      });
+
+      // 2. Generate event dates
+      const dates = data.is_recurring
+        ? generateEventDates(
+            data.day_of_week,
+            new Date(),
+            data.recurrence_end_type,
+            data.recurrence_end_date,
+            data.recurrence_count
+          )
+        : [format(nextDay(new Date(), data.day_of_week as 0 | 1 | 2 | 3 | 4 | 5 | 6), 'yyyy-MM-dd')];
+
+      // 3. Create events
+      const eventsToCreate = dates.map(date => ({
+        template_id: template.id,
+        name: data.name,
+        date,
+        start_time: data.start_time,
+        status: 'draft' as const,
+      }));
+
+      const { data: createdEvents, error: eventsError } = await supabase
+        .from('events')
+        .insert(eventsToCreate)
+        .select();
+
+      if (eventsError) throw eventsError;
+
+      // 4. Create event roles for each event
+      if (roles.length > 0 && createdEvents) {
+        const eventRolesToCreate = createdEvents.flatMap(event =>
+          roles.map(role => ({
+            event_id: event.id,
+            role: role.role as ServiceRole,
+            quantity: role.quantity,
+          }))
+        );
+
+        const { error: rolesError } = await supabase
+          .from('event_roles')
+          .insert(eventRolesToCreate);
+
+        if (rolesError) throw rolesError;
       }
+
+      // Invalidate queries
+      queryClient.invalidateQueries({ queryKey: ['events'] });
+
+      toast.success(`Created ${createdEvents?.length || 0} event${(createdEvents?.length || 0) !== 1 ? 's' : ''}`);
       onOpenChange(false);
     } catch (err: any) {
-      // Surface helpful error details
-      if (err?.code === '23505') {
-        toast.error('Duplicate role selected. Please choose each role once (or increase quantity).');
-        return;
-      }
-      toast.error(err?.message || (isEditing ? 'Failed to update template' : 'Failed to create template'));
+      console.error('Create event error:', err);
+      toast.error(err?.message || 'Failed to create event');
     }
   };
 
   const availableRoles = Object.entries(ROLE_LABELS) as [Role, string][];
+  const isPending = createTemplate.isPending || form.formState.isSubmitting;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="font-serif">
-            {isEditing ? 'Edit Event Template' : 'Create Event Template'}
-          </DialogTitle>
+          <DialogTitle className="font-serif">Create Event</DialogTitle>
           <DialogDescription>
-            {isEditing 
-              ? 'Update the event template settings and volunteer requirements.'
-              : 'Create a new event template to schedule recurring or one-off services.'
-            }
+            Create a new event. For recurring events, all instances will be automatically generated.
           </DialogDescription>
         </DialogHeader>
 
@@ -216,7 +259,7 @@ export function EventTemplateDialog({ open, onOpenChange, template }: EventTempl
                   <FormLabel>Description (Optional)</FormLabel>
                   <FormControl>
                     <Textarea 
-                      placeholder="Add any additional notes about this event..."
+                      placeholder="Add any additional notes..."
                       {...field}
                     />
                   </FormControl>
@@ -278,7 +321,7 @@ export function EventTemplateDialog({ open, onOpenChange, template }: EventTempl
                     <div>
                       <FormLabel>Recurring Event</FormLabel>
                       <FormDescription>
-                        Enable to create multiple events on a weekly schedule
+                        Create multiple events on a weekly schedule
                       </FormDescription>
                     </div>
                     <FormControl>
@@ -299,19 +342,16 @@ export function EventTemplateDialog({ open, onOpenChange, template }: EventTempl
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Recurrence End</FormLabel>
-                        <Select
-                          value={field.value || 'indefinite'}
-                          onValueChange={field.onChange}
-                        >
+                        <Select value={field.value} onValueChange={field.onChange}>
                           <FormControl>
                             <SelectTrigger>
                               <SelectValue />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            <SelectItem value="indefinite">Indefinite (no end date)</SelectItem>
+                            <SelectItem value="indefinite">Indefinite (1 year)</SelectItem>
                             <SelectItem value="date">Until specific date</SelectItem>
-                            <SelectItem value="count">After number of events</SelectItem>
+                            <SelectItem value="count">Number of events</SelectItem>
                           </SelectContent>
                         </Select>
                         <FormMessage />
@@ -327,11 +367,7 @@ export function EventTemplateDialog({ open, onOpenChange, template }: EventTempl
                         <FormItem>
                           <FormLabel>End Date</FormLabel>
                           <FormControl>
-                            <Input 
-                              type="date" 
-                              value={field.value || ''} 
-                              onChange={(e) => field.onChange(e.target.value || null)}
-                            />
+                            <Input type="date" {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -350,10 +386,14 @@ export function EventTemplateDialog({ open, onOpenChange, template }: EventTempl
                             <Input 
                               type="number" 
                               min={1}
-                              value={field.value || ''} 
-                              onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value, 10) : null)}
+                              max={104}
+                              {...field}
+                              onChange={(e) => field.onChange(parseInt(e.target.value, 10) || 1)}
                             />
                           </FormControl>
+                          <FormDescription>
+                            Maximum 104 events (2 years weekly)
+                          </FormDescription>
                           <FormMessage />
                         </FormItem>
                       )}
@@ -366,9 +406,9 @@ export function EventTemplateDialog({ open, onOpenChange, template }: EventTempl
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <h4 className="font-medium">Volunteer Requirements</h4>
+                  <h4 className="font-medium">Volunteer Roles</h4>
                   <p className="text-sm text-muted-foreground">
-                    Define the roles and quantities needed for this event
+                    Define the roles needed for this event
                   </p>
                 </div>
                 <Button
@@ -385,7 +425,7 @@ export function EventTemplateDialog({ open, onOpenChange, template }: EventTempl
 
               {fields.length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-4 border rounded-lg">
-                  No roles defined. Add roles to specify volunteer requirements.
+                  No roles defined yet.
                 </p>
               ) : (
                 <div className="space-y-3">
@@ -450,41 +490,13 @@ export function EventTemplateDialog({ open, onOpenChange, template }: EventTempl
               )}
             </div>
 
-            {isEditing && (
-              <FormField
-                control={form.control}
-                name="active"
-                render={({ field }) => (
-                  <FormItem className="flex items-center justify-between rounded-lg border p-4">
-                    <div>
-                      <FormLabel>Active</FormLabel>
-                      <FormDescription>
-                        Inactive templates won't be shown when generating events
-                      </FormDescription>
-                    </div>
-                    <FormControl>
-                      <Switch
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                      />
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
-            )}
-
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                 Cancel
               </Button>
-              <Button 
-                type="submit" 
-                disabled={createTemplate.isPending || updateTemplate.isPending}
-              >
-                {(createTemplate.isPending || updateTemplate.isPending) && (
-                  <span className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                )}
-                {isEditing ? 'Save Changes' : 'Create Template'}
+              <Button type="submit" disabled={isPending}>
+                {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Create Event
               </Button>
             </DialogFooter>
           </form>
