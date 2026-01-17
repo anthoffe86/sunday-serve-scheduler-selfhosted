@@ -1,29 +1,45 @@
 import { useState } from 'react';
-import { Save, User, Heart } from 'lucide-react';
+import { Save, User, Heart, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Checkbox } from '@/components/ui/checkbox';
-import { currentUser } from '@/data/mockData';
-import { Role, ROLE_LABELS, ROLES_PER_SUNDAY } from '@/types';
-import { toast } from 'sonner';
-import { cn } from '@/lib/utils';
+import { useAuth } from '@/hooks/useAuth';
+import { useProfile, useUpdateProfile, useRolePreferences, useUpdateRolePreferences } from '@/hooks/useVolunteerData';
+import { ROLE_LABELS, ROLES_PER_SUNDAY } from '@/types';
+import type { Database } from '@/integrations/supabase/types';
+
+type ServiceRole = Database['public']['Enums']['service_role'];
 
 const Profile = () => {
-  const [name, setName] = useState(currentUser.name);
-  const [email, setEmail] = useState(currentUser.email);
-  const [preferences, setPreferences] = useState<Role[]>(currentUser.rolePreferences);
+  const { user } = useAuth();
+  const { data: profile, isLoading: profileLoading } = useProfile();
+  const { data: rolePreferences, isLoading: prefsLoading } = useRolePreferences();
+  const updateProfile = useUpdateProfile();
+  const updatePreferences = useUpdateRolePreferences();
 
-  const allRoles: Role[] = [...new Set(ROLES_PER_SUNDAY.map((r) => r.role))];
+  const [name, setName] = useState('');
+  const [preferences, setPreferences] = useState<ServiceRole[]>([]);
+  const [initialized, setInitialized] = useState(false);
 
-  const toggleRole = (role: Role) => {
+  // Initialize form state when data loads
+  if (profile && !initialized) {
+    setName(profile.name);
+    if (rolePreferences) {
+      setPreferences(rolePreferences.map(p => p.role));
+    }
+    setInitialized(true);
+  }
+
+  const allRoles: ServiceRole[] = [...new Set(ROLES_PER_SUNDAY.map((r) => r.role))] as ServiceRole[];
+
+  const toggleRole = (role: ServiceRole) => {
     setPreferences((prev) =>
       prev.includes(role) ? prev.filter((r) => r !== role) : [...prev, role]
     );
   };
 
-  const moveRole = (role: Role, direction: 'up' | 'down') => {
+  const moveRole = (role: ServiceRole, direction: 'up' | 'down') => {
     const index = preferences.indexOf(role);
     if (index === -1) return;
     
@@ -35,9 +51,31 @@ const Profile = () => {
     setPreferences(newPrefs);
   };
 
-  const handleSave = () => {
-    toast.success('Profile saved successfully!');
+  const handleSave = async () => {
+    // Update profile name
+    if (name !== profile?.name) {
+      await updateProfile.mutateAsync({ name });
+    }
+    
+    // Update role preferences
+    await updatePreferences.mutateAsync(
+      preferences.map((role, index) => ({
+        role,
+        preference_order: index + 1,
+      }))
+    );
   };
+
+  const isLoading = profileLoading || prefsLoading;
+  const isSaving = updateProfile.isPending || updatePreferences.isPending;
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -74,9 +112,13 @@ const Profile = () => {
               <Input
                 id="email"
                 type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                value={user?.email || ''}
+                disabled
+                className="bg-muted"
               />
+              <p className="text-xs text-muted-foreground">
+                Email cannot be changed here
+              </p>
             </div>
           </CardContent>
         </Card>
@@ -97,7 +139,7 @@ const Profile = () => {
             {preferences.length > 0 && (
               <div className="space-y-2">
                 <p className="text-sm font-medium text-muted-foreground">
-                  Your preferences (drag to reorder):
+                  Your preferences (ordered):
                 </p>
                 <div className="space-y-2">
                   {preferences.map((role, index) => (
@@ -110,7 +152,7 @@ const Profile = () => {
                           {index + 1}
                         </span>
                         <span className="text-sm font-medium">
-                          {ROLE_LABELS[role]}
+                          {ROLE_LABELS[role as keyof typeof ROLE_LABELS]}
                         </span>
                       </div>
                       <div className="flex gap-1">
@@ -162,7 +204,7 @@ const Profile = () => {
                       className="flex items-center gap-2 rounded-lg border border-dashed px-3 py-2 text-left text-sm transition-colors hover:border-primary hover:bg-primary/5"
                     >
                       <span className="text-muted-foreground">+</span>
-                      {ROLE_LABELS[role]}
+                      {ROLE_LABELS[role as keyof typeof ROLE_LABELS]}
                     </button>
                   ))}
               </div>
@@ -173,9 +215,18 @@ const Profile = () => {
 
       {/* Save Button */}
       <div className="flex justify-end">
-        <Button onClick={handleSave} className="gap-2">
-          <Save className="h-4 w-4" />
-          Save Changes
+        <Button onClick={handleSave} disabled={isSaving} className="gap-2">
+          {isSaving ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Saving...
+            </>
+          ) : (
+            <>
+              <Save className="h-4 w-4" />
+              Save Changes
+            </>
+          )}
         </Button>
       </div>
     </div>

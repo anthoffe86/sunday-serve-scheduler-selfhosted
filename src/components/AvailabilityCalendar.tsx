@@ -1,46 +1,79 @@
 import { useState } from 'react';
 import { format, parseISO, isSameMonth, startOfMonth, addMonths, subMonths } from 'date-fns';
-import { ChevronLeft, ChevronRight, Check, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Check, X, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { upcomingSundays, mockSchedule, mockAvailability } from '@/data/mockData';
-import { currentUser } from '@/data/mockData';
+import { useAuth } from '@/hooks/useAuth';
+import { useAvailability, useToggleAvailability, useScheduleWithAssignments } from '@/hooks/useVolunteerData';
 import { toast } from 'sonner';
 
+// Generate upcoming Sundays
+const getUpcomingSundays = (count: number): string[] => {
+  const sundays: string[] = [];
+  const today = new Date();
+  let date = new Date(today);
+  
+  const dayOfWeek = date.getDay();
+  const daysUntilSunday = dayOfWeek === 0 ? 0 : 7 - dayOfWeek;
+  date.setDate(date.getDate() + daysUntilSunday);
+  
+  for (let i = 0; i < count; i++) {
+    sundays.push(date.toISOString().split('T')[0]);
+    date.setDate(date.getDate() + 7);
+  }
+  
+  return sundays;
+};
+
+const upcomingSundays = getUpcomingSundays(16);
+
 export function AvailabilityCalendar() {
+  const { user } = useAuth();
   const [currentMonth, setCurrentMonth] = useState(new Date());
-  const [availability, setAvailability] = useState<Record<string, boolean>>(() => {
-    const initial: Record<string, boolean> = {};
-    mockAvailability
-      .filter((a) => a.volunteerId === currentUser.id)
-      .forEach((a) => {
-        initial[a.date] = a.available;
-      });
-    return initial;
-  });
+  const { data: availability, isLoading: availabilityLoading } = useAvailability();
+  const { data: schedule } = useScheduleWithAssignments();
+  const toggleAvailability = useToggleAvailability();
 
   const sundaysInView = upcomingSundays.filter((date) =>
     isSameMonth(parseISO(date), currentMonth)
   );
 
   const getAssignment = (date: string) => {
-    const service = mockSchedule.find((s) => s.date === date);
-    return service?.assignments.find((a) => a.volunteerId === currentUser.id);
+    const service = schedule?.find((s) => s.date === date);
+    return service?.assignments.find((a) => a.volunteer_id === user?.id);
   };
 
-  const toggleAvailability = (date: string) => {
-    const newAvailable = availability[date] === false ? true : false;
-    setAvailability((prev) => ({ ...prev, [date]: newAvailable }));
+  const handleToggleAvailability = (date: string) => {
+    const currentAvailability = availability?.find(a => a.date === date);
+    const newAvailable = currentAvailability?.available === false ? true : false;
     
-    toast.success(
-      newAvailable 
-        ? 'Marked as available' 
-        : 'Marked as unavailable',
-      { duration: 2000 }
+    toggleAvailability.mutate(
+      { date, available: newAvailable },
+      {
+        onSuccess: () => {
+          toast.success(
+            newAvailable 
+              ? 'Marked as available' 
+              : 'Marked as unavailable',
+            { duration: 2000 }
+          );
+        }
+      }
     );
   };
 
-  const isAvailable = (date: string) => availability[date] !== false;
+  const isAvailable = (date: string) => {
+    const record = availability?.find(a => a.date === date);
+    return record?.available !== false;
+  };
+
+  if (availabilityLoading) {
+    return (
+      <div className="flex items-center justify-center py-8">
+        <Loader2 className="h-6 w-6 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
@@ -123,7 +156,8 @@ export function AvailabilityCalendar() {
                     <Button
                       variant={available ? 'outline' : 'secondary'}
                       size="sm"
-                      onClick={() => toggleAvailability(date)}
+                      onClick={() => handleToggleAvailability(date)}
+                      disabled={toggleAvailability.isPending}
                       className={cn(
                         'gap-1.5',
                         available
