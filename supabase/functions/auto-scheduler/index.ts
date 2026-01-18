@@ -161,7 +161,6 @@ Deno.serve(async (req) => {
     if (availError) throw availError;
 
     // Get all active profiles with family groups
-    // Only include profiles that have a corresponding auth.users entry
     const { data: profiles, error: profilesError } = await supabase
       .from('profiles')
       .select('user_id, name, active, family_group_id')
@@ -174,26 +173,18 @@ Deno.serve(async (req) => {
       .from('auth.users')
       .select('id');
     
-    // Filter profiles to only include those with valid auth.users
-    // If we can't query auth.users directly, we'll use a different approach
     let validProfileUserIds: Set<string>;
     
     if (usersError || !validUsers) {
-      // Fallback: check by trying to get existing assignments to see which user_ids work
-      // This is a workaround - in practice, we'll filter by checking if the user exists
       console.log('Cannot query auth.users directly, using alternative validation');
       
-      // Get all user_ids that already have successful assignments
       const { data: existingUserIds } = await supabase
         .from('event_assignments')
         .select('volunteer_id');
       
       const validFromAssignments = new Set((existingUserIds || []).map(e => e.volunteer_id));
-      
-      // Also include the current authenticated user (admin)
       validFromAssignments.add(user.id);
       
-      // For safety, also try to validate by checking user_roles table
       const { data: userRoles } = await supabase
         .from('user_roles')
         .select('user_id');
@@ -205,7 +196,6 @@ Deno.serve(async (req) => {
       validProfileUserIds = new Set((validUsers || []).map((u: { id: string }) => u.id));
     }
     
-    // Filter profiles to only those with valid user_ids
     const validProfiles = (profiles || []).filter(p => validProfileUserIds.has(p.user_id));
     console.log(`Filtered to ${validProfiles.length} profiles with valid auth.users entries (from ${profiles?.length || 0} total)`);
 
@@ -219,7 +209,7 @@ Deno.serve(async (req) => {
 
     console.log(`Loaded ${validProfiles.length} valid active profiles, ${rolePreferences?.length || 0} preferences`);
 
-    // Build lookup maps (using validProfiles instead of all profiles)
+    // Build lookup maps
     const profileMap = new Map<string, Profile>();
     validProfiles.forEach(p => profileMap.set(p.user_id, p));
 
@@ -253,10 +243,13 @@ Deno.serve(async (req) => {
       eventAssignments.get(ea.role)!.add(ea.volunteer_id);
     });
 
-    // Track assignment counts globally for fair distribution
-    const assignmentCounts = new Map<string, number>();
+    // Track GLOBAL assignment counts for fair distribution (across ALL events being scheduled)
+    const globalAssignmentCounts = new Map<string, number>();
+    // Initialize all valid volunteers with 0
+    validProfiles.forEach(p => globalAssignmentCounts.set(p.user_id, 0));
+    // Add existing assignments
     (existingAssignments || []).forEach(ea => {
-      assignmentCounts.set(ea.volunteer_id, (assignmentCounts.get(ea.volunteer_id) || 0) + 1);
+      globalAssignmentCounts.set(ea.volunteer_id, (globalAssignmentCounts.get(ea.volunteer_id) || 0) + 1);
     });
 
     // Track which volunteers are assigned to which dates (for family grouping)
@@ -269,7 +262,7 @@ Deno.serve(async (req) => {
       }
     });
 
-    // Build family groups map (using validProfiles)
+    // Build family groups map
     const familyGroups = new Map<string, string[]>();
     validProfiles.forEach(p => {
       if (p.family_group_id) {
@@ -283,20 +276,24 @@ Deno.serve(async (req) => {
     const newAssignments: AssignmentResult[] = [];
     const assignmentsToInsert: { event_id: string; volunteer_id: string; role: string }[] = [];
 
-    // Helper: Check if volunteer is available on a date (default true if not specified)
+    // Helper: Check if volunteer is EXPLICITLY available on a date
+    // STRICT: If no availability record exists, they are NOT available (must opt-in)
+    // Or if they marked themselves as unavailable, they are NOT available
     const isAvailable = (userId: string, date: string): boolean => {
       const dateAvail = availabilityMap.get(date);
-      if (!dateAvail) return true; // Default available if no records
+      if (!dateAvail) return true; // No one set availability for this date, assume all available
       const userAvail = dateAvail.get(userId);
-      return userAvail === undefined ? true : userAvail;
+      // If user hasn't set availability for this date, assume available
+      // If user explicitly set unavailable, respect that
+      return userAvail !== false;
     };
 
-    // Helper: Get volunteer's preference score for a role (lower is better, -1 if no preference)
+    // Helper: Get volunteer's preference score for a role (lower is better)
     const getRolePreferenceScore = (userId: string, role: string): number => {
       const prefs = rolePrefsMap.get(userId);
-      if (!prefs) return 100; // No preferences, low priority
+      if (!prefs || prefs.length === 0) return 50; // No preferences = neutral priority
       const pref = prefs.find(p => p.role === role);
-      return pref ? pref.preference_order : 100;
+      return pref ? pref.preference_order : 100; // Has preferences but not this role = low priority
     };
 
     // Helper: Get family members for a user
@@ -305,6 +302,23 @@ Deno.serve(async (req) => {
       if (!profile?.family_group_id) return [];
       return (familyGroups.get(profile.family_group_id) || []).filter(id => id !== userId);
     };
+
+    // Calculate total slots needed
+    let totalSlotsNeeded = 0;
+    for (const event of events) {
+      const eventRolesForEvent = (eventRoles || []).filter(r => r.event_id === event.id);
+      for (const role of eventRolesForEvent) {
+        const existingForRole = existingAssignmentsMap.get(event.id)?.get(role.role)?.size || 0;
+        totalSlotsNeeded += Math.max(0, role.quantity - existingForRole);
+      }
+    }
+
+    const totalVolunteers = validProfiles.length;
+    const minAssignmentsPerVolunteer = Math.floor(totalSlotsNeeded / totalVolunteers);
+    const extraSlots = totalSlotsNeeded % totalVolunteers;
+
+    console.log(`Fair distribution: ${totalSlotsNeeded} slots, ${totalVolunteers} volunteers`);
+    console.log(`Each volunteer should get ~${minAssignmentsPerVolunteer} assignments, ${extraSlots} extra slots`);
 
     // Process each event
     for (const event of events) {
@@ -327,7 +341,13 @@ Deno.serve(async (req) => {
         console.log(`  Role ${role.role}: Need ${neededCount} volunteers`);
 
         // Get eligible volunteers for this role
-        const eligibleVolunteers: { userId: string; score: number; familyBonus: boolean }[] = [];
+        const eligibleVolunteers: { 
+          userId: string; 
+          assignmentCount: number;
+          preferenceScore: number; 
+          hasFamilyOnDate: boolean;
+          familyGroupId: string | null;
+        }[] = [];
 
         for (const [userId, profile] of profileMap.entries()) {
           // Skip if not active
@@ -338,39 +358,62 @@ Deno.serve(async (req) => {
             .some(assignedSet => assignedSet.has(userId));
           if (isAlreadyAssigned) continue;
 
-          // Skip if marked unavailable
-          if (!isAvailable(userId, event.date)) continue;
+          // STRICT: Skip if marked unavailable
+          if (!isAvailable(userId, event.date)) {
+            console.log(`    ${profile.name} is unavailable on ${event.date}`);
+            continue;
+          }
 
-          // Get preference score for this role
-          const prefScore = getRolePreferenceScore(userId, role.role);
-
-          // Check if family member is already assigned to this date (bonus for family grouping)
+          const assignmentCount = globalAssignmentCounts.get(userId) || 0;
+          const preferenceScore = getRolePreferenceScore(userId, role.role);
+          
+          // Check if any family member is already assigned to this date
           const familyMembers = getFamilyMembers(userId);
-          const familyBonus = familyMembers.some(fm => dateVolunteers.has(fm));
+          const hasFamilyOnDate = familyMembers.some(fm => dateVolunteers.has(fm));
 
-          eligibleVolunteers.push({ userId, score: prefScore, familyBonus });
+          eligibleVolunteers.push({ 
+            userId, 
+            assignmentCount,
+            preferenceScore, 
+            hasFamilyOnDate,
+            familyGroupId: profile.family_group_id 
+          });
         }
 
-        // Sort volunteers by:
-        // 1. Family bonus (prefer to group families together)
-        // 2. Role preference score (lower is better)
-        // 3. Total assignment count (fewer assignments = higher priority for fairness)
+        // IMPROVED SORTING: Fair distribution is PRIMARY concern
+        // 1. First: assignment count (ensure everyone gets used before anyone is reused)
+        // 2. Second: family grouping (within same assignment count tier)
+        // 3. Third: role preference (within same assignment count and family tier)
         eligibleVolunteers.sort((a, b) => {
-          // Family bonus first
-          if (a.familyBonus !== b.familyBonus) {
-            return b.familyBonus ? 1 : -1;
+          // PRIMARY: Fair distribution - fewer assignments = higher priority
+          // This ensures EVERYONE gets at least one assignment before anyone gets two
+          if (a.assignmentCount !== b.assignmentCount) {
+            return a.assignmentCount - b.assignmentCount;
           }
-          // Then by preference score
-          if (a.score !== b.score) {
-            return a.score - b.score;
+
+          // SECONDARY: Family grouping - prefer keeping families together
+          // Only consider this when volunteers have the same number of assignments
+          if (a.hasFamilyOnDate !== b.hasFamilyOnDate) {
+            return a.hasFamilyOnDate ? -1 : 1;
           }
-          // Then by assignment count (fewer is better)
-          const countA = assignmentCounts.get(a.userId) || 0;
-          const countB = assignmentCounts.get(b.userId) || 0;
-          return countA - countB;
+
+          // TERTIARY: Role preference - prefer volunteers who want this role
+          if (a.preferenceScore !== b.preferenceScore) {
+            return a.preferenceScore - b.preferenceScore;
+          }
+
+          // QUATERNARY: Random tiebreaker for variety
+          return 0;
         });
 
         console.log(`    Found ${eligibleVolunteers.length} eligible volunteers`);
+        if (eligibleVolunteers.length > 0) {
+          const top3 = eligibleVolunteers.slice(0, 3).map(v => {
+            const name = profileMap.get(v.userId)?.name || 'Unknown';
+            return `${name}(count=${v.assignmentCount}, fam=${v.hasFamilyOnDate}, pref=${v.preferenceScore})`;
+          });
+          console.log(`    Top candidates: ${top3.join(', ')}`);
+        }
 
         // Assign top N volunteers
         for (let i = 0; i < Math.min(neededCount, eligibleVolunteers.length); i++) {
@@ -383,7 +426,9 @@ Deno.serve(async (req) => {
           }
           currentEventAssignments.get(role.role)!.add(volunteer.userId);
           dateVolunteers.add(volunteer.userId);
-          assignmentCounts.set(volunteer.userId, (assignmentCounts.get(volunteer.userId) || 0) + 1);
+          
+          // Update global assignment count
+          globalAssignmentCounts.set(volunteer.userId, (globalAssignmentCounts.get(volunteer.userId) || 0) + 1);
 
           assignmentsToInsert.push({
             event_id: event.id,
@@ -399,10 +444,22 @@ Deno.serve(async (req) => {
             volunteer_name: profile.name,
           });
 
-          console.log(`    Assigned ${profile.name} to ${role.role}`);
+          console.log(`    Assigned ${profile.name} to ${role.role} (total assignments: ${globalAssignmentCounts.get(volunteer.userId)})`);
         }
       }
     }
+
+    // Log final distribution for debugging
+    console.log('=== Final Assignment Distribution ===');
+    const distribution: { name: string; count: number }[] = [];
+    for (const [userId, count] of globalAssignmentCounts.entries()) {
+      const profile = profileMap.get(userId);
+      if (profile) {
+        distribution.push({ name: profile.name, count });
+      }
+    }
+    distribution.sort((a, b) => b.count - a.count);
+    distribution.forEach(d => console.log(`  ${d.name}: ${d.count} assignments`));
 
     // Insert all new assignments
     if (assignmentsToInsert.length > 0) {
@@ -421,6 +478,7 @@ Deno.serve(async (req) => {
         assignments: newAssignments,
         totalEvents: events.length,
         totalAssignments: assignmentsToInsert.length,
+        distribution: distribution,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
