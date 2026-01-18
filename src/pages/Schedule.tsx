@@ -1,13 +1,129 @@
-import { format, parseISO } from 'date-fns';
-import { Calendar, List, Download, Loader2 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { ScheduleTable } from '@/components/ScheduleTable';
-import { useScheduleWithAssignments } from '@/hooks/useVolunteerData';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useState, useMemo } from 'react';
+import { 
+  Calendar as CalendarIcon,
+  Clock,
+  Users,
+  Loader2,
+  List,
+  LayoutGrid,
+  ChevronLeft,
+  ChevronRight,
+  Star,
+} from 'lucide-react';
+import { 
+  format, 
+  parseISO, 
+  startOfMonth, 
+  endOfMonth, 
+  addMonths, 
+  subMonths,
+  eachDayOfInterval,
+  startOfWeek,
+  endOfWeek,
+  isSameMonth,
+  isToday
+} from 'date-fns';
 import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { useAuth } from '@/hooks/useAuth';
+import { useEvents, EventWithDetails } from '@/hooks/useEventScheduler';
+import { cn } from '@/lib/utils';
+import { ROLE_LABELS } from '@/types';
+import {
+  ToggleGroup,
+  ToggleGroupItem,
+} from '@/components/ui/toggle-group';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Separator } from '@/components/ui/separator';
 
 const Schedule = () => {
-  const { data: schedule, isLoading } = useScheduleWithAssignments();
+  const { user } = useAuth();
+  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [viewMode, setViewMode] = useState<'calendar' | 'list'>('calendar');
+  const [selectedEvent, setSelectedEvent] = useState<EventWithDetails | null>(null);
+
+  // Fetch only published events
+  const startDate = format(subMonths(startOfMonth(currentMonth), 1), 'yyyy-MM-dd');
+  const endDate = format(addMonths(endOfMonth(currentMonth), 2), 'yyyy-MM-dd');
+
+  const { data: allEvents, isLoading } = useEvents({ startDate, endDate });
+
+  // Filter to only show published events for volunteers
+  const events = useMemo(() => {
+    if (!allEvents) return [];
+    return allEvents.filter(e => e.status === 'published');
+  }, [allEvents]);
+
+  // Check if user is assigned to an event
+  const isUserAssigned = (event: EventWithDetails) => {
+    return event.assignments.some(a => a.volunteer_id === user?.id);
+  };
+
+  // Get user's roles in an event
+  const getUserRoles = (event: EventWithDetails) => {
+    return event.assignments
+      .filter(a => a.volunteer_id === user?.id)
+      .map(a => ROLE_LABELS[a.role as keyof typeof ROLE_LABELS] || a.role);
+  };
+
+  // Calendar grid generation
+  const calendarDays = useMemo(() => {
+    const monthStart = startOfMonth(currentMonth);
+    const monthEnd = endOfMonth(currentMonth);
+    const calendarStart = startOfWeek(monthStart);
+    const calendarEnd = endOfWeek(monthEnd);
+    
+    return eachDayOfInterval({ start: calendarStart, end: calendarEnd });
+  }, [currentMonth]);
+
+  // Group events by date for calendar view
+  const eventsByDate = useMemo(() => {
+    const map = new Map<string, EventWithDetails[]>();
+    for (const event of events) {
+      const dateKey = event.date;
+      if (!map.has(dateKey)) {
+        map.set(dateKey, []);
+      }
+      map.get(dateKey)!.push(event);
+    }
+    return map;
+  }, [events]);
+
+  // Filter events for current month in list view
+  const currentMonthEvents = useMemo(() => {
+    const monthStart = startOfMonth(currentMonth);
+    const monthEnd = endOfMonth(currentMonth);
+    
+    return events.filter(event => {
+      const eventDate = parseISO(event.date);
+      return eventDate >= monthStart && eventDate <= monthEnd;
+    }).sort((a, b) => {
+      const dateCompare = a.date.localeCompare(b.date);
+      if (dateCompare !== 0) return dateCompare;
+      return a.start_time.localeCompare(b.start_time);
+    });
+  }, [events, currentMonth]);
+
+  const formatTime = (time: string) => {
+    const [hours, minutes] = time.split(':');
+    const hour = parseInt(hours, 10);
+    const ampm = hour >= 12 ? 'PM' : 'AM';
+    const displayHour = hour % 12 || 12;
+    return `${displayHour}:${minutes} ${ampm}`;
+  };
+
+  const getFilledCount = (event: EventWithDetails) => {
+    const totalRequired = event.roles.reduce((sum, r) => sum + r.quantity, 0);
+    const totalFilled = event.assignments.length;
+    return { filled: totalFilled, required: totalRequired };
+  };
 
   if (isLoading) {
     return (
@@ -17,98 +133,313 @@ const Schedule = () => {
     );
   }
 
-  const services = schedule || [];
-
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="font-serif text-3xl font-bold">Full Schedule</h1>
+          <h1 className="font-serif text-3xl font-bold">Schedule</h1>
           <p className="text-muted-foreground">
-            View all upcoming Sunday service assignments
+            View upcoming events and your assignments
           </p>
         </div>
-        <Button variant="outline" className="gap-2 self-start">
-          <Download className="h-4 w-4" />
-          Export Schedule
-        </Button>
       </div>
 
-      {services.length === 0 ? (
-        <Card className="border-dashed">
-          <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-            <Calendar className="mb-4 h-12 w-12 text-muted-foreground/50" />
-            <h3 className="mb-1 font-serif text-lg font-semibold">No Schedules Yet</h3>
-            <p className="text-sm text-muted-foreground">
-              Schedules will appear here once an admin generates them.
-            </p>
-          </CardContent>
-        </Card>
-      ) : (
-        <Tabs defaultValue="table" className="space-y-4">
-          <TabsList>
-            <TabsTrigger value="table" className="gap-2">
-              <List className="h-4 w-4" />
-              Table View
-            </TabsTrigger>
-            <TabsTrigger value="calendar" className="gap-2">
-              <Calendar className="h-4 w-4" />
-              Calendar View
-            </TabsTrigger>
-          </TabsList>
+      {/* Controls */}
+      <div className="flex flex-wrap items-center gap-4">
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => setCurrentMonth(prev => subMonths(prev, 1))}
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <span className="font-medium min-w-[160px] text-center">
+            {format(currentMonth, 'MMMM yyyy')}
+          </span>
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => setCurrentMonth(prev => addMonths(prev, 1))}
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
 
-          <TabsContent value="table" className="animate-fade-in">
-            <ScheduleTable services={services} />
-          </TabsContent>
+        <ToggleGroup 
+          type="single" 
+          value={viewMode} 
+          onValueChange={(v) => v && setViewMode(v as 'calendar' | 'list')}
+          className="ml-auto"
+        >
+          <ToggleGroupItem value="calendar" aria-label="Calendar view">
+            <LayoutGrid className="h-4 w-4" />
+          </ToggleGroupItem>
+          <ToggleGroupItem value="list" aria-label="List view">
+            <List className="h-4 w-4" />
+          </ToggleGroupItem>
+        </ToggleGroup>
+      </div>
 
-          <TabsContent value="calendar" className="animate-fade-in">
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {services.map((service) => {
-                const dateObj = parseISO(service.date);
+      {viewMode === 'calendar' ? (
+        /* Calendar View */
+        <Card>
+          <CardContent className="p-4">
+            {/* Day headers */}
+            <div className="grid grid-cols-7 gap-1 mb-2">
+              {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+                <div key={day} className="text-center text-sm font-medium text-muted-foreground py-2">
+                  {day}
+                </div>
+              ))}
+            </div>
+
+            {/* Calendar grid */}
+            <div className="grid grid-cols-7 gap-1">
+              {calendarDays.map((day) => {
+                const dateKey = format(day, 'yyyy-MM-dd');
+                const dayEvents = eventsByDate.get(dateKey) || [];
+                const isCurrentMonth = isSameMonth(day, currentMonth);
+                
                 return (
                   <div
-                    key={service.id}
-                    className="rounded-xl border bg-card p-5 transition-shadow hover:shadow-md"
+                    key={dateKey}
+                    className={cn(
+                      'min-h-[100px] p-1 border rounded-lg',
+                      !isCurrentMonth && 'bg-muted/30',
+                      isToday(day) && 'border-primary'
+                    )}
                   >
-                    <div className="mb-4 flex items-center justify-between">
-                      <div>
-                        <p className="font-serif text-xl font-bold">
-                          {format(dateObj, 'd')}
-                        </p>
-                        <p className="text-sm text-muted-foreground">
-                          {format(dateObj, 'MMMM yyyy')}
-                        </p>
-                      </div>
-                      {service.status === 'draft' && (
-                        <span className="rounded-full bg-accent/20 px-2 py-0.5 text-xs font-medium">
-                          Draft
-                        </span>
-                      )}
+                    <div className={cn(
+                      'text-sm font-medium mb-1 px-1',
+                      !isCurrentMonth && 'text-muted-foreground',
+                      isToday(day) && 'text-primary'
+                    )}>
+                      {format(day, 'd')}
                     </div>
-                    <div className="space-y-2">
-                      {service.assignments.map((assignment) => (
-                        <div
-                          key={assignment.id}
-                          className="flex items-center justify-between text-sm"
-                        >
-                          <span className="text-muted-foreground">
-                            {assignment.role
-                              .replace(/-/g, ' ')
-                              .replace(/\b\w/g, (c) => c.toUpperCase())}
-                          </span>
-                          <span className="font-medium">
-                            {assignment.volunteerName?.split(' ')[0] || 'Unassigned'}
-                          </span>
+                    <div className="space-y-1">
+                      {dayEvents.slice(0, 3).map((event) => {
+                        const assigned = isUserAssigned(event);
+                        return (
+                          <button
+                            key={event.id}
+                            onClick={() => setSelectedEvent(event)}
+                            className={cn(
+                              'w-full text-left text-xs p-1 rounded truncate',
+                              'hover:opacity-80 transition-opacity',
+                              assigned 
+                                ? 'bg-primary text-primary-foreground font-medium' 
+                                : 'bg-primary/10 text-primary'
+                            )}
+                          >
+                            {assigned && <Star className="h-3 w-3 inline mr-0.5" />}
+                            <span className="font-medium">{formatTime(event.start_time)}</span>
+                            <span className="ml-1 hidden sm:inline">{event.name}</span>
+                          </button>
+                        );
+                      })}
+                      {dayEvents.length > 3 && (
+                        <div className="text-xs text-muted-foreground px-1">
+                          +{dayEvents.length - 3} more
                         </div>
-                      ))}
+                      )}
                     </div>
                   </div>
                 );
               })}
             </div>
-          </TabsContent>
-        </Tabs>
+          </CardContent>
+        </Card>
+      ) : (
+        /* List View */
+        <div className="space-y-3">
+          {currentMonthEvents.length === 0 ? (
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center py-12">
+                <CalendarIcon className="h-12 w-12 text-muted-foreground/50 mb-4" />
+                <h3 className="font-medium text-lg mb-2">No Events</h3>
+                <p className="text-muted-foreground text-center">
+                  No published events for {format(currentMonth, 'MMMM yyyy')}.
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            currentMonthEvents.map((event) => {
+              const { filled, required } = getFilledCount(event);
+              const assigned = isUserAssigned(event);
+              const userRoles = getUserRoles(event);
+              
+              return (
+                <Card 
+                  key={event.id} 
+                  className={cn(
+                    'cursor-pointer hover:shadow-md transition-shadow',
+                    assigned && 'ring-2 ring-primary bg-primary/5'
+                  )}
+                  onClick={() => setSelectedEvent(event)}
+                >
+                  <CardContent className="p-4">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          {assigned && <Star className="h-4 w-4 text-primary fill-primary" />}
+                          <h3 className="font-medium truncate">
+                            {event.name}
+                          </h3>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+                          <span className="flex items-center gap-1">
+                            <CalendarIcon className="h-3.5 w-3.5" />
+                            {format(parseISO(event.date), 'EEE, MMM d')}
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <Clock className="h-3.5 w-3.5" />
+                            {formatTime(event.start_time)}
+                          </span>
+                          {required > 0 && (
+                            <span className="flex items-center gap-1">
+                              <Users className="h-3.5 w-3.5" />
+                              {filled}/{required} filled
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      {assigned && (
+                        <Badge variant="default" className="shrink-0">
+                          You're Assigned
+                        </Badge>
+                      )}
+                    </div>
+                    {assigned && userRoles.length > 0 && (
+                      <div className="mt-2 pt-2 border-t">
+                        <p className="text-sm">
+                          <span className="text-muted-foreground">Your role(s): </span>
+                          <span className="font-medium">{userRoles.join(', ')}</span>
+                        </p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            })
+          )}
+        </div>
       )}
+
+      {/* Event Details Dialog (Read-only) */}
+      <Dialog open={!!selectedEvent} onOpenChange={(open) => !open && setSelectedEvent(null)}>
+        <DialogContent className="max-w-lg">
+          {selectedEvent && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="font-serif flex items-center gap-2">
+                  {isUserAssigned(selectedEvent) && (
+                    <Star className="h-5 w-5 text-primary fill-primary" />
+                  )}
+                  {selectedEvent.name}
+                </DialogTitle>
+                <DialogDescription className="flex flex-wrap items-center gap-4 pt-2">
+                  <span className="flex items-center gap-1.5">
+                    <CalendarIcon className="h-4 w-4" />
+                    {format(parseISO(selectedEvent.date), 'EEEE, MMMM d, yyyy')}
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <Clock className="h-4 w-4" />
+                    {formatTime(selectedEvent.start_time)}
+                  </span>
+                </DialogDescription>
+              </DialogHeader>
+
+              {isUserAssigned(selectedEvent) && (
+                <div className="bg-primary/10 rounded-lg p-3 flex items-center gap-2">
+                  <Star className="h-5 w-5 text-primary fill-primary" />
+                  <div>
+                    <p className="font-medium text-sm">You're assigned to this event</p>
+                    <p className="text-sm text-muted-foreground">
+                      Role(s): {getUserRoles(selectedEvent).join(', ')}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              <Separator />
+
+              {/* Volunteer Assignments */}
+              <div className="space-y-4">
+                <h4 className="font-medium flex items-center gap-2">
+                  <Users className="h-4 w-4" />
+                  Volunteer Assignments
+                </h4>
+
+                {selectedEvent.roles.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-4 border rounded-lg">
+                    No roles defined for this event
+                  </p>
+                ) : (
+                  <div className="space-y-3">
+                    {selectedEvent.roles.map((role) => {
+                      const assignments = selectedEvent.assignments.filter(a => a.role === role.role);
+                      const isFilled = assignments.length >= role.quantity;
+
+                      return (
+                        <div 
+                          key={role.id} 
+                          className={cn(
+                            'rounded-lg border p-3',
+                            isFilled ? 'border-green-200 bg-green-50/50' : 'border-amber-200 bg-amber-50/50'
+                          )}
+                        >
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="font-medium text-sm">
+                              {ROLE_LABELS[role.role as keyof typeof ROLE_LABELS] || role.role}
+                            </span>
+                            <Badge variant={isFilled ? 'default' : 'secondary'} className="text-xs">
+                              {assignments.length}/{role.quantity}
+                            </Badge>
+                          </div>
+
+                          <div className="space-y-1">
+                            {assignments.map((assignment) => {
+                              const isMe = assignment.volunteer_id === user?.id;
+                              return (
+                                <div 
+                                  key={assignment.id} 
+                                  className={cn(
+                                    'flex items-center justify-between text-sm rounded px-2 py-1.5',
+                                    isMe ? 'bg-primary/20 font-medium' : 'bg-background'
+                                  )}
+                                >
+                                  <span className="flex items-center gap-1.5">
+                                    {isMe && <Star className="h-3 w-3 text-primary fill-primary" />}
+                                    {assignment.volunteer_name || 'Unknown'}
+                                    {isMe && ' (You)'}
+                                  </span>
+                                </div>
+                              );
+                            })}
+                            {assignments.length < role.quantity && (
+                              <div className="text-sm text-muted-foreground italic px-2 py-1">
+                                {role.quantity - assignments.length} spot(s) available
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              <div className="flex justify-end">
+                <Button variant="outline" onClick={() => setSelectedEvent(null)}>
+                  Close
+                </Button>
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
