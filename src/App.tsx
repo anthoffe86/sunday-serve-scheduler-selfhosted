@@ -17,6 +17,7 @@ import AdminSchedule from "./pages/admin/Schedule";
 import AdminEvents from "./pages/admin/Events";
 import AdminEventDetail from "./pages/admin/EventDetail";
 import Auth from "./pages/Auth";
+import InviteSignup from "./pages/InviteSignup";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -30,6 +31,7 @@ const App = () => (
         <BrowserRouter>
           <Routes>
             <Route path="/auth" element={<Auth />} />
+            <Route path="/invite" element={<InviteSignup />} />
             <Route element={
               <ProtectedRoute>
                 <AppLayout />

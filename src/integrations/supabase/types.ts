@@ -291,6 +291,39 @@ export type Database = {
         }
         Relationships: []
       }
+      invite_tokens: {
+        Row: {
+          created_at: string
+          email: string
+          expires_at: string
+          id: string
+          invited_by: string
+          name: string
+          token: string
+          used_at: string | null
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          expires_at?: string
+          id?: string
+          invited_by: string
+          name: string
+          token?: string
+          used_at?: string | null
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          expires_at?: string
+          id?: string
+          invited_by?: string
+          name?: string
+          token?: string
+          used_at?: string | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           active: boolean
