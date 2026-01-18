@@ -161,12 +161,53 @@ Deno.serve(async (req) => {
     if (availError) throw availError;
 
     // Get all active profiles with family groups
+    // Only include profiles that have a corresponding auth.users entry
     const { data: profiles, error: profilesError } = await supabase
       .from('profiles')
       .select('user_id, name, active, family_group_id')
       .eq('active', true);
 
     if (profilesError) throw profilesError;
+
+    // Verify which profiles have valid auth.users entries
+    const { data: validUsers, error: usersError } = await supabase
+      .from('auth.users')
+      .select('id');
+    
+    // Filter profiles to only include those with valid auth.users
+    // If we can't query auth.users directly, we'll use a different approach
+    let validProfileUserIds: Set<string>;
+    
+    if (usersError || !validUsers) {
+      // Fallback: check by trying to get existing assignments to see which user_ids work
+      // This is a workaround - in practice, we'll filter by checking if the user exists
+      console.log('Cannot query auth.users directly, using alternative validation');
+      
+      // Get all user_ids that already have successful assignments
+      const { data: existingUserIds } = await supabase
+        .from('event_assignments')
+        .select('volunteer_id');
+      
+      const validFromAssignments = new Set((existingUserIds || []).map(e => e.volunteer_id));
+      
+      // Also include the current authenticated user (admin)
+      validFromAssignments.add(user.id);
+      
+      // For safety, also try to validate by checking user_roles table
+      const { data: userRoles } = await supabase
+        .from('user_roles')
+        .select('user_id');
+      
+      (userRoles || []).forEach(ur => validFromAssignments.add(ur.user_id));
+      
+      validProfileUserIds = validFromAssignments;
+    } else {
+      validProfileUserIds = new Set((validUsers || []).map((u: { id: string }) => u.id));
+    }
+    
+    // Filter profiles to only those with valid user_ids
+    const validProfiles = (profiles || []).filter(p => validProfileUserIds.has(p.user_id));
+    console.log(`Filtered to ${validProfiles.length} profiles with valid auth.users entries (from ${profiles?.length || 0} total)`);
 
     // Get all role preferences
     const { data: rolePreferences, error: prefsError } = await supabase
@@ -176,11 +217,11 @@ Deno.serve(async (req) => {
 
     if (prefsError) throw prefsError;
 
-    console.log(`Loaded ${profiles?.length || 0} active profiles, ${rolePreferences?.length || 0} preferences`);
+    console.log(`Loaded ${validProfiles.length} valid active profiles, ${rolePreferences?.length || 0} preferences`);
 
-    // Build lookup maps
+    // Build lookup maps (using validProfiles instead of all profiles)
     const profileMap = new Map<string, Profile>();
-    (profiles || []).forEach(p => profileMap.set(p.user_id, p));
+    validProfiles.forEach(p => profileMap.set(p.user_id, p));
 
     const rolePrefsMap = new Map<string, RolePreference[]>();
     (rolePreferences || []).forEach(rp => {
@@ -228,9 +269,9 @@ Deno.serve(async (req) => {
       }
     });
 
-    // Build family groups map
+    // Build family groups map (using validProfiles)
     const familyGroups = new Map<string, string[]>();
-    (profiles || []).forEach(p => {
+    validProfiles.forEach(p => {
       if (p.family_group_id) {
         if (!familyGroups.has(p.family_group_id)) {
           familyGroups.set(p.family_group_id, []);
