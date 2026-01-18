@@ -9,6 +9,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Star,
+  Table2,
 } from "lucide-react";
 import {
   format,
@@ -33,11 +34,12 @@ import { ROLE_LABELS } from "@/types";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
+import { VolunteerScheduleTableView } from "@/components/VolunteerScheduleTableView";
 
 const Schedule = () => {
   const { user } = useAuth();
   const [currentMonth, setCurrentMonth] = useState(new Date());
-  const [viewMode, setViewMode] = useState<"calendar" | "list">("list");
+  const [viewMode, setViewMode] = useState<"calendar" | "list" | "table">("table");
   const [selectedEvent, setSelectedEvent] = useState<EventWithDetails | null>(null);
 
   // Fetch only published events
@@ -151,9 +153,12 @@ const Schedule = () => {
         <ToggleGroup
           type="single"
           value={viewMode}
-          onValueChange={(v) => v && setViewMode(v as "calendar" | "list")}
+          onValueChange={(v) => v && setViewMode(v as "calendar" | "list" | "table")}
           className="ml-auto"
         >
+          <ToggleGroupItem value="table" aria-label="Table view">
+            <Table2 className="h-4 w-4" />
+          </ToggleGroupItem>
           <ToggleGroupItem value="calendar" aria-label="Calendar view">
             <LayoutGrid className="h-4 w-4" />
           </ToggleGroupItem>
@@ -163,7 +168,14 @@ const Schedule = () => {
         </ToggleGroup>
       </div>
 
-      {viewMode === "calendar" ? (
+      {viewMode === "table" ? (
+        /* Table View */
+        <VolunteerScheduleTableView
+          events={currentMonthEvents}
+          onEventClick={(event) => setSelectedEvent(event)}
+          currentUserId={user?.id}
+        />
+      ) : viewMode === "calendar" ? (
         /* Calendar View */
         <Card>
           <CardContent className="p-4">
