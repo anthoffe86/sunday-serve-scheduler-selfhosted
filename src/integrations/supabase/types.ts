@@ -456,8 +456,9 @@ export type Database = {
         Row: {
           approved_at: string | null
           approved_by: string | null
-          assignment_id: string
+          assignment_id: string | null
           created_at: string
+          event_assignment_id: string | null
           from_user_id: string
           id: string
           notes: string | null
@@ -468,8 +469,9 @@ export type Database = {
         Insert: {
           approved_at?: string | null
           approved_by?: string | null
-          assignment_id: string
+          assignment_id?: string | null
           created_at?: string
+          event_assignment_id?: string | null
           from_user_id: string
           id?: string
           notes?: string | null
@@ -480,8 +482,9 @@ export type Database = {
         Update: {
           approved_at?: string | null
           approved_by?: string | null
-          assignment_id?: string
+          assignment_id?: string | null
           created_at?: string
+          event_assignment_id?: string | null
           from_user_id?: string
           id?: string
           notes?: string | null
@@ -495,6 +498,13 @@ export type Database = {
             columns: ["assignment_id"]
             isOneToOne: false
             referencedRelation: "assignments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "swap_requests_event_assignment_id_fkey"
+            columns: ["event_assignment_id"]
+            isOneToOne: false
+            referencedRelation: "event_assignments"
             referencedColumns: ["id"]
           },
         ]
