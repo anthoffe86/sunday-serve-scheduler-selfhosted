@@ -68,7 +68,7 @@ const AdminDashboard = () => {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <p className="text-sm text-muted-foreground">Add, edit, or deactivate volunteers. Manage family groups.</p>
+            <p className="text-sm text-muted-foreground">Manage Volunteers.</p>
             <Button variant="outline" asChild className="w-full">
               <Link to="/admin/volunteers">Manage Volunteers</Link>
             </Button>
