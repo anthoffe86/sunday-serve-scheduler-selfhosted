@@ -27,7 +27,7 @@ const handler = async (req: Request): Promise<Response> => {
     console.log(`Sending invite email to ${email} for ${name}`);
 
     const emailResponse = await resend.emails.send({
-      from: "Volunteer Scheduler <onboarding@resend.dev>",
+      from: "Volunteer Scheduler <noreply@updates.lumotutor.co.uk>",
       to: [email],
       subject: "You've been invited to join the Volunteer Scheduler",
       html: `
