@@ -11,3 +11,9 @@ verify_jwt = false
 
 [functions.send-event-notification]
 verify_jwt = false
+
+[functions.send-swap-notification]
+verify_jwt = false
+
+[functions.accept-swap-request]
+verify_jwt = false
