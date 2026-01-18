@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Plus, Search, MoreHorizontal, Users, Loader2, UserX, UserCheck } from 'lucide-react';
+import { Plus, Search, MoreHorizontal, Users, Loader2, UserX, UserCheck, UserPlus, Link as LinkIcon } from 'lucide-react';
+import { InviteVolunteerDialog } from '@/components/admin/InviteVolunteerDialog';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -42,6 +43,7 @@ const VolunteerManagement = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [editingVolunteer, setEditingVolunteer] = useState<Profile | null>(null);
   const [showFamilyDialog, setShowFamilyDialog] = useState(false);
+  const [showInviteDialog, setShowInviteDialog] = useState(false);
   const [newFamilyName, setNewFamilyName] = useState('');
   const [selectedFamilyGroup, setSelectedFamilyGroup] = useState<string | null>(null);
   
@@ -104,10 +106,16 @@ const VolunteerManagement = () => {
             Manage volunteer profiles and family groups
           </p>
         </div>
-        <Button className="gap-2 self-start" onClick={() => setShowFamilyDialog(true)}>
-          <Plus className="h-4 w-4" />
-          New Family Group
-        </Button>
+        <div className="flex gap-2 self-start">
+          <Button className="gap-2" onClick={() => setShowInviteDialog(true)}>
+            <UserPlus className="h-4 w-4" />
+            Invite Volunteer
+          </Button>
+          <Button variant="outline" className="gap-2" onClick={() => setShowFamilyDialog(true)}>
+            <Plus className="h-4 w-4" />
+            New Family Group
+          </Button>
+        </div>
       </div>
 
       {/* Search */}
@@ -232,6 +240,12 @@ const VolunteerManagement = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Invite Volunteer Dialog */}
+      <InviteVolunteerDialog 
+        open={showInviteDialog} 
+        onOpenChange={setShowInviteDialog}
+      />
     </div>
   );
 };
