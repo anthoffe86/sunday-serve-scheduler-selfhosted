@@ -7,6 +7,7 @@ import {
   Settings,
   Users,
   LayoutDashboard,
+  CalendarPlus,
   X,
   Shield
 } from 'lucide-react';
@@ -29,6 +30,7 @@ const volunteerNav = [
 
 const adminNav = [
   { to: '/admin', icon: LayoutDashboard, label: 'Admin Dashboard' },
+  { to: '/admin/events', icon: CalendarPlus, label: 'Events' },
   { to: '/admin/schedule', icon: CalendarDays, label: 'Schedule' },
   { to: '/admin/volunteers', icon: Users, label: 'Volunteers' },
 ];

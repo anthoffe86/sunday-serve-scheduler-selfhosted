@@ -31,15 +31,14 @@ import { useAuth } from "@/hooks/useAuth";
 import { Navigate } from "react-router-dom";
 import { useEvents, EventWithDetails } from "@/hooks/useEventScheduler";
 import { cn } from "@/lib/utils";
-import { CreateEventDialog } from "@/components/admin/CreateEventDialog";
 import { EditEventDialog } from "@/components/admin/EditEventDialog";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Link } from "react-router-dom";
 
 const AdminSchedule = () => {
   const { isAdmin, isLoading: authLoading } = useAuth();
   const [currentMonth, setCurrentMonth] = useState(new Date());
-  const [viewMode, setViewMode] = useState<"calendar" | "list">("calendar");
-  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<"calendar" | "list">("list");
   const [editEventId, setEditEventId] = useState<string | null>(null);
 
   // Fetch events for a wider range to support calendar navigation
@@ -129,11 +128,13 @@ const AdminSchedule = () => {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="font-serif text-3xl font-bold">Schedule</h1>
-          <p className="text-muted-foreground">Manage events and volunteer assignments</p>
+          <p className="text-muted-foreground">View and manage volunteer assignments</p>
         </div>
-        <Button onClick={() => setCreateDialogOpen(true)} className="gap-2 self-start">
-          <Plus className="h-4 w-4" />
-          Create Event
+        <Button asChild variant="outline" className="gap-2 self-start">
+          <Link to="/admin/events">
+            <Plus className="h-4 w-4" />
+            Manage Events
+          </Link>
         </Button>
       </div>
 
@@ -244,9 +245,11 @@ const AdminSchedule = () => {
                 <p className="text-muted-foreground text-center mb-4">
                   No events scheduled for {format(currentMonth, "MMMM yyyy")}.
                 </p>
-                <Button onClick={() => setCreateDialogOpen(true)} className="gap-2">
-                  <Plus className="h-4 w-4" />
-                  Create Event
+                <Button asChild className="gap-2">
+                  <Link to="/admin/events">
+                    <Plus className="h-4 w-4" />
+                    Create Event
+                  </Link>
                 </Button>
               </CardContent>
             </Card>
@@ -358,9 +361,6 @@ const AdminSchedule = () => {
           )}
         </div>
       )}
-
-      {/* Create Event Dialog */}
-      <CreateEventDialog open={createDialogOpen} onOpenChange={setCreateDialogOpen} />
 
       {/* Edit Event Dialog */}
       <EditEventDialog open={!!editEventId} onOpenChange={(open) => !open && setEditEventId(null)} event={editEvent} />
