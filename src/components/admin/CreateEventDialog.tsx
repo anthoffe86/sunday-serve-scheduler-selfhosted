@@ -63,7 +63,8 @@ const formSchema = z.object({
   roles: z.array(
     z.object({
       role: z.string().min(1, "Role is required"),
-      quantity: z.number().min(1, "Quantity must be at least 1"),
+      // Keep as string while editing; validate on submit
+      quantity: z.string().optional(),
     }),
   ),
 });
@@ -235,8 +236,12 @@ export function CreateEventDialog({ open, onOpenChange }: CreateEventDialogProps
     const mergedRolesMap = new Map<string, number>();
     for (const r of data.roles) {
       if (!r.role) continue;
-      const qty = Number(r.quantity) || 0;
-      if (qty <= 0) continue;
+      const rawQty = (r.quantity ?? "").trim();
+      const qty = parseInt(rawQty, 10);
+      if (!rawQty || Number.isNaN(qty) || qty < 1) {
+        toast.error("Each role Qty must be a number of at least 1");
+        return;
+      }
       mergedRolesMap.set(r.role, (mergedRolesMap.get(r.role) || 0) + qty);
     }
     const roles = Array.from(mergedRolesMap.entries()).map(([role, quantity]) => ({ role, quantity }));
@@ -544,7 +549,7 @@ export function CreateEventDialog({ open, onOpenChange }: CreateEventDialogProps
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={() => append({ role: "", quantity: 1 })}
+                  onClick={() => append({ role: "", quantity: "1" })}
                   className="gap-1.5"
                 >
                   <Plus className="h-4 w-4" />
@@ -595,32 +600,10 @@ export function CreateEventDialog({ open, onOpenChange }: CreateEventDialogProps
                               <Input
                                 type="text"
                                 inputMode="numeric"
+                                placeholder="1"
                                 value={field.value ?? ""}
-                                onChange={(e) => {
-                                  const val = e.target.value;
-                                  // Allow clearing while typing
-                                  if (val === "") {
-                                    field.onChange(undefined);
-                                    return;
-                                  }
-
-                                  // Allow any digits (including intermediate "0" while editing)
-                                  if (!/^\d*$/.test(val)) return;
-
-                                  const num = parseInt(val, 10);
-                                  if (Number.isNaN(num)) {
-                                    field.onChange(undefined);
-                                    return;
-                                  }
-
-                                  field.onChange(num);
-                                }}
-                                onBlur={() => {
-                                  field.onBlur();
-                                  if (field.value === undefined || field.value < 1) {
-                                    field.onChange(1);
-                                  }
-                                }}
+                                onChange={field.onChange}
+                                onBlur={field.onBlur}
                               />
                             </FormControl>
                             <FormMessage />
