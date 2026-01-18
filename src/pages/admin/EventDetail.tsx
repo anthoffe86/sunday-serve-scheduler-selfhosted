@@ -415,13 +415,32 @@ const AdminEventDetail = () => {
                           <span className="text-sm text-muted-foreground">
                             {formatTime(event.start_time)}
                           </span>
+                          <span className="text-xs text-muted-foreground">
+                            ({filledCount}/{requiredCount})
+                          </span>
                         </div>
                         
-                        {/* Volunteer count */}
-                        <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                          <Users className="h-4 w-4" />
-                          <span>{filledCount}/{requiredCount} volunteers</span>
-                        </div>
+                        {/* Volunteer assignments by role */}
+                        {event.assignments.length > 0 ? (
+                          <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+                            {event.roles.map((role) => {
+                              const roleAssignments = event.assignments.filter(a => a.role === role.role);
+                              if (roleAssignments.length === 0) return null;
+                              return (
+                                <div key={role.id} className="flex items-center gap-1">
+                                  <span className="text-muted-foreground text-xs">
+                                    {ROLE_LABELS[role.role as keyof typeof ROLE_LABELS]?.split(' ')[0] || role.role}:
+                                  </span>
+                                  <span className="font-medium">
+                                    {roleAssignments.map(a => a.volunteer_name?.split(' ')[0] || 'Unknown').join(', ')}
+                                  </span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <p className="text-sm text-muted-foreground italic">No volunteers assigned</p>
+                        )}
                       </div>
 
                       {/* Validation status */}
