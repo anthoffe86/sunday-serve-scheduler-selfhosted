@@ -34,10 +34,6 @@ const AdminDashboard = () => {
           <h1 className="font-serif text-3xl font-bold">Admin Dashboard</h1>
           <p className="text-muted-foreground">Manage volunteers, schedules, and swap requests</p>
         </div>
-        <Button className="gap-2 self-start">
-          <CalendarDays className="h-4 w-4" />
-          Generate New Schedule
-        </Button>
       </div>
 
       {/* Stats Overview */}
