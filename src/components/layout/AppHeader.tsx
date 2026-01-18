@@ -1,49 +1,34 @@
 import { Bell, Menu, User, LogOut, Shield } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { useAuth } from '@/hooks/useAuth';
 import { useProfile } from '@/hooks/useVolunteerData';
-
 interface AppHeaderProps {
   onMenuClick: () => void;
 }
-
-export function AppHeader({ onMenuClick }: AppHeaderProps) {
-  const { user, signOut, isAdmin } = useAuth();
-  const { data: profile } = useProfile();
+export function AppHeader({
+  onMenuClick
+}: AppHeaderProps) {
+  const {
+    user,
+    signOut,
+    isAdmin
+  } = useAuth();
+  const {
+    data: profile
+  } = useProfile();
   const navigate = useNavigate();
-
   const displayName = profile?.name || user?.email?.split('@')[0] || 'User';
-  const initials = displayName
-    .split(' ')
-    .map((n) => n[0])
-    .join('')
-    .toUpperCase()
-    .slice(0, 2);
-
+  const initials = displayName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
   const handleSignOut = async () => {
     await signOut();
     navigate('/auth');
   };
-
-  return (
-    <header className="sticky top-0 z-50 w-full border-b bg-card/80 backdrop-blur-sm">
+  return <header className="sticky top-0 z-50 w-full border-b bg-card/80 backdrop-blur-sm">
       <div className="flex h-16 items-center gap-4 px-4 md:px-6">
-        <Button
-          variant="ghost"
-          size="icon"
-          className="md:hidden"
-          onClick={onMenuClick}
-        >
+        <Button variant="ghost" size="icon" className="md:hidden" onClick={onMenuClick}>
           <Menu className="h-5 w-5" />
         </Button>
 
@@ -52,19 +37,17 @@ export function AppHeader({ onMenuClick }: AppHeaderProps) {
             <span className="font-serif text-lg font-bold">S</span>
           </div>
           <div className="hidden md:block">
-            <h1 className="font-serif text-lg font-semibold">St. Mary's</h1>
+            <h1 className="font-serif text-lg font-semibold">St. Matthew's</h1>
             <p className="text-xs text-muted-foreground">Volunteer Scheduling</p>
           </div>
         </div>
 
         <div className="flex-1" />
 
-        {isAdmin && (
-          <div className="hidden items-center gap-1 rounded-full bg-accent/20 px-2 py-0.5 text-xs font-medium text-accent-foreground md:flex">
+        {isAdmin && <div className="hidden items-center gap-1 rounded-full bg-accent/20 px-2 py-0.5 text-xs font-medium text-accent-foreground md:flex">
             <Shield className="h-3 w-3" />
             Admin
-          </div>
-        )}
+          </div>}
 
         <Button variant="ghost" size="icon" className="relative">
           <Bell className="h-5 w-5" />
@@ -105,6 +88,5 @@ export function AppHeader({ onMenuClick }: AppHeaderProps) {
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
-    </header>
-  );
+    </header>;
 }
