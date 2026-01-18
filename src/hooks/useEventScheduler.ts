@@ -179,9 +179,11 @@ export function useUpdateEventTemplate() {
       recurrence_count?: number | null;
       active?: boolean;
       roles?: { role: string; quantity: number }[];
+      syncToEvents?: boolean; // Whether to sync changes to existing draft events
     }) => {
-      const { id, roles, ...updateData } = data;
+      const { id, roles, syncToEvents = true, ...updateData } = data;
 
+      // Update template
       const { error: templateError } = await supabase
         .from('event_templates')
         .update(updateData)
@@ -189,8 +191,9 @@ export function useUpdateEventTemplate() {
 
       if (templateError) throw templateError;
 
+      // Update template roles
       if (roles !== undefined) {
-        // Delete existing roles
+        // Delete existing template roles
         const { error: deleteError } = await supabase
           .from('event_template_roles')
           .delete()
@@ -198,7 +201,7 @@ export function useUpdateEventTemplate() {
 
         if (deleteError) throw deleteError;
 
-        // Insert new roles
+        // Insert new template roles
         if (roles.length > 0) {
           const { error: insertError } = await supabase
             .from('event_template_roles')
@@ -212,12 +215,81 @@ export function useUpdateEventTemplate() {
 
           if (insertError) throw insertError;
         }
+
+        // Sync roles to existing draft events
+        if (syncToEvents) {
+          // Get all draft events for this template
+          const today = format(new Date(), 'yyyy-MM-dd');
+          const { data: draftEvents, error: eventsError } = await supabase
+            .from('events')
+            .select('id')
+            .eq('template_id', id)
+            .eq('status', 'draft')
+            .gte('date', today);
+
+          if (eventsError) throw eventsError;
+
+          if (draftEvents && draftEvents.length > 0) {
+            const eventIds = draftEvents.map(e => e.id);
+
+            // Delete existing event roles for these events
+            const { error: deleteEventRolesError } = await supabase
+              .from('event_roles')
+              .delete()
+              .in('event_id', eventIds);
+
+            if (deleteEventRolesError) throw deleteEventRolesError;
+
+            // Insert new event roles for each event
+            if (roles.length > 0) {
+              const eventRolesToInsert = eventIds.flatMap(eventId =>
+                roles.map(role => ({
+                  event_id: eventId,
+                  role: role.role as ServiceRole,
+                  quantity: role.quantity,
+                }))
+              );
+
+              const { error: insertEventRolesError } = await supabase
+                .from('event_roles')
+                .insert(eventRolesToInsert);
+
+              if (insertEventRolesError) throw insertEventRolesError;
+            }
+
+            // Also remove any assignments that no longer match valid roles
+            const validRoles = roles.map(r => r.role);
+            if (validRoles.length > 0) {
+              const { error: cleanupError } = await supabase
+                .from('event_assignments')
+                .delete()
+                .in('event_id', eventIds)
+                .not('role', 'in', `(${validRoles.join(',')})`);
+
+              // Ignore cleanup errors - assignments for removed roles will just be orphaned
+              if (cleanupError) {
+                console.warn('Failed to cleanup orphaned assignments:', cleanupError);
+              }
+            } else {
+              // No roles defined, remove all assignments
+              const { error: cleanupError } = await supabase
+                .from('event_assignments')
+                .delete()
+                .in('event_id', eventIds);
+
+              if (cleanupError) {
+                console.warn('Failed to cleanup assignments:', cleanupError);
+              }
+            }
+          }
+        }
       }
 
       return { id };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['event-templates'] });
+      queryClient.invalidateQueries({ queryKey: ['events'] });
     },
   });
 }
