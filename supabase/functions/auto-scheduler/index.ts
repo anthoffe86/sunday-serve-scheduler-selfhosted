@@ -276,9 +276,7 @@ Deno.serve(async (req) => {
     const newAssignments: AssignmentResult[] = [];
     const assignmentsToInsert: { event_id: string; volunteer_id: string; role: string }[] = [];
 
-    // Helper: Check if volunteer is EXPLICITLY available on a date
-    // STRICT: If no availability record exists, they are NOT available (must opt-in)
-    // Or if they marked themselves as unavailable, they are NOT available
+    // Helper: Check if volunteer is available on a date
     const isAvailable = (userId: string, date: string): boolean => {
       const dateAvail = availabilityMap.get(date);
       if (!dateAvail) return true; // No one set availability for this date, assume all available
@@ -301,6 +299,12 @@ Deno.serve(async (req) => {
       const profile = profileMap.get(userId);
       if (!profile?.family_group_id) return [];
       return (familyGroups.get(profile.family_group_id) || []).filter(id => id !== userId);
+    };
+
+    // Helper: Count how many family members are AVAILABLE on a specific date
+    const getAvailableFamilyCount = (userId: string, date: string): number => {
+      const familyMembers = getFamilyMembers(userId);
+      return familyMembers.filter(fm => isAvailable(fm, date) && profileMap.get(fm)?.active).length;
     };
 
     // Calculate total slots needed
@@ -346,6 +350,7 @@ Deno.serve(async (req) => {
           assignmentCount: number;
           preferenceScore: number; 
           hasFamilyOnDate: boolean;
+          availableFamilyCount: number;
           familyGroupId: string | null;
         }[] = [];
 
@@ -370,39 +375,47 @@ Deno.serve(async (req) => {
           // Check if any family member is already assigned to this date
           const familyMembers = getFamilyMembers(userId);
           const hasFamilyOnDate = familyMembers.some(fm => dateVolunteers.has(fm));
+          
+          // Count how many family members are AVAILABLE on this date (proactive grouping)
+          const availableFamilyCount = getAvailableFamilyCount(userId, event.date);
 
           eligibleVolunteers.push({ 
             userId, 
             assignmentCount,
             preferenceScore, 
             hasFamilyOnDate,
+            availableFamilyCount,
             familyGroupId: profile.family_group_id 
           });
         }
 
-        // IMPROVED SORTING: Fair distribution is PRIMARY concern
+        // IMPROVED SORTING: Fair distribution is PRIMARY, then proactive family grouping
         // 1. First: assignment count (ensure everyone gets used before anyone is reused)
-        // 2. Second: family grouping (within same assignment count tier)
-        // 3. Third: role preference (within same assignment count and family tier)
+        // 2. Second: family already on date (keep families together)
+        // 3. Third: available family count (prefer volunteers whose family CAN be grouped)
+        // 4. Fourth: role preference
         eligibleVolunteers.sort((a, b) => {
           // PRIMARY: Fair distribution - fewer assignments = higher priority
-          // This ensures EVERYONE gets at least one assignment before anyone gets two
           if (a.assignmentCount !== b.assignmentCount) {
             return a.assignmentCount - b.assignmentCount;
           }
 
-          // SECONDARY: Family grouping - prefer keeping families together
-          // Only consider this when volunteers have the same number of assignments
+          // SECONDARY: Family already on date - prefer keeping families together
           if (a.hasFamilyOnDate !== b.hasFamilyOnDate) {
             return a.hasFamilyOnDate ? -1 : 1;
           }
 
-          // TERTIARY: Role preference - prefer volunteers who want this role
+          // TERTIARY: Available family count - prefer volunteers with available family
+          // This proactively groups families by picking someone whose family CAN be scheduled together
+          if (a.availableFamilyCount !== b.availableFamilyCount) {
+            return b.availableFamilyCount - a.availableFamilyCount; // Higher count = better
+          }
+
+          // QUATERNARY: Role preference - prefer volunteers who want this role
           if (a.preferenceScore !== b.preferenceScore) {
             return a.preferenceScore - b.preferenceScore;
           }
 
-          // QUATERNARY: Random tiebreaker for variety
           return 0;
         });
 
@@ -410,7 +423,7 @@ Deno.serve(async (req) => {
         if (eligibleVolunteers.length > 0) {
           const top3 = eligibleVolunteers.slice(0, 3).map(v => {
             const name = profileMap.get(v.userId)?.name || 'Unknown';
-            return `${name}(count=${v.assignmentCount}, fam=${v.hasFamilyOnDate}, pref=${v.preferenceScore})`;
+            return `${name}(cnt=${v.assignmentCount}, onDate=${v.hasFamilyOnDate}, availFam=${v.availableFamilyCount})`;
           });
           console.log(`    Top candidates: ${top3.join(', ')}`);
         }
