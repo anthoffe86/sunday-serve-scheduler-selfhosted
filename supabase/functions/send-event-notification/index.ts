@@ -169,7 +169,7 @@ const handler = async (req: Request): Promise<Response> => {
 
       try {
         await resend.emails.send({
-          from: "Volunteer Scheduler <onboarding@resend.dev>",
+          from: "Volunteer Scheduler <noreply@updates.lumotutor.co.uk>",
           to: [data.email],
           subject: `Your Volunteer Schedule - ${data.events.length} Assignment${data.events.length > 1 ? 's' : ''} Confirmed`,
           html: `
