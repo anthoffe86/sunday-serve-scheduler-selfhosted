@@ -13,6 +13,7 @@ import {
   X,
   CheckSquare,
   Square,
+  Table2,
 } from "lucide-react";
 import {
   format,
@@ -37,6 +38,7 @@ import { Navigate } from "react-router-dom";
 import { useEvents, useBulkDeleteEvents, EventWithDetails } from "@/hooks/useEventScheduler";
 import { cn } from "@/lib/utils";
 import { EditEventDialog } from "@/components/admin/EditEventDialog";
+import { ScheduleTableView } from "@/components/admin/ScheduleTableView";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
@@ -54,7 +56,7 @@ import {
 const AdminSchedule = () => {
   const { isAdmin, isLoading: authLoading } = useAuth();
   const [currentMonth, setCurrentMonth] = useState(new Date());
-  const [viewMode, setViewMode] = useState<"calendar" | "list">("list");
+  const [viewMode, setViewMode] = useState<"calendar" | "list" | "table">("table");
   const [editEventId, setEditEventId] = useState<string | null>(null);
   const [selectedEvents, setSelectedEvents] = useState<Set<string>>(new Set());
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -218,9 +220,12 @@ const AdminSchedule = () => {
         <ToggleGroup
           type="single"
           value={viewMode}
-          onValueChange={(v) => v && setViewMode(v as "calendar" | "list")}
+          onValueChange={(v) => v && setViewMode(v as "calendar" | "list" | "table")}
           className="ml-auto"
         >
+          <ToggleGroupItem value="table" aria-label="Table view">
+            <Table2 className="h-4 w-4" />
+          </ToggleGroupItem>
           <ToggleGroupItem value="calendar" aria-label="Calendar view">
             <LayoutGrid className="h-4 w-4" />
           </ToggleGroupItem>
@@ -234,6 +239,12 @@ const AdminSchedule = () => {
         <div className="flex items-center justify-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
+      ) : viewMode === "table" ? (
+        /* Table View */
+        <ScheduleTableView 
+          events={currentMonthEvents} 
+          onEventClick={(id) => setEditEventId(id)} 
+        />
       ) : viewMode === "calendar" ? (
         /* Calendar View */
         <Card>
