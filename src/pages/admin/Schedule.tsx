@@ -15,6 +15,7 @@ import {
   Square,
   Table2,
 } from "lucide-react";
+import { ScheduleExport } from "@/components/admin/ScheduleExport";
 import {
   format,
   parseISO,
@@ -197,12 +198,18 @@ const AdminSchedule = () => {
           <h1 className="font-serif text-3xl font-bold">Schedule</h1>
           <p className="text-muted-foreground">View and manage volunteer assignments</p>
         </div>
-        <Button asChild variant="outline" className="gap-2 self-start">
-          <Link to="/admin/events">
-            <Plus className="h-4 w-4" />
-            Manage Events
-          </Link>
-        </Button>
+        <div className="flex gap-2 self-start">
+          <ScheduleExport 
+            events={currentMonthEvents} 
+            monthLabel={format(currentMonth, "MMMM yyyy")} 
+          />
+          <Button asChild variant="outline" className="gap-2">
+            <Link to="/admin/events">
+              <Plus className="h-4 w-4" />
+              Manage Events
+            </Link>
+          </Button>
+        </div>
       </div>
 
       {/* Controls */}
