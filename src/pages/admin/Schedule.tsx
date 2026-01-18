@@ -83,12 +83,14 @@ const AdminSchedule = () => {
     return eachDayOfInterval({ start: calendarStart, end: calendarEnd });
   }, [currentMonth]);
 
-  // Group events by date for calendar view
+  // Group events by date for calendar view (exclude draft events)
   const eventsByDate = useMemo(() => {
     if (!events) return new Map<string, EventWithDetails[]>();
 
     const map = new Map<string, EventWithDetails[]>();
     for (const event of events) {
+      // Exclude draft events from calendar view
+      if (event.status === 'draft') continue;
       const dateKey = event.date;
       if (!map.has(dateKey)) {
         map.set(dateKey, []);
@@ -98,7 +100,7 @@ const AdminSchedule = () => {
     return map;
   }, [events]);
 
-  // Filter events for current month in list view
+  // Filter events for current month in list view (exclude draft events)
   const currentMonthEvents = useMemo(() => {
     if (!events) return [];
     const monthStart = startOfMonth(currentMonth);
@@ -107,6 +109,8 @@ const AdminSchedule = () => {
     return events
       .filter((event) => {
         const eventDate = parseISO(event.date);
+        // Exclude draft events from admin schedule view
+        if (event.status === 'draft') return false;
         return eventDate >= monthStart && eventDate <= monthEnd;
       })
       .sort((a, b) => {
