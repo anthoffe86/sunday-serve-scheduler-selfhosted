@@ -389,29 +389,29 @@ Deno.serve(async (req) => {
           });
         }
 
-        // IMPROVED SORTING: Fair distribution is PRIMARY, then proactive family grouping
-        // 1. First: assignment count (ensure everyone gets used before anyone is reused)
-        // 2. Second: family already on date (keep families together)
-        // 3. Third: available family count (prefer volunteers whose family CAN be grouped)
-        // 4. Fourth: role preference
+        // SORTING PRIORITY: FAMILY GROUPING IS PRIMARY
+        // 1. FIRST: Family already on date (MUST keep families together)
+        // 2. SECOND: Available family count (prefer volunteers whose family CAN be grouped)
+        // 3. THIRD: Assignment count (fair distribution - but only within same family tier)
+        // 4. FOURTH: Role preference
         eligibleVolunteers.sort((a, b) => {
-          // PRIMARY: Fair distribution - fewer assignments = higher priority
+          // Calculate family grouping score (higher = better for grouping)
+          // Family already assigned to this date = massive bonus (100)
+          // Each available family member = small bonus
+          const familyScoreA = (a.hasFamilyOnDate ? 100 : 0) + a.availableFamilyCount;
+          const familyScoreB = (b.hasFamilyOnDate ? 100 : 0) + b.availableFamilyCount;
+
+          // PRIMARY: Family grouping - ALWAYS prioritize keeping families together
+          if (familyScoreA !== familyScoreB) {
+            return familyScoreB - familyScoreA; // Higher score = better
+          }
+
+          // SECONDARY: Fair distribution - only matters when family scores are equal
           if (a.assignmentCount !== b.assignmentCount) {
             return a.assignmentCount - b.assignmentCount;
           }
 
-          // SECONDARY: Family already on date - prefer keeping families together
-          if (a.hasFamilyOnDate !== b.hasFamilyOnDate) {
-            return a.hasFamilyOnDate ? -1 : 1;
-          }
-
-          // TERTIARY: Available family count - prefer volunteers with available family
-          // This proactively groups families by picking someone whose family CAN be scheduled together
-          if (a.availableFamilyCount !== b.availableFamilyCount) {
-            return b.availableFamilyCount - a.availableFamilyCount; // Higher count = better
-          }
-
-          // QUATERNARY: Role preference - prefer volunteers who want this role
+          // TERTIARY: Role preference
           if (a.preferenceScore !== b.preferenceScore) {
             return a.preferenceScore - b.preferenceScore;
           }
