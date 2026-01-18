@@ -12,7 +12,8 @@ import {
   Trash2,
   Check,
   X,
-  UserPlus
+  UserPlus,
+  Wand2
 } from 'lucide-react';
 import { format, parseISO, isAfter, isBefore } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -36,6 +37,7 @@ import {
   useUpdateEventTemplate,
   useDeleteEventTemplate,
   useBulkUpdateEventStatus,
+  useAutoSchedule,
   EventWithDetails,
   EventTemplateWithRoles
 } from '@/hooks/useEventScheduler';
@@ -61,6 +63,7 @@ const AdminEventDetail = () => {
   const updateTemplate = useUpdateEventTemplate();
   const deleteTemplate = useDeleteEventTemplate();
   const bulkUpdateStatus = useBulkUpdateEventStatus();
+  const autoSchedule = useAutoSchedule();
 
   // Find the template
   const template = useMemo(() => {
@@ -152,6 +155,22 @@ const AdminEventDetail = () => {
     }
   };
 
+  const handleAutoSchedule = async () => {
+    if (!template) return;
+    
+    try {
+      const result = await autoSchedule.mutateAsync({ templateId: template.id });
+      if (result.totalAssignments === 0) {
+        toast.info('No volunteers could be assigned. Check availability and role preferences.');
+      } else {
+        toast.success(`Assigned ${result.totalAssignments} volunteers across ${result.totalEvents} events`);
+      }
+    } catch (error) {
+      console.error('Auto-schedule error:', error);
+      toast.error('Failed to auto-schedule volunteers');
+    }
+  };
+
   const formatTime = (time: string) => {
     const [hours, minutes] = time.split(':');
     const hour = parseInt(hours, 10);
@@ -224,7 +243,21 @@ const AdminEventDetail = () => {
           </div>
         </div>
         
-        <div className="flex gap-2 self-start">
+        <div className="flex flex-wrap gap-2 self-start">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={handleAutoSchedule}
+            disabled={autoSchedule.isPending || publishValidation.draftCount === 0}
+            className="gap-1.5"
+          >
+            {autoSchedule.isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Wand2 className="h-4 w-4" />
+            )}
+            Auto Assign
+          </Button>
           <Button variant="outline" size="sm" onClick={() => setEditTemplateOpen(true)} className="gap-1.5">
             <Edit2 className="h-4 w-4" />
             Edit
