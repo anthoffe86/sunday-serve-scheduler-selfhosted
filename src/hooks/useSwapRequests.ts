@@ -178,49 +178,17 @@ export function useCreateSwapRequest() {
 // Accept a swap request
 export function useAcceptSwapRequest() {
   const queryClient = useQueryClient();
-  const { user } = useAuth();
 
   return useMutation({
     mutationFn: async (swapRequestId: string) => {
-      if (!user) throw new Error('Not authenticated');
+      const { data: result, error } = await supabase.functions.invoke('accept-swap-request', {
+        body: { swapRequestId },
+      });
 
-      // Get the swap request
-      const { data: swapRequest, error: fetchError } = await supabase
-        .from('swap_requests')
-        .select('*')
-        .eq('id', swapRequestId)
-        .single();
+      if (error) throw error;
+      if (result?.error) throw new Error(result.error);
 
-      if (fetchError || !swapRequest) {
-        throw new Error('Swap request not found');
-      }
-
-      if (swapRequest.status !== 'pending') {
-        throw new Error('This swap request has already been processed');
-      }
-
-      // Update the event assignment to the new volunteer
-      const { error: updateAssignmentError } = await supabase
-        .from('event_assignments')
-        .update({ volunteer_id: user.id })
-        .eq('id', swapRequest.event_assignment_id);
-
-      if (updateAssignmentError) throw updateAssignmentError;
-
-      // Update the swap request
-      const { error: updateSwapError } = await supabase
-        .from('swap_requests')
-        .update({
-          status: 'approved',
-          to_user_id: user.id,
-          approved_at: new Date().toISOString(),
-          approved_by: user.id,
-        })
-        .eq('id', swapRequestId);
-
-      if (updateSwapError) throw updateSwapError;
-
-      return { success: true };
+      return result as { success: boolean; eventId: string; eventAssignmentId: string; newVolunteerId: string };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['swap-requests'] });
