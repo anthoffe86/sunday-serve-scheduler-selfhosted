@@ -1,21 +1,21 @@
-import { useEffect, useMemo } from 'react';
-import { useForm, useFieldArray } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-import { Plus, Trash2, Loader2, CalendarIcon } from 'lucide-react';
-import { 
-  format, 
-  addMonths, 
-  addWeeks, 
-  getDay, 
-  getDate, 
-  parseISO, 
+import { useEffect, useMemo } from "react";
+import { useForm, useFieldArray } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { Plus, Trash2, Loader2, CalendarIcon } from "lucide-react";
+import {
+  format,
+  addMonths,
+  addWeeks,
+  getDay,
+  getDate,
+  parseISO,
   isAfter,
   setDate,
   addDays,
   startOfMonth,
-  getWeeksInMonth
-} from 'date-fns';
+  getWeeksInMonth,
+} from "date-fns";
 import {
   Dialog,
   DialogContent,
@@ -23,68 +23,49 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog';
-import {
-  Form,
-  FormControl,
-  FormDescription,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from '@/components/ui/form';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { Calendar } from '@/components/ui/calendar';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
-import { 
-  useCreateEventTemplate,
-  DAYS_OF_WEEK,
-} from '@/hooks/useEventScheduler';
-import { supabase } from '@/integrations/supabase/client';
-import { useQueryClient } from '@tanstack/react-query';
-import { ROLE_LABELS, Role } from '@/types';
-import { toast } from 'sonner';
-import { cn } from '@/lib/utils';
-import type { Database } from '@/integrations/supabase/types';
+} from "@/components/ui/dialog";
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { useCreateEventTemplate, DAYS_OF_WEEK } from "@/hooks/useEventScheduler";
+import { supabase } from "@/integrations/supabase/client";
+import { useQueryClient } from "@tanstack/react-query";
+import { ROLE_LABELS, Role } from "@/types";
+import { toast } from "sonner";
+import { cn } from "@/lib/utils";
+import type { Database } from "@/integrations/supabase/types";
 
-type ServiceRole = Database['public']['Enums']['service_role'];
+type ServiceRole = Database["public"]["Enums"]["service_role"];
 
 // Recurrence pattern options
 const RECURRENCE_PATTERNS = [
-  { value: 'none', label: 'One-off (single event)' },
-  { value: 'weekly', label: 'Weekly' },
-  { value: 'monthly-day', label: 'Monthly (same day of month)' },
-  { value: 'monthly-nth', label: 'Monthly (e.g., 2nd Sunday)' },
+  { value: "none", label: "One-off (single event)" },
+  { value: "weekly", label: "Weekly" },
+  { value: "monthly-day", label: "Monthly (same day of month)" },
+  { value: "monthly-nth", label: "Monthly (e.g., 2nd Sunday)" },
 ] as const;
 
-type RecurrencePattern = typeof RECURRENCE_PATTERNS[number]['value'];
+type RecurrencePattern = (typeof RECURRENCE_PATTERNS)[number]["value"];
 
 const formSchema = z.object({
-  name: z.string().min(1, 'Name is required'),
+  name: z.string().min(1, "Name is required"),
   description: z.string().optional(),
-  start_date: z.date({ required_error: 'Start date is required' }),
-  start_time: z.string().min(1, 'Start time is required'),
-  recurrence_pattern: z.enum(['none', 'weekly', 'monthly-day', 'monthly-nth']),
-  recurrence_end_type: z.enum(['indefinite', 'date', 'count']),
+  start_date: z.date({ required_error: "Start date is required" }),
+  start_time: z.string().min(1, "Start time is required"),
+  recurrence_pattern: z.enum(["none", "weekly", "monthly-day", "monthly-nth"]),
+  recurrence_end_type: z.enum(["indefinite", "date", "count"]),
   recurrence_end_date: z.string().optional(),
   recurrence_count: z.number().min(1).max(104).optional().nullable(),
-  roles: z.array(z.object({
-    role: z.string().min(1, 'Role is required'),
-    quantity: z.number().min(1, 'Quantity must be at least 1'),
-  })),
+  roles: z.array(
+    z.object({
+      role: z.string().min(1, "Role is required"),
+      quantity: z.number().min(1, "Quantity must be at least 1"),
+    }),
+  ),
 });
 
 type FormData = z.infer<typeof formSchema>;
@@ -99,8 +80,8 @@ function getNthWeekdayInfo(date: Date): { nth: number; dayOfWeek: number; label:
   const dayOfWeek = getDay(date);
   const dayOfMonth = getDate(date);
   const nth = Math.ceil(dayOfMonth / 7);
-  const dayLabel = DAYS_OF_WEEK.find(d => d.value === dayOfWeek)?.label || '';
-  const ordinal = ['1st', '2nd', '3rd', '4th', '5th'][nth - 1] || `${nth}th`;
+  const dayLabel = DAYS_OF_WEEK.find((d) => d.value === dayOfWeek)?.label || "";
+  const ordinal = ["1st", "2nd", "3rd", "4th", "5th"][nth - 1] || `${nth}th`;
   return { nth, dayOfWeek, label: `${ordinal} ${dayLabel}` };
 }
 
@@ -108,20 +89,20 @@ function getNthWeekdayInfo(date: Date): { nth: number; dayOfWeek: number; label:
 function getNthWeekdayOfMonth(year: number, month: number, dayOfWeek: number, nth: number): Date | null {
   const firstOfMonth = startOfMonth(new Date(year, month, 1));
   let date = firstOfMonth;
-  
+
   // Find first occurrence of the weekday
   while (getDay(date) !== dayOfWeek) {
     date = addDays(date, 1);
   }
-  
+
   // Move to nth occurrence
   date = addDays(date, (nth - 1) * 7);
-  
+
   // Check if still in the same month
   if (date.getMonth() !== month) {
     return null;
   }
-  
+
   return date;
 }
 
@@ -132,13 +113,13 @@ export function CreateEventDialog({ open, onOpenChange }: CreateEventDialogProps
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      name: '',
-      description: '',
+      name: "",
+      description: "",
       start_date: undefined,
-      start_time: '10:00',
-      recurrence_pattern: 'weekly',
-      recurrence_end_type: 'count',
-      recurrence_end_date: format(addMonths(new Date(), 3), 'yyyy-MM-dd'),
+      start_time: "10:00",
+      recurrence_pattern: "weekly",
+      recurrence_end_type: "count",
+      recurrence_end_date: format(addMonths(new Date(), 3), "yyyy-MM-dd"),
       recurrence_count: 12,
       roles: [],
     },
@@ -146,35 +127,35 @@ export function CreateEventDialog({ open, onOpenChange }: CreateEventDialogProps
 
   const { fields, append, remove } = useFieldArray({
     control: form.control,
-    name: 'roles',
+    name: "roles",
   });
 
-  const recurrencePattern = form.watch('recurrence_pattern');
-  const recurrenceEndType = form.watch('recurrence_end_type');
-  const startDate = form.watch('start_date');
+  const recurrencePattern = form.watch("recurrence_pattern");
+  const recurrenceEndType = form.watch("recurrence_end_type");
+  const startDate = form.watch("start_date");
 
   // Derived info about the selected start date
   const startDateInfo = useMemo(() => {
     if (!startDate) return null;
     const dayOfWeek = getDay(startDate);
     const dayOfMonth = getDate(startDate);
-    const dayLabel = DAYS_OF_WEEK.find(d => d.value === dayOfWeek)?.label || '';
+    const dayLabel = DAYS_OF_WEEK.find((d) => d.value === dayOfWeek)?.label || "";
     const nthInfo = getNthWeekdayInfo(startDate);
     return { dayOfWeek, dayOfMonth, dayLabel, nthInfo };
   }, [startDate]);
 
-  const isRecurring = recurrencePattern !== 'none';
+  const isRecurring = recurrencePattern !== "none";
 
   useEffect(() => {
     if (open) {
       form.reset({
-        name: '',
-        description: '',
+        name: "",
+        description: "",
         start_date: undefined,
-        start_time: '10:00',
-        recurrence_pattern: 'weekly',
-        recurrence_end_type: 'count',
-        recurrence_end_date: format(addMonths(new Date(), 3), 'yyyy-MM-dd'),
+        start_time: "10:00",
+        recurrence_pattern: "weekly",
+        recurrence_end_type: "count",
+        recurrence_end_date: format(addMonths(new Date(), 3), "yyyy-MM-dd"),
         recurrence_count: 12,
         roles: [],
       });
@@ -184,39 +165,38 @@ export function CreateEventDialog({ open, onOpenChange }: CreateEventDialogProps
   const generateEventDates = (
     startDate: Date,
     pattern: RecurrencePattern,
-    endType: 'indefinite' | 'date' | 'count',
+    endType: "indefinite" | "date" | "count",
     endDate?: string,
-    count?: number
+    count?: number,
   ): string[] => {
     const dates: string[] = [];
-    
+
     // One-off event
-    if (pattern === 'none') {
-      return [format(startDate, 'yyyy-MM-dd')];
+    if (pattern === "none") {
+      return [format(startDate, "yyyy-MM-dd")];
     }
-    
-    const maxDate = endType === 'date' && endDate 
-      ? parseISO(endDate) 
-      : addMonths(startDate, 24); // 2 year max for indefinite
-    
-    const maxCount = endType === 'count' && count 
-      ? count 
-      : endType === 'indefinite' 
-        ? 52 // 1 year for indefinite
-        : 104;
+
+    const maxDate = endType === "date" && endDate ? parseISO(endDate) : addMonths(startDate, 24); // 2 year max for indefinite
+
+    const maxCount =
+      endType === "count" && count
+        ? count
+        : endType === "indefinite"
+          ? 52 // 1 year for indefinite
+          : 104;
 
     let currentDate = startDate;
 
-    if (pattern === 'weekly') {
+    if (pattern === "weekly") {
       while (dates.length < maxCount && !isAfter(currentDate, maxDate)) {
-        dates.push(format(currentDate, 'yyyy-MM-dd'));
+        dates.push(format(currentDate, "yyyy-MM-dd"));
         currentDate = addWeeks(currentDate, 1);
       }
-    } else if (pattern === 'monthly-day') {
+    } else if (pattern === "monthly-day") {
       // Same day of month (e.g., 15th)
       const targetDay = getDate(startDate);
       while (dates.length < maxCount && !isAfter(currentDate, maxDate)) {
-        dates.push(format(currentDate, 'yyyy-MM-dd'));
+        dates.push(format(currentDate, "yyyy-MM-dd"));
         // Move to next month
         let nextMonth = addMonths(currentDate, 1);
         // Set to target day (handle months with fewer days)
@@ -224,30 +204,20 @@ export function CreateEventDialog({ open, onOpenChange }: CreateEventDialogProps
         nextMonth = setDate(nextMonth, Math.min(targetDay, daysInNextMonth));
         currentDate = nextMonth;
       }
-    } else if (pattern === 'monthly-nth') {
+    } else if (pattern === "monthly-nth") {
       // Nth weekday of month (e.g., 2nd Sunday)
       const { nth, dayOfWeek } = getNthWeekdayInfo(startDate);
       while (dates.length < maxCount && !isAfter(currentDate, maxDate)) {
-        dates.push(format(currentDate, 'yyyy-MM-dd'));
+        dates.push(format(currentDate, "yyyy-MM-dd"));
         // Find same pattern in next month
         let nextMonth = addMonths(currentDate, 1);
-        const nextOccurrence = getNthWeekdayOfMonth(
-          nextMonth.getFullYear(),
-          nextMonth.getMonth(),
-          dayOfWeek,
-          nth
-        );
+        const nextOccurrence = getNthWeekdayOfMonth(nextMonth.getFullYear(), nextMonth.getMonth(), dayOfWeek, nth);
         if (nextOccurrence) {
           currentDate = nextOccurrence;
         } else {
           // Skip months where nth weekday doesn't exist (e.g., 5th Sunday)
           nextMonth = addMonths(nextMonth, 1);
-          const fallback = getNthWeekdayOfMonth(
-            nextMonth.getFullYear(),
-            nextMonth.getMonth(),
-            dayOfWeek,
-            nth
-          );
+          const fallback = getNthWeekdayOfMonth(nextMonth.getFullYear(), nextMonth.getMonth(), dayOfWeek, nth);
           if (fallback) {
             currentDate = fallback;
           } else {
@@ -280,14 +250,14 @@ export function CreateEventDialog({ open, onOpenChange }: CreateEventDialogProps
         description: data.description || undefined,
         day_of_week: dayOfWeek,
         start_time: data.start_time,
-        is_recurring: data.recurrence_pattern !== 'none',
+        is_recurring: data.recurrence_pattern !== "none",
         recurrence_end_type: isRecurring ? data.recurrence_end_type : undefined,
-        recurrence_end_date: data.recurrence_end_type === 'date' ? data.recurrence_end_date : undefined,
-        recurrence_count: data.recurrence_end_type === 'count' ? data.recurrence_count : undefined,
+        recurrence_end_date: data.recurrence_end_type === "date" ? data.recurrence_end_date : undefined,
+        recurrence_count: data.recurrence_end_type === "count" ? data.recurrence_count : undefined,
         roles,
         // New fields
-        start_date: format(data.start_date, 'yyyy-MM-dd'),
-        recurrence_pattern: data.recurrence_pattern === 'none' ? null : data.recurrence_pattern,
+        start_date: format(data.start_date, "yyyy-MM-dd"),
+        recurrence_pattern: data.recurrence_pattern === "none" ? null : data.recurrence_pattern,
       });
 
       // 2. Generate event dates
@@ -296,50 +266,45 @@ export function CreateEventDialog({ open, onOpenChange }: CreateEventDialogProps
         data.recurrence_pattern,
         data.recurrence_end_type,
         data.recurrence_end_date,
-        data.recurrence_count ?? undefined
+        data.recurrence_count ?? undefined,
       );
 
       // 3. Create events
-      const eventsToCreate = dates.map(date => ({
+      const eventsToCreate = dates.map((date) => ({
         template_id: template.id,
         name: data.name,
         date,
         start_time: data.start_time,
-        status: 'draft' as const,
+        status: "draft" as const,
       }));
 
-      const { data: createdEvents, error: eventsError } = await supabase
-        .from('events')
-        .insert(eventsToCreate)
-        .select();
+      const { data: createdEvents, error: eventsError } = await supabase.from("events").insert(eventsToCreate).select();
 
       if (eventsError) throw eventsError;
 
       // 4. Create event roles for each event
       if (roles.length > 0 && createdEvents) {
-        const eventRolesToCreate = createdEvents.flatMap(event =>
-          roles.map(role => ({
+        const eventRolesToCreate = createdEvents.flatMap((event) =>
+          roles.map((role) => ({
             event_id: event.id,
             role: role.role as ServiceRole,
             quantity: role.quantity,
-          }))
+          })),
         );
 
-        const { error: rolesError } = await supabase
-          .from('event_roles')
-          .insert(eventRolesToCreate);
+        const { error: rolesError } = await supabase.from("event_roles").insert(eventRolesToCreate);
 
         if (rolesError) throw rolesError;
       }
 
       // Invalidate queries
-      queryClient.invalidateQueries({ queryKey: ['events'] });
+      queryClient.invalidateQueries({ queryKey: ["events"] });
 
-      toast.success(`Created ${createdEvents?.length || 0} event${(createdEvents?.length || 0) !== 1 ? 's' : ''}`);
+      toast.success(`Created ${createdEvents?.length || 0} event${(createdEvents?.length || 0) !== 1 ? "s" : ""}`);
       onOpenChange(false);
     } catch (err: any) {
-      console.error('Create event error:', err);
-      toast.error(err?.message || 'Failed to create event');
+      console.error("Create event error:", err);
+      toast.error(err?.message || "Failed to create event");
     }
   };
 
@@ -379,10 +344,7 @@ export function CreateEventDialog({ open, onOpenChange }: CreateEventDialogProps
                 <FormItem>
                   <FormLabel>Description (Optional)</FormLabel>
                   <FormControl>
-                    <Textarea 
-                      placeholder="Add any additional notes..."
-                      {...field}
-                    />
+                    <Textarea placeholder="Add any additional notes..." {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -402,16 +364,9 @@ export function CreateEventDialog({ open, onOpenChange }: CreateEventDialogProps
                         <FormControl>
                           <Button
                             variant="outline"
-                            className={cn(
-                              "w-full pl-3 text-left font-normal",
-                              !field.value && "text-muted-foreground"
-                            )}
+                            className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")}
                           >
-                            {field.value ? (
-                              format(field.value, "PPP")
-                            ) : (
-                              <span>Pick a date</span>
-                            )}
+                            {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
                             <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                           </Button>
                         </FormControl>
@@ -449,9 +404,9 @@ export function CreateEventDialog({ open, onOpenChange }: CreateEventDialogProps
             {/* Show derived day info when date is selected */}
             {startDateInfo && (
               <p className="text-sm text-muted-foreground -mt-2">
-                {startDateInfo.dayLabel}, {format(startDate!, 'MMMM d, yyyy')} 
-                {recurrencePattern === 'monthly-nth' && ` (${startDateInfo.nthInfo.label} of the month)`}
-                {recurrencePattern === 'monthly-day' && ` (day ${startDateInfo.dayOfMonth} of each month)`}
+                {startDateInfo.dayLabel}, {format(startDate!, "MMMM d, yyyy")}
+                {recurrencePattern === "monthly-nth" && ` (${startDateInfo.nthInfo.label} of the month)`}
+                {recurrencePattern === "monthly-day" && ` (day ${startDateInfo.dayOfMonth} of each month)`}
               </p>
             )}
 
@@ -478,10 +433,12 @@ export function CreateEventDialog({ open, onOpenChange }: CreateEventDialogProps
                       </SelectContent>
                     </Select>
                     <FormDescription>
-                      {recurrencePattern === 'weekly' && 'Creates events every week on the same day'}
-                      {recurrencePattern === 'monthly-day' && `Creates events on the same date each month${startDateInfo ? ` (${startDateInfo.dayOfMonth}${['st', 'nd', 'rd'][startDateInfo.dayOfMonth - 1] || 'th'})` : ''}`}
-                      {recurrencePattern === 'monthly-nth' && `Creates events on the same weekday pattern${startDateInfo ? ` (${startDateInfo.nthInfo.label})` : ''}`}
-                      {recurrencePattern === 'none' && 'Creates a single event only'}
+                      {recurrencePattern === "weekly" && "Creates events every week on the same day"}
+                      {recurrencePattern === "monthly-day" &&
+                        `Creates events on the same date each month${startDateInfo ? ` (${startDateInfo.dayOfMonth}${["st", "nd", "rd"][startDateInfo.dayOfMonth - 1] || "th"})` : ""}`}
+                      {recurrencePattern === "monthly-nth" &&
+                        `Creates events on the same weekday pattern${startDateInfo ? ` (${startDateInfo.nthInfo.label})` : ""}`}
+                      {recurrencePattern === "none" && "Creates a single event only"}
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -513,7 +470,7 @@ export function CreateEventDialog({ open, onOpenChange }: CreateEventDialogProps
                     )}
                   />
 
-                  {recurrenceEndType === 'date' && (
+                  {recurrenceEndType === "date" && (
                     <FormField
                       control={form.control}
                       name="recurrence_end_date"
@@ -529,7 +486,7 @@ export function CreateEventDialog({ open, onOpenChange }: CreateEventDialogProps
                     />
                   )}
 
-                  {recurrenceEndType === 'count' && (
+                  {recurrenceEndType === "count" && (
                     <FormField
                       control={form.control}
                       name="recurrence_count"
@@ -537,16 +494,16 @@ export function CreateEventDialog({ open, onOpenChange }: CreateEventDialogProps
                         <FormItem>
                           <FormLabel>Number of Events</FormLabel>
                           <FormControl>
-                            <Input 
+                            <Input
                               type="text"
                               inputMode="numeric"
                               pattern="[0-9]*"
                               placeholder="e.g., 12"
-                              value={field.value ?? ''}
+                              value={field.value ?? ""}
                               onChange={(e) => {
                                 const val = e.target.value;
                                 // Allow empty or numeric input only
-                                if (val === '') {
+                                if (val === "") {
                                   field.onChange(null);
                                   return;
                                 }
@@ -567,9 +524,7 @@ export function CreateEventDialog({ open, onOpenChange }: CreateEventDialogProps
                               }}
                             />
                           </FormControl>
-                          <FormDescription>
-                            Enter a number between 1 and 104
-                          </FormDescription>
+                          <FormDescription>Enter a number between 1 and 104</FormDescription>
                           <FormMessage />
                         </FormItem>
                       )}
@@ -583,15 +538,13 @@ export function CreateEventDialog({ open, onOpenChange }: CreateEventDialogProps
               <div className="flex items-center justify-between">
                 <div>
                   <h4 className="font-medium">Volunteer Roles</h4>
-                  <p className="text-sm text-muted-foreground">
-                    Define the roles needed for this event
-                  </p>
+                  <p className="text-sm text-muted-foreground">Define the roles needed for this event</p>
                 </div>
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={() => append({ role: '', quantity: 1 })}
+                  onClick={() => append({ role: "", quantity: 1 })}
                   className="gap-1.5"
                 >
                   <Plus className="h-4 w-4" />
@@ -639,17 +592,14 @@ export function CreateEventDialog({ open, onOpenChange }: CreateEventDialogProps
                           <FormItem className="w-24">
                             {index === 0 && <FormLabel>Qty</FormLabel>}
                             <FormControl>
-                              <Input 
+                              <Input
                                 type="text"
                                 inputMode="numeric"
                                 pattern="[0-9]*"
-                                value={field.value ?? ''}
+                                value={field.value ?? ""}
                                 onChange={(e) => {
                                   const val = e.target.value;
-                                  if (val === '') {
-                                    field.onChange(undefined);
-                                    return;
-                                  }
+
                                   if (!/^\d*$/.test(val)) return;
                                   const num = parseInt(val, 10);
                                   if (!isNaN(num)) {
