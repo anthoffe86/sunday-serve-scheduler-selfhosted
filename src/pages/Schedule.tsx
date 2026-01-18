@@ -10,6 +10,7 @@ import {
   ChevronRight,
   Star,
   Table2,
+  ArrowLeftRight,
 } from "lucide-react";
 import {
   format,
@@ -30,23 +31,37 @@ import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/useAuth";
 import { useEvents, EventWithDetails } from "@/hooks/useEventScheduler";
 import { cn } from "@/lib/utils";
-import { ROLE_LABELS } from "@/types";
+import { ROLE_LABELS, Role } from "@/types";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
 import { VolunteerScheduleTableView } from "@/components/VolunteerScheduleTableView";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { useCreateSwapRequest, useExistingSwapRequest } from "@/hooks/useSwapRequests";
+import { toast } from "sonner";
 
 const Schedule = () => {
   const { user } = useAuth();
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [viewMode, setViewMode] = useState<"calendar" | "list" | "table">("table");
   const [selectedEvent, setSelectedEvent] = useState<EventWithDetails | null>(null);
+  const [swapDialogOpen, setSwapDialogOpen] = useState(false);
+  const [swapNotes, setSwapNotes] = useState("");
+  const [selectedAssignmentForSwap, setSelectedAssignmentForSwap] = useState<{
+    id: string;
+    role: string;
+  } | null>(null);
 
   // Fetch only published events
   const startDate = format(subMonths(startOfMonth(currentMonth), 1), "yyyy-MM-dd");
   const endDate = format(addMonths(endOfMonth(currentMonth), 2), "yyyy-MM-dd");
 
   const { data: allEvents, isLoading } = useEvents({ startDate, endDate });
+  const createSwapRequest = useCreateSwapRequest();
+
+  // Check for existing swap request
+  const { data: existingSwapRequest } = useExistingSwapRequest(selectedAssignmentForSwap?.id);
 
   // Filter to only show published events for volunteers
   const events = useMemo(() => {
@@ -57,6 +72,11 @@ const Schedule = () => {
   // Check if user is assigned to an event
   const isUserAssigned = (event: EventWithDetails) => {
     return event.assignments.some((a) => a.volunteer_id === user?.id);
+  };
+
+  // Get user's assignments in an event
+  const getUserAssignments = (event: EventWithDetails) => {
+    return event.assignments.filter((a) => a.volunteer_id === user?.id);
   };
 
   // Get user's roles in an event
@@ -118,6 +138,27 @@ const Schedule = () => {
     const totalRequired = event.roles.reduce((sum, r) => sum + r.quantity, 0);
     const totalFilled = event.assignments.length;
     return { filled: totalFilled, required: totalRequired };
+  };
+
+  const handleRequestSwap = (assignment: { id: string; role: string }) => {
+    setSelectedAssignmentForSwap(assignment);
+    setSwapNotes("");
+    setSwapDialogOpen(true);
+  };
+
+  const handleSubmitSwapRequest = async () => {
+    if (!selectedAssignmentForSwap) return;
+
+    try {
+      await createSwapRequest.mutateAsync({
+        eventAssignmentId: selectedAssignmentForSwap.id,
+        notes: swapNotes.trim() || undefined,
+      });
+      setSwapDialogOpen(false);
+      setSelectedEvent(null);
+    } catch (error) {
+      // Error handled by the hook
+    }
   };
 
   if (isLoading) {
@@ -363,7 +404,7 @@ const Schedule = () => {
         </div>
       )}
 
-      {/* Event Details Dialog (Read-only) */}
+      {/* Event Details Dialog */}
       <Dialog open={!!selectedEvent} onOpenChange={(open) => !open && setSelectedEvent(null)}>
         <DialogContent className="max-w-lg">
           {selectedEvent && (
@@ -386,12 +427,33 @@ const Schedule = () => {
               </DialogHeader>
 
               {isUserAssigned(selectedEvent) && (
-                <div className="bg-primary/10 rounded-lg p-3 flex items-center gap-2">
-                  <Star className="h-5 w-5 text-primary fill-primary" />
-                  <div>
-                    <p className="font-medium text-sm">You're assigned to this event</p>
-                    <p className="text-sm text-muted-foreground">Role(s): {getUserRoles(selectedEvent).join(", ")}</p>
+                <div className="bg-primary/10 rounded-lg p-3">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Star className="h-5 w-5 text-primary fill-primary" />
+                    <div>
+                      <p className="font-medium text-sm">You're assigned to this event</p>
+                      <p className="text-sm text-muted-foreground">
+                        Role(s): {getUserRoles(selectedEvent).join(", ")}
+                      </p>
+                    </div>
                   </div>
+                  
+                  {/* Request Swap Button */}
+                  {getUserAssignments(selectedEvent).map((assignment) => (
+                    <Button
+                      key={assignment.id}
+                      variant="outline"
+                      size="sm"
+                      className="mt-2 gap-1"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleRequestSwap({ id: assignment.id, role: assignment.role });
+                      }}
+                    >
+                      <ArrowLeftRight className="h-4 w-4" />
+                      Request Swap for {ROLE_LABELS[assignment.role as Role] || assignment.role}
+                    </Button>
+                  ))}
                 </div>
               )}
 
@@ -466,6 +528,77 @@ const Schedule = () => {
               <div className="flex justify-end">
                 <Button variant="outline" onClick={() => setSelectedEvent(null)}>
                   Close
+                </Button>
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Swap Request Dialog */}
+      <Dialog open={swapDialogOpen} onOpenChange={setSwapDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="font-serif">Request a Swap</DialogTitle>
+            <DialogDescription>
+              {selectedEvent && selectedAssignmentForSwap && (
+                <>
+                  Request someone to take over your{" "}
+                  <strong>
+                    {ROLE_LABELS[selectedAssignmentForSwap.role as Role] || selectedAssignmentForSwap.role}
+                  </strong>{" "}
+                  assignment for <strong>{selectedEvent.name}</strong> on{" "}
+                  <strong>{format(parseISO(selectedEvent.date), "MMMM d, yyyy")}</strong>.
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+
+          {existingSwapRequest ? (
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+              <p className="text-sm text-amber-800">
+                You already have a pending swap request for this assignment. Check the Swap Requests page to view its
+                status.
+              </p>
+            </div>
+          ) : (
+            <>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="swap-notes">Add a note (optional)</Label>
+                  <Textarea
+                    id="swap-notes"
+                    placeholder="e.g., I have a family commitment that day..."
+                    value={swapNotes}
+                    onChange={(e) => setSwapNotes(e.target.value)}
+                    rows={3}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    This note will be included in the notification email sent to other volunteers.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setSwapDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleSubmitSwapRequest}
+                  disabled={createSwapRequest.isPending}
+                  className="gap-1"
+                >
+                  {createSwapRequest.isPending ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Submitting...
+                    </>
+                  ) : (
+                    <>
+                      <ArrowLeftRight className="h-4 w-4" />
+                      Submit Request
+                    </>
+                  )}
                 </Button>
               </div>
             </>
