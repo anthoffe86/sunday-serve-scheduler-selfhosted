@@ -352,6 +352,7 @@ Deno.serve(async (req) => {
           hasFamilyOnDate: boolean;
           availableFamilyCount: number;
           familyGroupId: string | null;
+          hasExplicitlyUnavailableFamilyMember: boolean;
         }[] = [];
 
         for (const [userId, profile] of profileMap.entries()) {
@@ -371,13 +372,20 @@ Deno.serve(async (req) => {
 
           const assignmentCount = globalAssignmentCounts.get(userId) || 0;
           const preferenceScore = getRolePreferenceScore(userId, role.role);
-          
+
           // Check if any family member is already assigned to this date
           const familyMembers = getFamilyMembers(userId);
           const hasFamilyOnDate = familyMembers.some(fm => dateVolunteers.has(fm));
-          
+
           // Count how many family members are AVAILABLE on this date (proactive grouping)
           const availableFamilyCount = getAvailableFamilyCount(userId, event.date);
+
+          // If a family member explicitly marked unavailable for this date, treat assigning this
+          // person as a "family split" risk and only do it as a last resort.
+          const dateAvail = availabilityMap.get(event.date);
+          const hasExplicitlyUnavailableFamilyMember = familyMembers.some(
+            (fm) => dateAvail?.get(fm) === false
+          );
 
           eligibleVolunteers.push({ 
             userId, 
@@ -385,15 +393,17 @@ Deno.serve(async (req) => {
             preferenceScore, 
             hasFamilyOnDate,
             availableFamilyCount,
-            familyGroupId: profile.family_group_id 
+            familyGroupId: profile.family_group_id,
+            hasExplicitlyUnavailableFamilyMember,
           });
         }
 
         // SORTING PRIORITY: FAMILY GROUPING IS PRIMARY
         // 1. FIRST: Family already on date (MUST keep families together)
         // 2. SECOND: Available family count (prefer volunteers whose family CAN be grouped)
-        // 3. THIRD: Assignment count (fair distribution - but only within same family tier)
-        // 4. FOURTH: Role preference
+        // 3. THIRD: Avoid splitting families when a family member is explicitly unavailable
+        // 4. FOURTH: Assignment count (fair distribution - but only within same family tier)
+        // 5. FIFTH: Role preference
         eligibleVolunteers.sort((a, b) => {
           // Calculate family grouping score (higher = better for grouping)
           // Family already assigned to this date = massive bonus (100)
@@ -406,12 +416,20 @@ Deno.serve(async (req) => {
             return familyScoreB - familyScoreA; // Higher score = better
           }
 
-          // SECONDARY: Fair distribution - only matters when family scores are equal
+          // TERTIARY: Avoid splitting families when we KNOW a family member can't make this date.
+          // Only apply this penalty when they don't already have family on the date.
+          const splitRiskA = !a.hasFamilyOnDate && !!a.familyGroupId && a.hasExplicitlyUnavailableFamilyMember;
+          const splitRiskB = !b.hasFamilyOnDate && !!b.familyGroupId && b.hasExplicitlyUnavailableFamilyMember;
+          if (splitRiskA !== splitRiskB) {
+            return splitRiskA ? 1 : -1; // Non-risk first
+          }
+
+          // FOURTH: Fair distribution - only matters when family scores are equal
           if (a.assignmentCount !== b.assignmentCount) {
             return a.assignmentCount - b.assignmentCount;
           }
 
-          // TERTIARY: Role preference
+          // FIFTH: Role preference
           if (a.preferenceScore !== b.preferenceScore) {
             return a.preferenceScore - b.preferenceScore;
           }
@@ -423,7 +441,8 @@ Deno.serve(async (req) => {
         if (eligibleVolunteers.length > 0) {
           const top3 = eligibleVolunteers.slice(0, 3).map(v => {
             const name = profileMap.get(v.userId)?.name || 'Unknown';
-            return `${name}(cnt=${v.assignmentCount}, onDate=${v.hasFamilyOnDate}, availFam=${v.availableFamilyCount})`;
+            const splitRisk = !v.hasFamilyOnDate && !!v.familyGroupId && v.hasExplicitlyUnavailableFamilyMember;
+            return `${name}(cnt=${v.assignmentCount}, onDate=${v.hasFamilyOnDate}, availFam=${v.availableFamilyCount}, splitRisk=${splitRisk})`;
           });
           console.log(`    Top candidates: ${top3.join(', ')}`);
         }
