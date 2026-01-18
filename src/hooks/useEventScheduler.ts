@@ -338,7 +338,12 @@ export function useEvents(options?: { startDate?: string; endDate?: string; stat
       const { data: events, error: eventsError } = await query;
       if (eventsError) throw eventsError;
 
-      const eventIds = (events || []).map(e => e.id);
+      // Return empty array early if no events
+      if (!events || events.length === 0) {
+        return [] as EventWithDetails[];
+      }
+
+      const eventIds = events.map(e => e.id);
 
       const [rolesResult, assignmentsResult, profilesResult] = await Promise.all([
         supabase.from('event_roles').select('*').in('event_id', eventIds),
@@ -354,7 +359,7 @@ export function useEvents(options?: { startDate?: string; endDate?: string; stat
         (profilesResult.data || []).map(p => [p.user_id, { name: p.name, email: p.email }])
       );
 
-      const eventsWithDetails: EventWithDetails[] = (events || []).map(event => ({
+      const eventsWithDetails: EventWithDetails[] = events.map(event => ({
         ...event,
         status: event.status as Event['status'],
         roles: (rolesResult.data || []).filter(r => r.event_id === event.id),
