@@ -35,10 +35,12 @@ export interface Event {
   id: string;
   template_id: string | null;
   name: string;
+  subheading: string | null;
   date: string;
   start_time: string;
   status: 'draft' | 'published' | 'cancelled';
   notes: string | null;
+  reading: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -473,10 +475,12 @@ export function useUpdateEvent() {
     mutationFn: async (data: {
       id: string;
       name?: string;
+      subheading?: string | null;
       date?: string;
       start_time?: string;
       status?: 'draft' | 'published' | 'cancelled';
-      notes?: string;
+      notes?: string | null;
+      reading?: string | null;
     }) => {
       const { id, ...updateData } = data;
 
@@ -679,6 +683,72 @@ export function useAutoSchedule() {
         totalEvents: number;
         totalAssignments: number;
       };
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['events'] });
+    },
+  });
+}
+
+// Hook: Update event roles (for individual event customization)
+export function useUpdateEventRoles() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (data: {
+      eventId: string;
+      roles: { role: string; quantity: number }[];
+    }) => {
+      const { eventId, roles } = data;
+
+      // Delete existing roles for this event
+      const { error: deleteError } = await supabase
+        .from('event_roles')
+        .delete()
+        .eq('event_id', eventId);
+
+      if (deleteError) throw deleteError;
+
+      // Insert new roles
+      if (roles.length > 0) {
+        const { error: insertError } = await supabase
+          .from('event_roles')
+          .insert(
+            roles.map(role => ({
+              event_id: eventId,
+              role: role.role as ServiceRole,
+              quantity: role.quantity,
+            }))
+          );
+
+        if (insertError) throw insertError;
+      }
+
+      // Clean up any orphaned assignments
+      const validRoles = roles.map(r => r.role);
+      if (validRoles.length > 0) {
+        const { error: cleanupError } = await supabase
+          .from('event_assignments')
+          .delete()
+          .eq('event_id', eventId)
+          .not('role', 'in', `(${validRoles.join(',')})`);
+
+        if (cleanupError) {
+          console.warn('Failed to cleanup orphaned assignments:', cleanupError);
+        }
+      } else {
+        // No roles, remove all assignments
+        const { error: cleanupError } = await supabase
+          .from('event_assignments')
+          .delete()
+          .eq('event_id', eventId);
+
+        if (cleanupError) {
+          console.warn('Failed to cleanup assignments:', cleanupError);
+        }
+      }
+
+      return { eventId };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['events'] });

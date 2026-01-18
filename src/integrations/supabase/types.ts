@@ -239,8 +239,10 @@ export type Database = {
           id: string
           name: string
           notes: string | null
+          reading: string | null
           start_time: string
           status: string
+          subheading: string | null
           template_id: string | null
           updated_at: string
         }
@@ -250,8 +252,10 @@ export type Database = {
           id?: string
           name: string
           notes?: string | null
+          reading?: string | null
           start_time: string
           status?: string
+          subheading?: string | null
           template_id?: string | null
           updated_at?: string
         }
@@ -261,8 +265,10 @@ export type Database = {
           id?: string
           name?: string
           notes?: string | null
+          reading?: string | null
           start_time?: string
           status?: string
+          subheading?: string | null
           template_id?: string | null
           updated_at?: string
         }

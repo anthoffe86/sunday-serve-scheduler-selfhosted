@@ -68,12 +68,14 @@ export function VolunteerScheduleTableView({
     return sidesmen;
   };
 
-  // Get special day name from notes
-  const getSpecialDayName = (event: EventWithDetails) => {
-    if (event.notes && event.notes.length < 50) {
-      return event.notes;
-    }
-    return null;
+  // Get subheading from the event
+  const getSubheading = (event: EventWithDetails) => {
+    return event.subheading || null;
+  };
+
+  // Get reading from the event
+  const getReading = (event: EventWithDetails) => {
+    return event.reading || null;
   };
 
   const formatDate = (date: string) => {
@@ -100,6 +102,7 @@ export function VolunteerScheduleTableView({
             <TableHead className="w-[100px] font-semibold">Date</TableHead>
             <TableHead className="min-w-[180px] font-semibold">Sidesmen</TableHead>
             <TableHead className="min-w-[120px] font-semibold">Reader</TableHead>
+            <TableHead className="min-w-[140px] font-semibold">Reading</TableHead>
             <TableHead className="min-w-[120px] font-semibold">Intercessions</TableHead>
             <TableHead className="min-w-[140px] font-semibold">Collection Count</TableHead>
           </TableRow>
@@ -107,7 +110,8 @@ export function VolunteerScheduleTableView({
         <TableBody>
           {events.map((event) => {
             const { day, month } = formatDate(event.date);
-            const specialDay = getSpecialDayName(event);
+            const subheading = getSubheading(event);
+            const reading = getReading(event);
             const sidesmen = getSidesmenDisplay(event);
             const readers = getVolunteersForRole(event, 'reader');
             const intercessions = getVolunteersForRole(event, 'intercessions');
@@ -135,9 +139,9 @@ export function VolunteerScheduleTableView({
                       <div className="font-medium">
                         {day} {month}
                       </div>
-                      {specialDay && (
+                      {subheading && (
                         <div className="text-xs text-muted-foreground italic">
-                          {specialDay}
+                          {subheading}
                         </div>
                       )}
                     </div>
@@ -183,6 +187,15 @@ export function VolunteerScheduleTableView({
                       <span className="text-muted-foreground text-sm">-</span>
                     )}
                   </div>
+                </TableCell>
+
+                {/* Reading Column */}
+                <TableCell className="py-3">
+                  {reading ? (
+                    <span className="text-sm">{reading}</span>
+                  ) : (
+                    <span className="text-muted-foreground text-sm italic">-</span>
+                  )}
                 </TableCell>
 
                 {/* Intercessions Column */}
