@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { Plus, Search, MoreHorizontal, Users, Loader2, UserX, UserCheck, UserPlus, Link as LinkIcon } from 'lucide-react';
+import { Plus, Search, MoreHorizontal, Users, Loader2, UserX, UserCheck, UserPlus, Pencil } from 'lucide-react';
 import { InviteVolunteerDialog } from '@/components/admin/InviteVolunteerDialog';
+import { EditVolunteerDialog } from '@/components/admin/EditVolunteerDialog';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -38,15 +39,18 @@ import {
   Profile 
 } from '@/hooks/useVolunteerData';
 import { useServiceHistory } from '@/hooks/useVolunteerData';
+import { useQueryClient } from '@tanstack/react-query';
 
 const VolunteerManagement = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [editingVolunteer, setEditingVolunteer] = useState<Profile | null>(null);
+  const [editingFamilyVolunteer, setEditingFamilyVolunteer] = useState<Profile | null>(null);
   const [showFamilyDialog, setShowFamilyDialog] = useState(false);
   const [showInviteDialog, setShowInviteDialog] = useState(false);
   const [newFamilyName, setNewFamilyName] = useState('');
   const [selectedFamilyGroup, setSelectedFamilyGroup] = useState<string | null>(null);
   
+  const queryClient = useQueryClient();
   const { data: volunteers, isLoading } = useAllProfiles();
   const { data: familyGroups } = useFamilyGroups();
   const updateProfile = useAdminUpdateProfile();
@@ -66,13 +70,13 @@ const VolunteerManagement = () => {
   };
 
   const handleUpdateFamilyGroup = async () => {
-    if (!editingVolunteer) return;
+    if (!editingFamilyVolunteer) return;
     
     await updateProfile.mutateAsync({
-      userId: editingVolunteer.user_id,
+      userId: editingFamilyVolunteer.user_id,
       updates: { family_group_id: selectedFamilyGroup },
     });
-    setEditingVolunteer(null);
+    setEditingFamilyVolunteer(null);
     setSelectedFamilyGroup(null);
   };
 
@@ -85,8 +89,17 @@ const VolunteerManagement = () => {
   };
 
   const openEditFamily = (volunteer: Profile) => {
-    setEditingVolunteer(volunteer);
+    setEditingFamilyVolunteer(volunteer);
     setSelectedFamilyGroup(volunteer.family_group_id);
+  };
+
+  const openEditVolunteer = (volunteer: Profile) => {
+    setEditingVolunteer(volunteer);
+  };
+
+  const handleEditSuccess = () => {
+    queryClient.invalidateQueries({ queryKey: ['profiles'] });
+    queryClient.invalidateQueries({ queryKey: ['role-preferences'] });
   };
 
   if (isLoading) {
@@ -151,6 +164,7 @@ const VolunteerManagement = () => {
             familyGroups={familyGroups || []}
             onToggleActive={handleToggleActive}
             onEditFamily={openEditFamily}
+            onEdit={openEditVolunteer}
           />
         ))}
         
@@ -166,13 +180,21 @@ const VolunteerManagement = () => {
         )}
       </div>
 
+      {/* Edit Volunteer Dialog */}
+      <EditVolunteerDialog
+        volunteer={editingVolunteer}
+        open={!!editingVolunteer}
+        onOpenChange={(open) => !open && setEditingVolunteer(null)}
+        onSuccess={handleEditSuccess}
+      />
+
       {/* Edit Family Group Dialog */}
-      <Dialog open={!!editingVolunteer} onOpenChange={(open) => !open && setEditingVolunteer(null)}>
+      <Dialog open={!!editingFamilyVolunteer} onOpenChange={(open) => !open && setEditingFamilyVolunteer(null)}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Edit Family Group</DialogTitle>
             <DialogDescription>
-              Assign {editingVolunteer?.name} to a family group. Family members won't be scheduled on the same Sunday.
+              Assign {editingFamilyVolunteer?.name} to a family group. Family members won't be scheduled on the same Sunday.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
@@ -197,7 +219,7 @@ const VolunteerManagement = () => {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setEditingVolunteer(null)}>
+            <Button variant="outline" onClick={() => setEditingFamilyVolunteer(null)}>
               Cancel
             </Button>
             <Button onClick={handleUpdateFamilyGroup} disabled={updateProfile.isPending}>
@@ -255,9 +277,10 @@ interface VolunteerCardProps {
   familyGroups: { id: string; name: string }[];
   onToggleActive: (volunteer: Profile) => void;
   onEditFamily: (volunteer: Profile) => void;
+  onEdit: (volunteer: Profile) => void;
 }
 
-function VolunteerCard({ volunteer, familyGroups, onToggleActive, onEditFamily }: VolunteerCardProps) {
+function VolunteerCard({ volunteer, familyGroups, onToggleActive, onEditFamily, onEdit }: VolunteerCardProps) {
   const { data: rolePrefs } = useUserRolePreferences(volunteer.user_id);
   const { data: serviceHistory } = useServiceHistory(volunteer.user_id);
   
@@ -327,6 +350,10 @@ function VolunteerCard({ volunteer, familyGroups, onToggleActive, onEditFamily }
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => onEdit(volunteer)}>
+                <Pencil className="mr-2 h-4 w-4" />
+                Edit Volunteer
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={() => onEditFamily(volunteer)}>
                 <Users className="mr-2 h-4 w-4" />
                 Manage Family Group
