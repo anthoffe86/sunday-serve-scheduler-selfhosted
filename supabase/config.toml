@@ -5,3 +5,9 @@ verify_jwt = false
 
 [functions.auto-scheduler]
 verify_jwt = false
+
+[functions.send-invite-email]
+verify_jwt = false
+
+[functions.send-event-notification]
+verify_jwt = false
