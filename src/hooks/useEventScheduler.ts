@@ -124,7 +124,9 @@ export function useCreateEventTemplate() {
       is_recurring: boolean;
       recurrence_end_type?: 'indefinite' | 'date' | 'count';
       recurrence_end_date?: string;
-      recurrence_count?: number;
+      recurrence_count?: number | null;
+      start_date?: string;
+      recurrence_pattern?: string | null;
       roles: { role: string; quantity: number }[];
     }) => {
       const { roles, ...templateData } = data;

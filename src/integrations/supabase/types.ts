@@ -191,6 +191,8 @@ export type Database = {
           recurrence_count: number | null
           recurrence_end_date: string | null
           recurrence_end_type: string | null
+          recurrence_pattern: string | null
+          start_date: string | null
           start_time: string
           updated_at: string
         }
@@ -206,6 +208,8 @@ export type Database = {
           recurrence_count?: number | null
           recurrence_end_date?: string | null
           recurrence_end_type?: string | null
+          recurrence_pattern?: string | null
+          start_date?: string | null
           start_time: string
           updated_at?: string
         }
@@ -221,6 +225,8 @@ export type Database = {
           recurrence_count?: number | null
           recurrence_end_date?: string | null
           recurrence_end_type?: string | null
+          recurrence_pattern?: string | null
+          start_date?: string | null
           start_time?: string
           updated_at?: string
         }
