@@ -19,6 +19,8 @@ import { format, parseISO, isAfter, isBefore } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import {
   AlertDialog,
@@ -57,6 +59,7 @@ const AdminEventDetail = () => {
   const [editTemplateOpen, setEditTemplateOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
+  const [sendNotifications, setSendNotifications] = useState(true);
   
   const { data: templates, isLoading: templatesLoading } = useEventTemplates();
   const { data: allEvents, isLoading: eventsLoading } = useEvents();
@@ -194,8 +197,19 @@ const AdminEventDetail = () => {
     }
 
     try {
-      await bulkUpdateStatus.mutateAsync({ eventIds: draftEventIds, status: 'published' });
-      toast.success(`Published ${draftEventIds.length} event${draftEventIds.length !== 1 ? 's' : ''}`);
+      const result = await bulkUpdateStatus.mutateAsync({ 
+        eventIds: draftEventIds, 
+        status: 'published',
+        sendNotifications 
+      });
+      
+      if (sendNotifications && result.emailsSent && result.emailsSent > 0) {
+        toast.success(`Published ${draftEventIds.length} event${draftEventIds.length !== 1 ? 's' : ''} and sent ${result.emailsSent} notification email${result.emailsSent !== 1 ? 's' : ''}`);
+      } else if (sendNotifications && result.emailError) {
+        toast.success(`Published ${draftEventIds.length} event${draftEventIds.length !== 1 ? 's' : ''} (email notifications failed)`);
+      } else {
+        toast.success(`Published ${draftEventIds.length} event${draftEventIds.length !== 1 ? 's' : ''}`);
+      }
     } catch (error) {
       toast.error('Failed to publish events');
     }
@@ -390,15 +404,30 @@ const AdminEventDetail = () => {
             </div>
             
             {publishValidation.draftCount > 0 && (
-              <Button 
-                onClick={handlePublishAll}
-                disabled={!publishValidation.canPublishAll || bulkUpdateStatus.isPending}
-                className="gap-2 shrink-0"
-              >
-                {bulkUpdateStatus.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-                <Check className="h-4 w-4" />
-                Publish All ({publishValidation.readyCount})
-              </Button>
+              <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                <div className="flex items-center space-x-2">
+                  <Checkbox 
+                    id="sendNotifications" 
+                    checked={sendNotifications}
+                    onCheckedChange={(checked) => setSendNotifications(checked === true)}
+                  />
+                  <Label 
+                    htmlFor="sendNotifications" 
+                    className="text-sm font-normal cursor-pointer"
+                  >
+                    Send email notifications to volunteers
+                  </Label>
+                </div>
+                <Button 
+                  onClick={handlePublishAll}
+                  disabled={!publishValidation.canPublishAll || bulkUpdateStatus.isPending}
+                  className="gap-2 shrink-0"
+                >
+                  {bulkUpdateStatus.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+                  <Check className="h-4 w-4" />
+                  Publish All ({publishValidation.readyCount})
+                </Button>
+              </div>
             )}
           </div>
         </CardContent>

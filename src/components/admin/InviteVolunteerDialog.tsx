@@ -89,7 +89,27 @@ export function InviteVolunteerDialog({ open, onOpenChange, onSuccess }: InviteV
       const link = `${window.location.origin}/invite?token=${invite.token}`;
       setInviteLink(link);
       
-      toast.success('Invitation created! Share the link with the volunteer.');
+      // Send the invitation email
+      try {
+        const emailResponse = await supabase.functions.invoke('send-invite-email', {
+          body: {
+            name: name.trim(),
+            email: email.trim().toLowerCase(),
+            inviteLink: link,
+          },
+        });
+        
+        if (emailResponse.error) {
+          console.error('Failed to send invite email:', emailResponse.error);
+          toast.success('Invitation created! Email sending failed - please share the link manually.');
+        } else {
+          toast.success('Invitation sent! An email has been sent to the volunteer.');
+        }
+      } catch (emailErr) {
+        console.error('Failed to send invite email:', emailErr);
+        toast.success('Invitation created! Email sending failed - please share the link manually.');
+      }
+      
       onSuccess?.();
     } catch (err: any) {
       console.error('Failed to create invitation:', err);

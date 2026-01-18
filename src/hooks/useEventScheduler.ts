@@ -588,17 +588,68 @@ export function useBulkUpdateEventStatus() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (data: { eventIds: string[]; status: 'draft' | 'published' | 'cancelled' }) => {
+    mutationFn: async (data: { eventIds: string[]; status: 'draft' | 'published' | 'cancelled'; sendNotifications?: boolean }) => {
       const { error } = await supabase
         .from('events')
         .update({ status: data.status })
         .in('id', data.eventIds);
 
       if (error) throw error;
-      return { count: data.eventIds.length };
+
+      // Send notifications if publishing and notifications are enabled
+      if (data.status === 'published' && data.sendNotifications) {
+        try {
+          const { data: notificationResult, error: notificationError } = await supabase.functions.invoke('send-event-notification', {
+            body: {
+              eventIds: data.eventIds,
+              baseUrl: window.location.origin,
+            },
+          });
+
+          if (notificationError) {
+            console.error('Failed to send notifications:', notificationError);
+            return { count: data.eventIds.length, emailsSent: 0, emailError: true };
+          }
+
+          return { 
+            count: data.eventIds.length, 
+            emailsSent: notificationResult?.emailsSent || 0,
+            emailError: false 
+          };
+        } catch (err) {
+          console.error('Failed to send notifications:', err);
+          return { count: data.eventIds.length, emailsSent: 0, emailError: true };
+        }
+      }
+
+      return { count: data.eventIds.length, emailsSent: 0, emailError: false };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['events'] });
+    },
+  });
+}
+
+// Hook: Send event notifications
+export function useSendEventNotifications() {
+  return useMutation({
+    mutationFn: async (data: { eventIds: string[] }) => {
+      const { data: result, error } = await supabase.functions.invoke('send-event-notification', {
+        body: {
+          eventIds: data.eventIds,
+          baseUrl: window.location.origin,
+        },
+      });
+
+      if (error) throw error;
+      if (result.error) throw new Error(result.error);
+      
+      return result as {
+        success: boolean;
+        emailsSent: number;
+        totalVolunteers: number;
+        errors?: string[];
+      };
     },
   });
 }
