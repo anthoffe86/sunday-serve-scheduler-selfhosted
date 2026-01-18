@@ -43,13 +43,19 @@ const AdminSchedule = () => {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [viewMode, setViewMode] = useState<'calendar' | 'list'>('calendar');
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
-  const [editEvent, setEditEvent] = useState<EventWithDetails | null>(null);
+  const [editEventId, setEditEventId] = useState<string | null>(null);
 
   // Fetch events for a wider range to support calendar navigation
   const startDate = format(subMonths(startOfMonth(currentMonth), 1), 'yyyy-MM-dd');
   const endDate = format(addMonths(endOfMonth(currentMonth), 2), 'yyyy-MM-dd');
 
   const { data: events, isLoading } = useEvents({ startDate, endDate });
+
+  // Get the current event from fresh data (so it updates after mutations)
+  const editEvent = useMemo(() => {
+    if (!editEventId || !events) return null;
+    return events.find(e => e.id === editEventId) || null;
+  }, [editEventId, events]);
 
   // Calendar grid generation
   const calendarDays = useMemo(() => {
@@ -223,7 +229,7 @@ const AdminSchedule = () => {
                       {dayEvents.slice(0, 3).map((event) => (
                         <button
                           key={event.id}
-                          onClick={() => setEditEvent(event)}
+                          onClick={() => setEditEventId(event.id)}
                           className={cn(
                             'w-full text-left text-xs p-1 rounded truncate',
                             'hover:opacity-80 transition-opacity',
@@ -276,7 +282,7 @@ const AdminSchedule = () => {
                     'cursor-pointer hover:shadow-md transition-shadow',
                     event.status === 'cancelled' && 'opacity-60'
                   )}
-                  onClick={() => setEditEvent(event)}
+                  onClick={() => setEditEventId(event.id)}
                 >
                   <CardContent className="p-4">
                     <div className="flex items-start justify-between gap-4">
@@ -327,8 +333,8 @@ const AdminSchedule = () => {
 
       {/* Edit Event Dialog */}
       <EditEventDialog
-        open={!!editEvent}
-        onOpenChange={(open) => !open && setEditEvent(null)}
+        open={!!editEventId}
+        onOpenChange={(open) => !open && setEditEventId(null)}
         event={editEvent}
       />
     </div>
