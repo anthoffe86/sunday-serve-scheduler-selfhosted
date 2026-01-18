@@ -1,9 +1,8 @@
 import { Link } from 'react-router-dom';
-import { format, parseISO, isSameDay, isThisWeek } from 'date-fns';
+import { format, parseISO, isThisWeek, addMonths } from 'date-fns';
 import { 
   CalendarDays, 
   CalendarCheck, 
-  Clock,
   Loader2,
   Users
 } from 'lucide-react';
@@ -12,24 +11,26 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { RoleBadge } from '@/components/RoleBadge';
 import { useAuth } from '@/hooks/useAuth';
-import { 
-  useProfile, 
-  useScheduleWithAssignments, 
-} from '@/hooks/useVolunteerData';
+import { useProfile } from '@/hooks/useVolunteerData';
+import { useEvents } from '@/hooks/useEventScheduler';
 import { ROLE_LABELS } from '@/types';
 import { cn } from '@/lib/utils';
 
 const Dashboard = () => {
   const { user } = useAuth();
   const { data: profile, isLoading: profileLoading } = useProfile();
-  const { data: schedule, isLoading: scheduleLoading } = useScheduleWithAssignments();
+  
+  // Fetch published events for the next 3 months
+  const startDate = format(new Date(), 'yyyy-MM-dd');
+  const endDate = format(addMonths(new Date(), 3), 'yyyy-MM-dd');
+  const { data: allEvents, isLoading: eventsLoading } = useEvents({ startDate, endDate, status: 'published' });
 
-  const isLoading = profileLoading || scheduleLoading;
+  const isLoading = profileLoading || eventsLoading;
 
   // Get next 3 events the user is assigned to
-  const myUpcomingEvents = schedule
-    ?.filter((service) =>
-      service.assignments.some((a) => a.volunteer_id === user?.id)
+  const myUpcomingEvents = allEvents
+    ?.filter((event) =>
+      event.assignments.some((a) => a.volunteer_id === user?.id)
     )
     .slice(0, 3) || [];
 
@@ -77,16 +78,16 @@ const Dashboard = () => {
 
         {myUpcomingEvents.length > 0 ? (
           <div className="space-y-3">
-            {myUpcomingEvents.map((service, index) => {
-              const serviceDate = parseISO(service.date);
-              const myAssignment = service.assignments.find(a => a.volunteer_id === user?.id);
-              const otherAssignments = service.assignments.filter(a => a.volunteer_id !== user?.id);
+        {myUpcomingEvents.map((event, index) => {
+              const eventDate = parseISO(event.date);
+              const myAssignment = event.assignments.find(a => a.volunteer_id === user?.id);
+              const otherAssignments = event.assignments.filter(a => a.volunteer_id !== user?.id);
               const isNextEvent = index === 0;
-              const isThisWeekEvent = isThisWeek(serviceDate, { weekStartsOn: 0 });
+              const isThisWeekEvent = isThisWeek(eventDate, { weekStartsOn: 0 });
 
               return (
                 <Card 
-                  key={service.id} 
+                  key={event.id} 
                   className={cn(
                     "overflow-hidden transition-all hover:shadow-md",
                     isNextEvent && "ring-2 ring-primary/20"
@@ -102,13 +103,13 @@ const Dashboard = () => {
                           : 'bg-muted text-muted-foreground'
                       )}>
                         <span className="text-xs font-semibold uppercase tracking-wide">
-                          {format(serviceDate, 'EEE')}
+                          {format(eventDate, 'EEE')}
                         </span>
                         <span className="text-2xl font-bold font-serif">
-                          {format(serviceDate, 'd')}
+                          {format(eventDate, 'd')}
                         </span>
                         <span className="text-xs font-medium">
-                          {format(serviceDate, 'MMM')}
+                          {format(eventDate, 'MMM')}
                         </span>
                       </div>
 
@@ -130,9 +131,9 @@ const Dashboard = () => {
                               )}
                             </div>
 
-                            {/* Date Title */}
+                            {/* Event Name */}
                             <h3 className="font-serif text-lg font-semibold mb-1">
-                              {format(serviceDate, 'EEEE, MMMM d')}
+                              {event.name} — {format(eventDate, 'EEEE, MMMM d')}
                             </h3>
 
                             {/* My Role */}
@@ -157,10 +158,10 @@ const Dashboard = () => {
                                       className="flex items-center gap-2 bg-muted/50 rounded-full pl-1 pr-3 py-1"
                                     >
                                       <div className="h-6 w-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-medium">
-                                        {getInitials(assignment.volunteerName || 'V')}
+                                        {getInitials(assignment.volunteer_name || 'V')}
                                       </div>
                                       <span className="text-sm">
-                                        {assignment.volunteerName?.split(' ')[0]}
+                                        {assignment.volunteer_name?.split(' ')[0]}
                                       </span>
                                       <span className="text-xs text-muted-foreground">
                                         · {ROLE_LABELS[assignment.role as keyof typeof ROLE_LABELS]}
