@@ -55,13 +55,14 @@ export function ScheduleTableView({ events, onEventClick }: ScheduleTableViewPro
     return sidesmen;
   };
 
-  // Get special day name (like Epiphany, Candlemas, etc.) - could be from notes field
-  const getSpecialDayName = (event: EventWithDetails) => {
-    // For now, return event notes if they exist and seem like a special day
-    if (event.notes && event.notes.length < 50) {
-      return event.notes;
-    }
-    return null;
+  // Get subheading from the event
+  const getSubheading = (event: EventWithDetails) => {
+    return event.subheading || null;
+  };
+
+  // Get reading from the event
+  const getReading = (event: EventWithDetails) => {
+    return event.reading || null;
   };
 
   // Get required count for a role
@@ -100,6 +101,7 @@ export function ScheduleTableView({ events, onEventClick }: ScheduleTableViewPro
             <TableHead className="w-[100px] font-semibold">Date</TableHead>
             <TableHead className="min-w-[180px] font-semibold">Sidesmen</TableHead>
             <TableHead className="min-w-[120px] font-semibold">Reader</TableHead>
+            <TableHead className="min-w-[140px] font-semibold">Reading</TableHead>
             <TableHead className="min-w-[120px] font-semibold">Intercessions</TableHead>
             <TableHead className="min-w-[140px] font-semibold">Collection Count</TableHead>
           </TableRow>
@@ -107,7 +109,8 @@ export function ScheduleTableView({ events, onEventClick }: ScheduleTableViewPro
         <TableBody>
           {events.map((event) => {
             const { day, month } = formatDate(event.date);
-            const specialDay = getSpecialDayName(event);
+            const subheading = getSubheading(event);
+            const reading = getReading(event);
             const sidesmen = getSidesmenDisplay(event);
             const readers = getVolunteersForRole(event, 'reader');
             const intercessions = getVolunteersForRole(event, 'intercessions');
@@ -133,9 +136,9 @@ export function ScheduleTableView({ events, onEventClick }: ScheduleTableViewPro
                   <div className="font-medium">
                     {day} {month}
                   </div>
-                  {specialDay && (
+                  {subheading && (
                     <div className="text-xs text-muted-foreground italic">
-                      {specialDay}
+                      {subheading}
                     </div>
                   )}
                 </TableCell>
@@ -178,6 +181,15 @@ export function ScheduleTableView({ events, onEventClick }: ScheduleTableViewPro
                       </span>
                     )}
                   </div>
+                </TableCell>
+
+                {/* Reading Column */}
+                <TableCell className="py-3">
+                  {reading ? (
+                    <span className="text-sm">{reading}</span>
+                  ) : (
+                    <span className="text-muted-foreground text-sm italic">-</span>
+                  )}
                 </TableCell>
 
                 {/* Intercessions Column */}

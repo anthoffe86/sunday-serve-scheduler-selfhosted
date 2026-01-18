@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   Calendar, 
   Clock, 
@@ -7,7 +7,11 @@ import {
   Trash2,
   Check,
   X,
-  Loader2
+  Loader2,
+  Pencil,
+  Plus,
+  Minus,
+  BookOpen
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import {
@@ -20,6 +24,8 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import {
   AlertDialog,
@@ -35,10 +41,11 @@ import {
   useUpdateEvent, 
   useDeleteEvent, 
   useRemoveAssignment,
+  useUpdateEventRoles,
   EventWithDetails 
 } from '@/hooks/useEventScheduler';
 import { useProfiles } from '@/hooks/useVolunteerData';
-import { ROLE_LABELS } from '@/types';
+import { ROLE_LABELS, Role } from '@/types';
 import { AssignVolunteerDialog } from './AssignVolunteerDialog';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -49,14 +56,42 @@ interface EditEventDialogProps {
   event: EventWithDetails | null;
 }
 
+const ALL_ROLES: Role[] = [
+  'sidesman-standard',
+  'sidesman-sound',
+  'sidesman-welcome',
+  'reader',
+  'intercessions',
+  'collection',
+];
+
 export function EditEventDialog({ open, onOpenChange, event }: EditEventDialogProps) {
   const [assignRole, setAssignRole] = useState<string | null>(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [isEditingDetails, setIsEditingDetails] = useState(false);
+  const [isEditingRoles, setIsEditingRoles] = useState(false);
+  
+  // Editable fields
+  const [subheading, setSubheading] = useState('');
+  const [reading, setReading] = useState('');
+  const [editedRoles, setEditedRoles] = useState<{ role: string; quantity: number }[]>([]);
   
   const { data: profiles } = useProfiles();
   const updateEvent = useUpdateEvent();
   const deleteEvent = useDeleteEvent();
   const removeAssignment = useRemoveAssignment();
+  const updateEventRoles = useUpdateEventRoles();
+
+  // Reset form when event changes
+  useEffect(() => {
+    if (event) {
+      setSubheading(event.subheading || '');
+      setReading(event.reading || '');
+      setEditedRoles(event.roles.map(r => ({ role: r.role, quantity: r.quantity })));
+      setIsEditingDetails(false);
+      setIsEditingRoles(false);
+    }
+  }, [event]);
 
   if (!event) return null;
 
@@ -75,6 +110,38 @@ export function EditEventDialog({ open, onOpenChange, event }: EditEventDialogPr
     } catch (error) {
       toast.error('Failed to update status');
     }
+  };
+
+  const handleSaveDetails = async () => {
+    try {
+      await updateEvent.mutateAsync({ 
+        id: event.id, 
+        subheading: subheading.trim() || null,
+        reading: reading.trim() || null,
+      });
+      toast.success('Event details updated');
+      setIsEditingDetails(false);
+    } catch (error) {
+      toast.error('Failed to update event');
+    }
+  };
+
+  const handleSaveRoles = async () => {
+    try {
+      await updateEventRoles.mutateAsync({
+        eventId: event.id,
+        roles: editedRoles.filter(r => r.quantity > 0),
+      });
+      toast.success('Roles updated');
+      setIsEditingRoles(false);
+    } catch (error) {
+      toast.error('Failed to update roles');
+    }
+  };
+
+  const handleCancelRolesEdit = () => {
+    setEditedRoles(event.roles.map(r => ({ role: r.role, quantity: r.quantity })));
+    setIsEditingRoles(false);
   };
 
   const handleDelete = async () => {
@@ -97,18 +164,38 @@ export function EditEventDialog({ open, onOpenChange, event }: EditEventDialogPr
     }
   };
 
+  const updateRoleQuantity = (role: string, delta: number) => {
+    setEditedRoles(prev => {
+      const existing = prev.find(r => r.role === role);
+      if (existing) {
+        const newQuantity = Math.max(0, existing.quantity + delta);
+        if (newQuantity === 0) {
+          return prev.filter(r => r.role !== role);
+        }
+        return prev.map(r => r.role === role ? { ...r, quantity: newQuantity } : r);
+      } else if (delta > 0) {
+        return [...prev, { role, quantity: delta }];
+      }
+      return prev;
+    });
+  };
+
+  const getRoleQuantity = (role: string) => {
+    return editedRoles.find(r => r.role === role)?.quantity || 0;
+  };
+
   const getFilledRolesCount = (role: string) => {
     const required = event.roles.find(r => r.role === role)?.quantity || 0;
     const filled = event.assignments.filter(a => a.role === role).length;
     return { filled, required };
   };
 
-  const isPending = updateEvent.isPending || deleteEvent.isPending;
+  const isPending = updateEvent.isPending || deleteEvent.isPending || updateEventRoles.isPending;
 
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader className="space-y-3">
             <div className="flex items-center gap-3">
               <DialogTitle className="text-2xl">
@@ -121,6 +208,9 @@ export function EditEventDialog({ open, onOpenChange, event }: EditEventDialogPr
                 {event.status}
               </Badge>
             </div>
+            {event.subheading && !isEditingDetails && (
+              <p className="text-sm text-muted-foreground italic">{event.subheading}</p>
+            )}
             <DialogDescription className="flex flex-wrap items-center gap-4">
               <span className="flex items-center gap-1.5">
                 <Calendar className="h-4 w-4" />
@@ -135,75 +225,218 @@ export function EditEventDialog({ open, onOpenChange, event }: EditEventDialogPr
 
           <Separator />
 
-          {/* Volunteer Assignments */}
-          <div className="space-y-4">
-            <h4 className="font-semibold flex items-center gap-2 text-base">
-              <Users className="h-4 w-4" />
-              Volunteer Assignments
-            </h4>
+          {/* Event Details (Subheading & Reading) */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h4 className="font-semibold flex items-center gap-2 text-base">
+                <Pencil className="h-4 w-4" />
+                Event Details
+              </h4>
+              {!isEditingDetails ? (
+                <Button variant="ghost" size="sm" onClick={() => setIsEditingDetails(true)}>
+                  Edit
+                </Button>
+              ) : (
+                <div className="flex gap-1">
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={() => {
+                      setSubheading(event.subheading || '');
+                      setReading(event.reading || '');
+                      setIsEditingDetails(false);
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                  <Button 
+                    size="sm" 
+                    onClick={handleSaveDetails}
+                    disabled={updateEvent.isPending}
+                  >
+                    {updateEvent.isPending && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}
+                    Save
+                  </Button>
+                </div>
+              )}
+            </div>
 
-            {event.roles.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-4 border rounded-lg">
-                No roles defined for this event
-              </p>
+            {isEditingDetails ? (
+              <div className="space-y-3 p-3 border rounded-lg bg-muted/30">
+                <div className="space-y-1.5">
+                  <Label htmlFor="subheading" className="text-sm">Subheading</Label>
+                  <Input
+                    id="subheading"
+                    placeholder="e.g. Epiphany, Candlemas, Baptism of Christ"
+                    value={subheading}
+                    onChange={(e) => setSubheading(e.target.value)}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    A special name or occasion for this service
+                  </p>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="reading" className="text-sm">Reading</Label>
+                  <Input
+                    id="reading"
+                    placeholder="e.g. Acts 10: 34-43"
+                    value={reading}
+                    onChange={(e) => setReading(e.target.value)}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    The bible passage for the reader
+                  </p>
+                </div>
+              </div>
             ) : (
-              <div className="space-y-3">
-                {event.roles.map((role) => {
-                  const { filled, required } = getFilledRolesCount(role.role);
-                  const isFilled = filled >= required;
-                  const assignments = event.assignments.filter(a => a.role === role.role);
+              <div className="p-3 border rounded-lg bg-muted/30 space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Subheading:</span>
+                  <span className={cn(!event.subheading && "text-muted-foreground italic")}>
+                    {event.subheading || 'Not set'}
+                  </span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground flex items-center gap-1">
+                    <BookOpen className="h-3 w-3" />
+                    Reading:
+                  </span>
+                  <span className={cn(!event.reading && "text-muted-foreground italic")}>
+                    {event.reading || 'Not set'}
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
 
+          <Separator />
+
+          {/* Roles Configuration */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h4 className="font-semibold flex items-center gap-2 text-base">
+                <Users className="h-4 w-4" />
+                Roles Required
+              </h4>
+              {!isEditingRoles ? (
+                <Button variant="ghost" size="sm" onClick={() => setIsEditingRoles(true)}>
+                  Edit Roles
+                </Button>
+              ) : (
+                <div className="flex gap-1">
+                  <Button variant="ghost" size="sm" onClick={handleCancelRolesEdit}>
+                    Cancel
+                  </Button>
+                  <Button 
+                    size="sm" 
+                    onClick={handleSaveRoles}
+                    disabled={updateEventRoles.isPending}
+                  >
+                    {updateEventRoles.isPending && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}
+                    Save
+                  </Button>
+                </div>
+              )}
+            </div>
+
+            {isEditingRoles ? (
+              <div className="space-y-2 p-3 border rounded-lg bg-muted/30">
+                {ALL_ROLES.map((role) => {
+                  const quantity = getRoleQuantity(role);
                   return (
-                    <div 
-                      key={role.id} 
-                      className={cn(
-                        'rounded-lg border p-3',
-                        isFilled ? 'border-green-200 bg-green-50/50' : 'border-amber-200 bg-amber-50/50'
-                      )}
-                    >
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="font-medium text-sm">
-                          {ROLE_LABELS[role.role as keyof typeof ROLE_LABELS] || role.role}
-                        </span>
-                        <Badge variant={isFilled ? 'default' : 'secondary'} className="text-xs">
-                          {filled}/{required}
-                        </Badge>
-                      </div>
-
-                      <div className="space-y-1">
-                        {assignments.map((assignment) => (
-                          <div 
-                            key={assignment.id} 
-                            className="flex items-center justify-between text-sm bg-background rounded px-2 py-1.5"
-                          >
-                            <span>{assignment.volunteer_name || 'Unknown'}</span>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-6 w-6 text-muted-foreground hover:text-destructive"
-                              onClick={() => handleRemoveAssignment(assignment.id)}
-                              disabled={removeAssignment.isPending}
-                            >
-                              <X className="h-3.5 w-3.5" />
-                            </Button>
-                          </div>
-                        ))}
-
-                        {filled < required && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="w-full h-8 text-xs gap-1 border-dashed border"
-                            onClick={() => setAssignRole(role.role)}
-                          >
-                            <UserPlus className="h-3.5 w-3.5" />
-                            Assign Volunteer
-                          </Button>
-                        )}
+                    <div key={role} className="flex items-center justify-between">
+                      <span className="text-sm">
+                        {ROLE_LABELS[role] || role}
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-7 w-7"
+                          onClick={() => updateRoleQuantity(role, -1)}
+                          disabled={quantity === 0}
+                        >
+                          <Minus className="h-3 w-3" />
+                        </Button>
+                        <span className="w-6 text-center font-medium">{quantity}</span>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-7 w-7"
+                          onClick={() => updateRoleQuantity(role, 1)}
+                        >
+                          <Plus className="h-3 w-3" />
+                        </Button>
                       </div>
                     </div>
                   );
                 })}
+              </div>
+            ) : (
+              /* Volunteer Assignments */
+              <div className="space-y-3">
+                {event.roles.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-4 border rounded-lg">
+                    No roles defined for this event
+                  </p>
+                ) : (
+                  event.roles.map((role) => {
+                    const { filled, required } = getFilledRolesCount(role.role);
+                    const isFilled = filled >= required;
+                    const assignments = event.assignments.filter(a => a.role === role.role);
+
+                    return (
+                      <div 
+                        key={role.id} 
+                        className={cn(
+                          'rounded-lg border p-3',
+                          isFilled ? 'border-green-200 bg-green-50/50' : 'border-amber-200 bg-amber-50/50'
+                        )}
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="font-medium text-sm">
+                            {ROLE_LABELS[role.role as keyof typeof ROLE_LABELS] || role.role}
+                          </span>
+                          <Badge variant={isFilled ? 'default' : 'secondary'} className="text-xs">
+                            {filled}/{required}
+                          </Badge>
+                        </div>
+
+                        <div className="space-y-1">
+                          {assignments.map((assignment) => (
+                            <div 
+                              key={assignment.id} 
+                              className="flex items-center justify-between text-sm bg-background rounded px-2 py-1.5"
+                            >
+                              <span>{assignment.volunteer_name || 'Unknown'}</span>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                                onClick={() => handleRemoveAssignment(assignment.id)}
+                                disabled={removeAssignment.isPending}
+                              >
+                                <X className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                          ))}
+
+                          {filled < required && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="w-full h-8 text-xs gap-1 border-dashed border"
+                              onClick={() => setAssignRole(role.role)}
+                            >
+                              <UserPlus className="h-3.5 w-3.5" />
+                              Assign Volunteer
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
               </div>
             )}
           </div>
