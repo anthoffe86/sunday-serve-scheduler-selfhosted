@@ -341,33 +341,74 @@ export function EditEventDialog({ open, onOpenChange, event }: EditEventDialogPr
 
             {isEditingRoles ? (
               <div className="space-y-2 p-3 border rounded-lg bg-muted/30">
+                <p className="text-xs text-muted-foreground mb-3">
+                  Set the number of volunteers needed for each role. Set to 0 to remove a role.
+                </p>
                 {ALL_ROLES.map((role) => {
                   const quantity = getRoleQuantity(role);
+                  const currentAssignments = event.assignments.filter(a => a.role === role);
+                  const willRemoveVolunteers = quantity < currentAssignments.length;
+                  const isRoleRemoved = quantity === 0 && currentAssignments.length > 0;
+                  
                   return (
-                    <div key={role} className="flex items-center justify-between">
-                      <span className="text-sm">
-                        {ROLE_LABELS[role] || role}
-                      </span>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          className="h-7 w-7"
-                          onClick={() => updateRoleQuantity(role, -1)}
-                          disabled={quantity === 0}
-                        >
-                          <Minus className="h-3 w-3" />
-                        </Button>
-                        <span className="w-6 text-center font-medium">{quantity}</span>
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          className="h-7 w-7"
-                          onClick={() => updateRoleQuantity(role, 1)}
-                        >
-                          <Plus className="h-3 w-3" />
-                        </Button>
+                    <div 
+                      key={role} 
+                      className={cn(
+                        "flex flex-col gap-1 p-2 rounded-md transition-colors",
+                        isRoleRemoved && "bg-destructive/10 border border-destructive/30",
+                        quantity > 0 && "bg-background"
+                      )}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <span className={cn(
+                            "text-sm",
+                            quantity === 0 && "text-muted-foreground"
+                          )}>
+                            {ROLE_LABELS[role] || role}
+                          </span>
+                          {currentAssignments.length > 0 && (
+                            <span className="text-xs text-muted-foreground ml-2">
+                              ({currentAssignments.length} assigned)
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            className="h-7 w-7"
+                            onClick={() => updateRoleQuantity(role, -1)}
+                            disabled={quantity === 0}
+                          >
+                            <Minus className="h-3 w-3" />
+                          </Button>
+                          <span className={cn(
+                            "w-6 text-center font-medium",
+                            quantity === 0 && "text-muted-foreground"
+                          )}>
+                            {quantity}
+                          </span>
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            className="h-7 w-7"
+                            onClick={() => updateRoleQuantity(role, 1)}
+                          >
+                            <Plus className="h-3 w-3" />
+                          </Button>
+                        </div>
                       </div>
+                      {willRemoveVolunteers && (
+                        <p className="text-xs text-amber-600">
+                          ⚠️ {currentAssignments.length - quantity} volunteer(s) will be unassigned
+                        </p>
+                      )}
+                      {isRoleRemoved && (
+                        <p className="text-xs text-destructive">
+                          This role will be removed. {currentAssignments.map(a => a.volunteer_name).join(', ')} will be freed up.
+                        </p>
+                      )}
                     </div>
                   );
                 })}
