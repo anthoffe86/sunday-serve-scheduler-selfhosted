@@ -1,13 +1,15 @@
 import { Link } from 'react-router-dom';
-import { format, parseISO, isSameDay, startOfWeek, addWeeks, addDays } from 'date-fns';
+import { format, parseISO, isSameDay, isThisWeek } from 'date-fns';
 import { 
   CalendarDays, 
   CalendarCheck, 
-  Check,
-  Loader2
+  Clock,
+  Loader2,
+  Users
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { RoleBadge } from '@/components/RoleBadge';
 import { useAuth } from '@/hooks/useAuth';
 import { 
@@ -17,54 +19,29 @@ import {
 import { ROLE_LABELS } from '@/types';
 import { cn } from '@/lib/utils';
 
-// Generate upcoming Sundays (next 8 weeks)
-const getUpcomingSundays = (count: number): Date[] => {
-  const sundays: Date[] = [];
-  const today = new Date();
-  let date = new Date(today);
-  
-  const dayOfWeek = date.getDay();
-  const daysUntilSunday = dayOfWeek === 0 ? 0 : 7 - dayOfWeek;
-  date.setDate(date.getDate() + daysUntilSunday);
-  
-  for (let i = 0; i < count; i++) {
-    sundays.push(new Date(date));
-    date.setDate(date.getDate() + 7);
-  }
-  
-  return sundays;
-};
-
 const Dashboard = () => {
   const { user } = useAuth();
   const { data: profile, isLoading: profileLoading } = useProfile();
   const { data: schedule, isLoading: scheduleLoading } = useScheduleWithAssignments();
 
   const isLoading = profileLoading || scheduleLoading;
-  const upcomingSundays = getUpcomingSundays(8);
 
-  // Get next assignment for current user
-  const myNextService = schedule?.find((service) =>
-    service.assignments.some((a) => a.volunteer_id === user?.id)
-  );
-  const myNextAssignment = myNextService?.assignments.find(
-    (a) => a.volunteer_id === user?.id
-  );
+  // Get next 3 events the user is assigned to
+  const myUpcomingEvents = schedule
+    ?.filter((service) =>
+      service.assignments.some((a) => a.volunteer_id === user?.id)
+    )
+    .slice(0, 3) || [];
 
-  // Map services to check if user is scheduled on each Sunday
-  const sundaySchedule = upcomingSundays.map(sunday => {
-    const service = schedule?.find(s => 
-      isSameDay(parseISO(s.date), sunday)
-    );
-    const myAssignment = service?.assignments.find(a => a.volunteer_id === user?.id);
-    
-    return {
-      date: sunday,
-      service,
-      myAssignment,
-      isScheduled: !!myAssignment,
-    };
-  });
+  // Get initials from name
+  const getInitials = (name: string) => {
+    return name
+      .split(' ')
+      .map((n) => n[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2);
+  };
 
   if (isLoading) {
     return (
@@ -82,88 +59,142 @@ const Dashboard = () => {
           Welcome, {profile?.name?.split(' ')[0] || 'Volunteer'}
         </h1>
         <p className="text-muted-foreground">
-          Here's your service schedule at a glance.
+          Here's your upcoming service schedule.
         </p>
       </div>
 
-      {/* Next Assignment Card */}
-      <Card className="border-primary/20 bg-primary/5">
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-lg font-serif">
-            <CalendarDays className="h-5 w-5 text-primary" />
-            Your Next Assignment
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {myNextAssignment && myNextService ? (
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <p className="text-2xl font-bold font-serif">
-                  {format(parseISO(myNextService.date), 'EEEE, MMMM d')}
-                </p>
-                <div className="mt-2 flex items-center gap-2">
-                  <span className="text-muted-foreground">Role:</span>
-                  <RoleBadge role={myNextAssignment.role as any} />
-                </div>
-              </div>
-              <Button variant="outline" asChild>
-                <Link to="/schedule">View Full Schedule</Link>
-              </Button>
-            </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center py-6 text-center">
-              <CalendarCheck className="mb-3 h-10 w-10 text-muted-foreground/50" />
-              <p className="text-muted-foreground">
-                No upcoming assignments scheduled.
-              </p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Upcoming Sundays Grid */}
+      {/* Upcoming Events Section */}
       <section>
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="font-serif text-xl font-semibold">Upcoming Sundays</h2>
+          <h2 className="font-serif text-xl font-semibold flex items-center gap-2">
+            <CalendarDays className="h-5 w-5 text-primary" />
+            Your Upcoming Services
+          </h2>
           <Button variant="ghost" size="sm" asChild>
-            <Link to="/availability">Update Availability</Link>
+            <Link to="/schedule">View All</Link>
           </Button>
         </div>
 
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-8">
-          {sundaySchedule.map(({ date, myAssignment, isScheduled }) => (
-            <Card 
-              key={date.toISOString()} 
-              className={cn(
-                "relative transition-all hover:shadow-md cursor-default",
-                isScheduled && "border-primary bg-primary/5 ring-1 ring-primary/20"
-              )}
-            >
-              <CardContent className="p-4 text-center">
-                <p className="text-xs font-medium text-muted-foreground uppercase">
-                  {format(date, 'MMM')}
-                </p>
-                <p className="text-2xl font-bold font-serif">
-                  {format(date, 'd')}
-                </p>
-                {isScheduled ? (
-                  <div className="mt-2">
-                    <div className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-primary text-primary-foreground">
-                      <Check className="h-4 w-4" />
+        {myUpcomingEvents.length > 0 ? (
+          <div className="space-y-3">
+            {myUpcomingEvents.map((service, index) => {
+              const serviceDate = parseISO(service.date);
+              const myAssignment = service.assignments.find(a => a.volunteer_id === user?.id);
+              const otherAssignments = service.assignments.filter(a => a.volunteer_id !== user?.id);
+              const isNextEvent = index === 0;
+              const isThisWeekEvent = isThisWeek(serviceDate, { weekStartsOn: 0 });
+
+              return (
+                <Card 
+                  key={service.id} 
+                  className={cn(
+                    "overflow-hidden transition-all hover:shadow-md",
+                    isNextEvent && "ring-2 ring-primary/20"
+                  )}
+                >
+                  <CardContent className="p-0">
+                    <div className="flex">
+                      {/* Date Block */}
+                      <div className={cn(
+                        'flex flex-col items-center justify-center px-4 py-4 min-w-[80px]',
+                        isNextEvent 
+                          ? 'bg-primary text-primary-foreground' 
+                          : 'bg-muted text-muted-foreground'
+                      )}>
+                        <span className="text-xs font-semibold uppercase tracking-wide">
+                          {format(serviceDate, 'EEE')}
+                        </span>
+                        <span className="text-2xl font-bold font-serif">
+                          {format(serviceDate, 'd')}
+                        </span>
+                        <span className="text-xs font-medium">
+                          {format(serviceDate, 'MMM')}
+                        </span>
+                      </div>
+
+                      {/* Content */}
+                      <div className="flex-1 p-4">
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1">
+                            {/* Badges */}
+                            <div className="flex items-center gap-2 mb-2">
+                              {isNextEvent && (
+                                <Badge variant="default" className="text-xs">
+                                  Next Service
+                                </Badge>
+                              )}
+                              {isThisWeekEvent && !isNextEvent && (
+                                <Badge variant="secondary" className="text-xs">
+                                  This Week
+                                </Badge>
+                              )}
+                            </div>
+
+                            {/* Date Title */}
+                            <h3 className="font-serif text-lg font-semibold mb-1">
+                              {format(serviceDate, 'EEEE, MMMM d')}
+                            </h3>
+
+                            {/* My Role */}
+                            {myAssignment && (
+                              <div className="flex items-center gap-2 mb-3">
+                                <span className="text-sm text-muted-foreground">Your role:</span>
+                                <RoleBadge role={myAssignment.role as any} />
+                              </div>
+                            )}
+
+                            {/* Other Volunteers */}
+                            {otherAssignments.length > 0 && (
+                              <div className="space-y-2">
+                                <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                                  <Users className="h-4 w-4" />
+                                  <span>Also serving:</span>
+                                </div>
+                                <div className="flex flex-wrap gap-2">
+                                  {otherAssignments.map((assignment) => (
+                                    <div 
+                                      key={assignment.id}
+                                      className="flex items-center gap-2 bg-muted/50 rounded-full pl-1 pr-3 py-1"
+                                    >
+                                      <div className="h-6 w-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-medium">
+                                        {getInitials(assignment.volunteerName || 'V')}
+                                      </div>
+                                      <span className="text-sm">
+                                        {assignment.volunteerName?.split(' ')[0]}
+                                      </span>
+                                      <span className="text-xs text-muted-foreground">
+                                        · {ROLE_LABELS[assignment.role as keyof typeof ROLE_LABELS]}
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                    <p className="mt-1 text-[10px] font-medium text-primary truncate">
-                      {ROLE_LABELS[myAssignment!.role as keyof typeof ROLE_LABELS]}
-                    </p>
-                  </div>
-                ) : (
-                  <div className="mt-2 h-6 flex items-center justify-center">
-                    <span className="text-xs text-muted-foreground">—</span>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        ) : (
+          <Card>
+            <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+              <CalendarCheck className="mb-3 h-12 w-12 text-muted-foreground/50" />
+              <p className="text-lg font-medium text-muted-foreground mb-2">
+                No upcoming assignments
+              </p>
+              <p className="text-sm text-muted-foreground mb-4">
+                Check back soon or update your availability.
+              </p>
+              <Button asChild>
+                <Link to="/availability">Update Availability</Link>
+              </Button>
+            </CardContent>
+          </Card>
+        )}
       </section>
 
       {/* Quick Actions */}
