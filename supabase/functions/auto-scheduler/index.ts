@@ -307,12 +307,19 @@ Deno.serve(async (req) => {
       return userAvail !== false;
     };
 
+    // Helper: Check if volunteer has the role in their preferences (STRICT)
+    const hasRolePreference = (userId: string, role: string): boolean => {
+      const prefs = rolePrefsMap.get(userId);
+      if (!prefs || prefs.length === 0) return false; // No preferences = cannot be assigned
+      return prefs.some(p => p.role === role);
+    };
+
     // Helper: Get volunteer's preference score for a role (lower is better)
     const getRolePreferenceScore = (userId: string, role: string): number => {
       const prefs = rolePrefsMap.get(userId);
-      if (!prefs || prefs.length === 0) return 50; // No preferences = neutral priority
+      if (!prefs || prefs.length === 0) return 100; // No preferences = not eligible anyway
       const pref = prefs.find(p => p.role === role);
-      return pref ? pref.preference_order : 100; // Has preferences but not this role = low priority
+      return pref ? pref.preference_order : 100;
     };
 
     // Helper: Get family members for a user
@@ -381,6 +388,11 @@ Deno.serve(async (req) => {
         for (const [userId, profile] of profileMap.entries()) {
           // Skip if not active
           if (!profile.active) continue;
+
+          // STRICT: Skip if volunteer doesn't have this role in their preferences
+          if (!hasRolePreference(userId, role.role)) {
+            continue;
+          }
 
           // Skip if already assigned to this event (any role)
           const isAlreadyAssigned = Array.from(currentEventAssignments.values())
