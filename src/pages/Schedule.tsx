@@ -265,64 +265,109 @@ const Schedule = () => {
               </CardContent>
             </Card>
           ) : (
-            currentMonthEvents.map((event) => {
+            currentMonthEvents.map((event, index) => {
               const { filled, required } = getFilledCount(event);
               const assigned = isUserAssigned(event);
               const userRoles = getUserRoles(event);
-              const allFilled = filled >= required && required > 0;
+              const eventDate = parseISO(event.date);
+              const isNextEvent = index === 0;
+              
+              // Get volunteer initials for display
+              const volunteerInitials = event.assignments.slice(0, 4).map(a => {
+                const name = a.volunteer_name || 'Unknown';
+                return name.split(' ').map(n => n[0]).join('').slice(0, 1).toUpperCase();
+              });
+              const remainingCount = event.assignments.length - 4;
               
               return (
                 <Card 
                   key={event.id} 
                   className={cn(
-                    'cursor-pointer hover:shadow-md transition-all hover:border-primary/30',
-                    assigned && 'ring-2 ring-primary bg-primary/5'
+                    'cursor-pointer hover:shadow-md transition-all overflow-hidden',
+                    assigned && 'ring-2 ring-primary',
+                    isNextEvent && !assigned && 'ring-1 ring-primary/30'
                   )}
                   onClick={() => setSelectedEvent(event)}
                 >
-                  <CardContent className="p-5">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-3 mb-2">
-                          {assigned && <Star className="h-5 w-5 text-primary fill-primary shrink-0" />}
-                          <h3 className="font-serif text-lg font-semibold truncate">
-                            {event.name}
-                          </h3>
+                  <CardContent className="p-0">
+                    <div className="flex">
+                      {/* Date Block */}
+                      <div className={cn(
+                        'flex flex-col items-center justify-center px-4 py-4 min-w-[72px]',
+                        assigned ? 'bg-primary text-primary-foreground' : 'bg-secondary text-secondary-foreground'
+                      )}>
+                        <span className="text-xs font-semibold uppercase tracking-wide">
+                          {format(eventDate, 'EEE')}
+                        </span>
+                        <span className="text-2xl font-bold">
+                          {format(eventDate, 'd')}
+                        </span>
+                      </div>
+                      
+                      {/* Content */}
+                      <div className="flex-1 p-4">
+                        {/* Badges */}
+                        <div className="flex flex-wrap gap-2 mb-2">
+                          {isNextEvent && (
+                            <Badge variant="default" className="text-xs">
+                              Next Service
+                            </Badge>
+                          )}
+                          {assigned && (
+                            <Badge variant="outline" className="text-xs gap-1 border-primary text-primary">
+                              <Star className="h-3 w-3 fill-primary" />
+                              You're Serving
+                            </Badge>
+                          )}
                         </div>
-                        <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
-                          <span className="flex items-center gap-1.5">
-                            <CalendarIcon className="h-4 w-4" />
-                            {format(parseISO(event.date), 'EEEE, MMM d')}
-                          </span>
+                        
+                        <h3 className="font-serif text-lg font-semibold mb-1">
+                          {event.name}
+                        </h3>
+                        
+                        <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground mb-3">
                           <span className="flex items-center gap-1.5">
                             <Clock className="h-4 w-4" />
                             {formatTime(event.start_time)}
                           </span>
-                          {required > 0 && (
-                            <span className={cn(
-                              'flex items-center gap-1.5',
-                              allFilled ? 'text-green-600' : 'text-amber-600'
-                            )}>
-                              <Users className="h-4 w-4" />
-                              {filled}/{required} volunteers
+                          {assigned && userRoles.length > 0 && (
+                            <span className="font-medium text-foreground">
+                              {userRoles.join(', ')}
                             </span>
                           )}
                         </div>
+                        
+                        {/* Volunteer Avatars */}
+                        {required > 0 && (
+                          <div className="flex items-center gap-2">
+                            <Users className="h-4 w-4 text-muted-foreground" />
+                            <div className="flex items-center -space-x-1">
+                              {volunteerInitials.map((initial, i) => (
+                                <div 
+                                  key={i}
+                                  className={cn(
+                                    'flex h-7 w-7 items-center justify-center rounded-full border-2 border-background text-xs font-medium',
+                                    event.assignments[i]?.volunteer_id === user?.id 
+                                      ? 'bg-primary text-primary-foreground' 
+                                      : 'bg-secondary'
+                                  )}
+                                >
+                                  {initial}
+                                </div>
+                              ))}
+                              {remainingCount > 0 && (
+                                <div className="flex h-7 w-7 items-center justify-center rounded-full bg-muted border-2 border-background text-xs font-medium text-muted-foreground">
+                                  +{remainingCount}
+                                </div>
+                              )}
+                            </div>
+                            <span className="text-sm text-muted-foreground">
+                              {filled} serving
+                            </span>
+                          </div>
+                        )}
                       </div>
-                      {assigned && (
-                        <Badge variant="default" className="shrink-0">
-                          You're Assigned
-                        </Badge>
-                      )}
                     </div>
-                    {assigned && userRoles.length > 0 && (
-                      <div className="mt-3 pt-3 border-t">
-                        <p className="text-sm">
-                          <span className="text-muted-foreground">Your role(s): </span>
-                          <span className="font-semibold">{userRoles.join(', ')}</span>
-                        </p>
-                      </div>
-                    )}
                   </CardContent>
                 </Card>
               );
