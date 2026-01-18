@@ -593,26 +593,19 @@ export function CreateEventDialog({ open, onOpenChange }: CreateEventDialogProps
                             {index === 0 && <FormLabel>Qty</FormLabel>}
                             <FormControl>
                               <Input
-                                type="text"
-                                inputMode="numeric"
-                                pattern="[0-9]*"
-                                value={field.value ?? ""}
+                                type="number"
+                                min={1}
+                                max={99}
+                                value={field.value === undefined ? "" : String(field.value)}
                                 onChange={(e) => {
                                   const val = e.target.value;
                                   if (val === "") {
-                                    field.onChange(undefined);
+                                    field.onChange(1);
                                     return;
                                   }
-                                  if (!/^\d*$/.test(val)) return;
                                   const num = parseInt(val, 10);
-                                  if (!isNaN(num)) {
+                                  if (!isNaN(num) && num >= 1 && num <= 99) {
                                     field.onChange(num);
-                                  }
-                                }}
-                                onBlur={() => {
-                                  field.onBlur();
-                                  if (!field.value || field.value < 1) {
-                                    field.onChange(1);
                                   }
                                 }}
                               />
