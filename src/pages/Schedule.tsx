@@ -37,7 +37,7 @@ import { Separator } from "@/components/ui/separator";
 const Schedule = () => {
   const { user } = useAuth();
   const [currentMonth, setCurrentMonth] = useState(new Date());
-  const [viewMode, setViewMode] = useState<"calendar" | "list">("calendar");
+  const [viewMode, setViewMode] = useState<"calendar" | "list">("list");
   const [selectedEvent, setSelectedEvent] = useState<EventWithDetails | null>(null);
 
   // Fetch only published events
