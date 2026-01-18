@@ -603,12 +603,17 @@ export function CreateEventDialog({ open, onOpenChange }: CreateEventDialogProps
                                     field.onChange(undefined);
                                     return;
                                   }
-                                  // Only allow digits
-                                  if (!/^\d+$/.test(val)) return;
+
+                                  // Allow any digits (including intermediate "0" while editing)
+                                  if (!/^\d*$/.test(val)) return;
+
                                   const num = parseInt(val, 10);
-                                  if (!Number.isNaN(num)) {
-                                    field.onChange(num);
+                                  if (Number.isNaN(num)) {
+                                    field.onChange(undefined);
+                                    return;
                                   }
+
+                                  field.onChange(num);
                                 }}
                                 onBlur={() => {
                                   field.onBlur();
