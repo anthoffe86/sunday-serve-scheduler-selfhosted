@@ -1,1 +1,7 @@
 project_id = "rshmjqidfzemwxrlgcbr"
+
+[functions.admin-user-management]
+verify_jwt = false
+
+[functions.auto-scheduler]
+verify_jwt = false

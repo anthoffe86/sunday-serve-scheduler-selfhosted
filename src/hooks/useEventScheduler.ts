@@ -580,3 +580,35 @@ export function useBulkUpdateEventStatus() {
     },
   });
 }
+
+// Hook: Auto-schedule volunteers for events
+export function useAutoSchedule() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (data: { templateId?: string; eventIds?: string[] }) => {
+      const { data: result, error } = await supabase.functions.invoke('auto-scheduler', {
+        body: data,
+      });
+
+      if (error) throw error;
+      if (result.error) throw new Error(result.error);
+      
+      return result as {
+        message: string;
+        assignments: Array<{
+          event_id: string;
+          event_date: string;
+          role: string;
+          volunteer_id: string;
+          volunteer_name: string;
+        }>;
+        totalEvents: number;
+        totalAssignments: number;
+      };
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['events'] });
+    },
+  });
+}
