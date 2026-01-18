@@ -41,6 +41,7 @@ import {
   EventWithDetails,
   EventTemplateWithRoles
 } from '@/hooks/useEventScheduler';
+import { useProfiles } from '@/hooks/useVolunteerData';
 import { cn } from '@/lib/utils';
 import { ROLE_LABELS } from '@/types';
 import { DAYS_OF_WEEK } from '@/hooks/useEventScheduler';
@@ -59,6 +60,7 @@ const AdminEventDetail = () => {
   
   const { data: templates, isLoading: templatesLoading } = useEventTemplates();
   const { data: allEvents, isLoading: eventsLoading } = useEvents();
+  const { data: allProfiles, isLoading: profilesLoading } = useProfiles();
   
   const updateTemplate = useUpdateEventTemplate();
   const deleteTemplate = useDeleteEventTemplate();
@@ -126,9 +128,13 @@ const AdminEventDetail = () => {
   }, [templateEvents]);
 
   // Calculate volunteer assignment counts across all events (draft and published separately)
-  const { draftAssignmentCounts, publishedAssignmentCounts } = useMemo(() => {
+  // Also track who is NOT assigned
+  const { draftAssignmentCounts, publishedAssignmentCounts, draftUnassigned, publishedUnassigned } = useMemo(() => {
     const draftEvents = templateEvents.filter(e => e.status === 'draft');
     const publishedEvents = templateEvents.filter(e => e.status === 'published');
+    
+    // Get all active volunteers
+    const activeVolunteers = (allProfiles || []).filter(p => p.active);
     
     const countAssignments = (events: typeof templateEvents) => {
       const counts = new Map<string, { name: string; count: number }>();
@@ -143,16 +149,35 @@ const AdminEventDetail = () => {
           }
         }
       }
-      return Array.from(counts.entries())
-        .map(([id, data]) => ({ volunteerId: id, name: data.name, count: data.count }))
-        .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+      return {
+        assigned: Array.from(counts.entries())
+          .map(([id, data]) => ({ volunteerId: id, name: data.name, count: data.count }))
+          .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name)),
+        assignedIds: counts,
+      };
     };
 
+    const draftResult = countAssignments(draftEvents);
+    const publishedResult = countAssignments(publishedEvents);
+
+    // Find unassigned volunteers
+    const draftUnassignedList = activeVolunteers
+      .filter(p => !draftResult.assignedIds.has(p.user_id))
+      .map(p => ({ volunteerId: p.user_id, name: p.name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+
+    const publishedUnassignedList = activeVolunteers
+      .filter(p => !publishedResult.assignedIds.has(p.user_id))
+      .map(p => ({ volunteerId: p.user_id, name: p.name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+
     return {
-      draftAssignmentCounts: countAssignments(draftEvents),
-      publishedAssignmentCounts: countAssignments(publishedEvents),
+      draftAssignmentCounts: draftResult.assigned,
+      publishedAssignmentCounts: publishedResult.assigned,
+      draftUnassigned: draftUnassignedList,
+      publishedUnassigned: publishedUnassignedList,
     };
-  }, [templateEvents]);
+  }, [templateEvents, allProfiles]);
 
   const publishedEventCount = useMemo(() => 
     templateEvents.filter(e => e.status === 'published').length
@@ -212,7 +237,7 @@ const AdminEventDetail = () => {
     return `${displayHour}:${minutes} ${ampm}`;
   };
 
-  if (authLoading || templatesLoading || eventsLoading) {
+  if (authLoading || templatesLoading || eventsLoading || profilesLoading) {
     return (
       <div className="flex items-center justify-center py-12">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -380,7 +405,7 @@ const AdminEventDetail = () => {
       </Card>
 
       {/* Volunteer Assignment Summary (for draft events) */}
-      {draftAssignmentCounts.length > 0 && (
+      {(draftAssignmentCounts.length > 0 || draftUnassigned.length > 0) && publishValidation.draftCount > 0 && (
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2">
@@ -388,32 +413,54 @@ const AdminEventDetail = () => {
               Volunteer Assignment Summary (Draft Events)
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground mb-3">
-              How many times each volunteer is assigned across {publishValidation.draftCount} draft event{publishValidation.draftCount !== 1 ? 's' : ''}:
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {draftAssignmentCounts.map((v) => (
-                <Badge 
-                  key={v.volunteerId} 
-                  variant="outline" 
-                  className={cn(
-                    "text-sm py-1.5 px-3",
-                    v.count >= 3 && "border-amber-400 bg-amber-50 text-amber-800",
-                    v.count >= 4 && "border-red-400 bg-red-50 text-red-800"
-                  )}
-                >
-                  {v.name}
-                  <span className="ml-1.5 font-bold">×{v.count}</span>
-                </Badge>
-              ))}
-            </div>
+          <CardContent className="space-y-4">
+            {draftAssignmentCounts.length > 0 && (
+              <div>
+                <p className="text-sm text-muted-foreground mb-3">
+                  How many times each volunteer is assigned across {publishValidation.draftCount} draft event{publishValidation.draftCount !== 1 ? 's' : ''}:
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {draftAssignmentCounts.map((v) => (
+                    <Badge 
+                      key={v.volunteerId} 
+                      variant="outline" 
+                      className={cn(
+                        "text-sm py-1.5 px-3",
+                        v.count >= 3 && "border-amber-400 bg-amber-50 text-amber-800",
+                        v.count >= 4 && "border-red-400 bg-red-50 text-red-800"
+                      )}
+                    >
+                      {v.name}
+                      <span className="ml-1.5 font-bold">×{v.count}</span>
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+            {draftUnassigned.length > 0 && (
+              <div>
+                <p className="text-sm text-muted-foreground mb-3">
+                  <span className="text-amber-600 font-medium">{draftUnassigned.length}</span> active volunteer{draftUnassigned.length !== 1 ? 's are' : ' is'} not assigned to any draft event:
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {draftUnassigned.map((v) => (
+                    <Badge 
+                      key={v.volunteerId} 
+                      variant="outline" 
+                      className="text-sm py-1.5 px-3 border-muted-foreground/30 text-muted-foreground"
+                    >
+                      {v.name}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
 
       {/* Volunteer Assignment Summary (for published events) */}
-      {publishedAssignmentCounts.length > 0 && (
+      {(publishedAssignmentCounts.length > 0 || publishedUnassigned.length > 0) && publishedEventCount > 0 && (
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2">
@@ -421,26 +468,48 @@ const AdminEventDetail = () => {
               Volunteer Assignment Summary (Published Events)
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground mb-3">
-              How many times each volunteer is assigned across {publishedEventCount} published event{publishedEventCount !== 1 ? 's' : ''}:
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {publishedAssignmentCounts.map((v) => (
-                <Badge 
-                  key={v.volunteerId} 
-                  variant="outline" 
-                  className={cn(
-                    "text-sm py-1.5 px-3",
-                    v.count >= 3 && "border-amber-400 bg-amber-50 text-amber-800",
-                    v.count >= 4 && "border-red-400 bg-red-50 text-red-800"
-                  )}
-                >
-                  {v.name}
-                  <span className="ml-1.5 font-bold">×{v.count}</span>
-                </Badge>
-              ))}
-            </div>
+          <CardContent className="space-y-4">
+            {publishedAssignmentCounts.length > 0 && (
+              <div>
+                <p className="text-sm text-muted-foreground mb-3">
+                  How many times each volunteer is assigned across {publishedEventCount} published event{publishedEventCount !== 1 ? 's' : ''}:
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {publishedAssignmentCounts.map((v) => (
+                    <Badge 
+                      key={v.volunteerId} 
+                      variant="outline" 
+                      className={cn(
+                        "text-sm py-1.5 px-3",
+                        v.count >= 3 && "border-amber-400 bg-amber-50 text-amber-800",
+                        v.count >= 4 && "border-red-400 bg-red-50 text-red-800"
+                      )}
+                    >
+                      {v.name}
+                      <span className="ml-1.5 font-bold">×{v.count}</span>
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+            {publishedUnassigned.length > 0 && (
+              <div>
+                <p className="text-sm text-muted-foreground mb-3">
+                  <span className="text-amber-600 font-medium">{publishedUnassigned.length}</span> active volunteer{publishedUnassigned.length !== 1 ? 's are' : ' is'} not assigned to any published event:
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {publishedUnassigned.map((v) => (
+                    <Badge 
+                      key={v.volunteerId} 
+                      variant="outline" 
+                      className="text-sm py-1.5 px-3 border-muted-foreground/30 text-muted-foreground"
+                    >
+                      {v.name}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
