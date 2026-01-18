@@ -14,6 +14,8 @@ import Profile from "./pages/Profile";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import VolunteerManagement from "./pages/admin/VolunteerManagement";
 import AdminSchedule from "./pages/admin/Schedule";
+import AdminEvents from "./pages/admin/Events";
+import AdminEventDetail from "./pages/admin/EventDetail";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 
@@ -41,6 +43,8 @@ const App = () => (
               <Route path="/admin" element={<AdminDashboard />} />
               <Route path="/admin/volunteers" element={<VolunteerManagement />} />
               <Route path="/admin/schedule" element={<AdminSchedule />} />
+              <Route path="/admin/events" element={<AdminEvents />} />
+              <Route path="/admin/events/:eventId" element={<AdminEventDetail />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>
