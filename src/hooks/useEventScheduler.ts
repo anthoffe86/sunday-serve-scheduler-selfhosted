@@ -512,6 +512,26 @@ export function useDeleteEvent() {
   });
 }
 
+// Hook: Bulk delete events
+export function useBulkDeleteEvents() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (ids: string[]) => {
+      const { error } = await supabase
+        .from('events')
+        .delete()
+        .in('id', ids);
+
+      if (error) throw error;
+      return { ids };
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['events'] });
+    },
+  });
+}
+
 // Hook: Assign volunteer to event
 export function useAssignVolunteer() {
   const queryClient = useQueryClient();

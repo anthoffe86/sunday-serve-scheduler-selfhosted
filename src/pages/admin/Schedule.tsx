@@ -9,6 +9,10 @@ import {
   LayoutGrid,
   ChevronLeft,
   ChevronRight,
+  Trash2,
+  X,
+  CheckSquare,
+  Square,
 } from "lucide-react";
 import {
   format,
@@ -27,19 +31,35 @@ import {
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useAuth } from "@/hooks/useAuth";
 import { Navigate } from "react-router-dom";
-import { useEvents, EventWithDetails } from "@/hooks/useEventScheduler";
+import { useEvents, useBulkDeleteEvents, EventWithDetails } from "@/hooks/useEventScheduler";
 import { cn } from "@/lib/utils";
 import { EditEventDialog } from "@/components/admin/EditEventDialog";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Link } from "react-router-dom";
+import { toast } from "sonner";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const AdminSchedule = () => {
   const { isAdmin, isLoading: authLoading } = useAuth();
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [viewMode, setViewMode] = useState<"calendar" | "list">("list");
   const [editEventId, setEditEventId] = useState<string | null>(null);
+  const [selectedEvents, setSelectedEvents] = useState<Set<string>>(new Set());
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  
+  const bulkDeleteMutation = useBulkDeleteEvents();
 
   // Fetch events for a wider range to support calendar navigation
   const startDate = format(subMonths(startOfMonth(currentMonth), 1), "yyyy-MM-dd");
@@ -121,6 +141,47 @@ const AdminSchedule = () => {
     const totalFilled = event.assignments.length;
     return { filled: totalFilled, required: totalRequired };
   };
+
+  const toggleEventSelection = (eventId: string, e?: React.MouseEvent) => {
+    if (e) {
+      e.stopPropagation();
+    }
+    setSelectedEvents((prev) => {
+      const next = new Set(prev);
+      if (next.has(eventId)) {
+        next.delete(eventId);
+      } else {
+        next.add(eventId);
+      }
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedEvents.size === currentMonthEvents.length) {
+      setSelectedEvents(new Set());
+    } else {
+      setSelectedEvents(new Set(currentMonthEvents.map((e) => e.id)));
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    const ids = Array.from(selectedEvents);
+    try {
+      await bulkDeleteMutation.mutateAsync(ids);
+      toast.success(`Deleted ${ids.length} event${ids.length > 1 ? "s" : ""}`);
+      setSelectedEvents(new Set());
+      setShowDeleteConfirm(false);
+    } catch (error) {
+      toast.error("Failed to delete events");
+    }
+  };
+
+  const clearSelection = () => {
+    setSelectedEvents(new Set());
+  };
+
+  const isSelectionMode = selectedEvents.size > 0;
 
   return (
     <div className="space-y-6">
@@ -254,116 +315,201 @@ const AdminSchedule = () => {
               </CardContent>
             </Card>
           ) : (
-            currentMonthEvents.map((event, index) => {
-              const { filled, required } = getFilledCount(event);
-              const eventDate = parseISO(event.date);
-              const isNextEvent = index === 0 && event.status !== "cancelled";
-
-              // Get volunteer initials for display
-              const volunteerInitials = event.assignments.slice(0, 4).map((a) => {
-                const name = a.volunteer_name || "Unknown";
-                return name
-                  .split(" ")
-                  .map((n) => n[0])
-                  .join("")
-                  .slice(0, 1)
-                  .toUpperCase();
-              });
-              const remainingCount = event.assignments.length - 4;
-
-              return (
-                <Card
-                  key={event.id}
-                  className={cn(
-                    "cursor-pointer hover:shadow-md transition-all overflow-hidden",
-                    event.status === "cancelled" && "opacity-60",
-                    isNextEvent && "ring-1 ring-primary/30",
-                  )}
-                  onClick={() => setEditEventId(event.id)}
+            <>
+              {/* Bulk Actions Bar */}
+              <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={toggleSelectAll}
+                  className="gap-2"
                 >
-                  <CardContent className="p-0">
-                    <div className="flex">
-                      {/* Date Block */}
-                      <div
-                        className={cn(
-                          "flex flex-col items-center justify-center px-4 py-4 min-w-[72px]",
-                          event.status === "published"
-                            ? "bg-primary text-primary-foreground"
-                            : event.status === "cancelled"
-                              ? "bg-muted text-muted-foreground"
-                              : "bg-secondary text-secondary-foreground",
-                        )}
-                      >
-                        <span className="text-xs font-semibold uppercase tracking-wide">
-                          {format(eventDate, "EEE")}
-                        </span>
-                        <span className="text-2xl font-bold">{format(eventDate, "d")}</span>
-                      </div>
+                  {selectedEvents.size === currentMonthEvents.length ? (
+                    <CheckSquare className="h-4 w-4" />
+                  ) : (
+                    <Square className="h-4 w-4" />
+                  )}
+                  {selectedEvents.size === currentMonthEvents.length ? "Deselect All" : "Select All"}
+                </Button>
+                
+                {isSelectionMode && (
+                  <>
+                    <span className="text-sm text-muted-foreground">
+                      {selectedEvents.size} selected
+                    </span>
+                    <div className="flex-1" />
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={clearSelection}
+                      className="gap-2"
+                    >
+                      <X className="h-4 w-4" />
+                      Clear
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => setShowDeleteConfirm(true)}
+                      className="gap-2"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      Delete {selectedEvents.size}
+                    </Button>
+                  </>
+                )}
+              </div>
 
-                      {/* Content */}
-                      <div className="flex-1 p-4">
-                        <h3
-                          className={cn(
-                            "font-serif text-lg font-semibold mb-1",
-                            event.status === "cancelled" && "line-through",
-                          )}
+              {currentMonthEvents.map((event, index) => {
+                const { filled, required } = getFilledCount(event);
+                const eventDate = parseISO(event.date);
+                const isNextEvent = index === 0 && event.status !== "cancelled";
+                const isSelected = selectedEvents.has(event.id);
+
+                // Get volunteer initials for display
+                const volunteerInitials = event.assignments.slice(0, 4).map((a) => {
+                  const name = a.volunteer_name || "Unknown";
+                  return name
+                    .split(" ")
+                    .map((n) => n[0])
+                    .join("")
+                    .slice(0, 1)
+                    .toUpperCase();
+                });
+                const remainingCount = event.assignments.length - 4;
+
+                return (
+                  <Card
+                    key={event.id}
+                    className={cn(
+                      "cursor-pointer hover:shadow-md transition-all overflow-hidden",
+                      event.status === "cancelled" && "opacity-60",
+                      isNextEvent && "ring-1 ring-primary/30",
+                      isSelected && "ring-2 ring-primary bg-primary/5",
+                    )}
+                    onClick={() => setEditEventId(event.id)}
+                  >
+                    <CardContent className="p-0">
+                      <div className="flex">
+                        {/* Checkbox */}
+                        <div
+                          className="flex items-center justify-center px-3"
+                          onClick={(e) => toggleEventSelection(event.id, e)}
                         >
-                          {event.name}
-                        </h3>
-
-                        <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground mb-3">
-                          <span className="flex items-center gap-1.5">
-                            <Clock className="h-4 w-4" />
-                            {formatTime(event.start_time)}
-                          </span>
-                          <Badge
-                            variant={
-                              event.status === "published"
-                                ? "outline"
-                                : event.status === "cancelled"
-                                  ? "destructive"
-                                  : "secondary"
-                            }
-                            className="text-xs"
-                          >
-                            {event.status}
-                          </Badge>
+                          <Checkbox
+                            checked={isSelected}
+                            onCheckedChange={() => toggleEventSelection(event.id)}
+                            onClick={(e) => e.stopPropagation()}
+                          />
                         </div>
 
-                        {/* Volunteer Avatars */}
-                        {required > 0 && (
-                          <div className="flex items-center gap-2">
-                            <Users className="h-4 w-4 text-muted-foreground" />
-                            <div className="flex items-center -space-x-1">
-                              {volunteerInitials.map((initial, i) => (
-                                <div
-                                  key={i}
-                                  className="flex h-7 w-7 items-center justify-center rounded-full bg-secondary border-2 border-background text-xs font-medium"
-                                >
-                                  {initial}
-                                </div>
-                              ))}
-                              {remainingCount > 0 && (
-                                <div className="flex h-7 w-7 items-center justify-center rounded-full bg-muted border-2 border-background text-xs font-medium text-muted-foreground">
-                                  +{remainingCount}
-                                </div>
-                              )}
-                            </div>
-                            <span className="text-sm text-muted-foreground">{filled} serving</span>
+                        {/* Date Block */}
+                        <div
+                          className={cn(
+                            "flex flex-col items-center justify-center px-4 py-4 min-w-[72px]",
+                            event.status === "published"
+                              ? "bg-primary text-primary-foreground"
+                              : event.status === "cancelled"
+                                ? "bg-muted text-muted-foreground"
+                                : "bg-secondary text-secondary-foreground",
+                          )}
+                        >
+                          <span className="text-xs font-semibold uppercase tracking-wide">
+                            {format(eventDate, "EEE")}
+                          </span>
+                          <span className="text-2xl font-bold">{format(eventDate, "d")}</span>
+                        </div>
+
+                        {/* Content */}
+                        <div className="flex-1 p-4">
+                          <h3
+                            className={cn(
+                              "font-serif text-lg font-semibold mb-1",
+                              event.status === "cancelled" && "line-through",
+                            )}
+                          >
+                            {event.name}
+                          </h3>
+
+                          <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground mb-3">
+                            <span className="flex items-center gap-1.5">
+                              <Clock className="h-4 w-4" />
+                              {formatTime(event.start_time)}
+                            </span>
+                            <Badge
+                              variant={
+                                event.status === "published"
+                                  ? "outline"
+                                  : event.status === "cancelled"
+                                    ? "destructive"
+                                    : "secondary"
+                              }
+                              className="text-xs"
+                            >
+                              {event.status}
+                            </Badge>
                           </div>
-                        )}
+
+                          {/* Volunteer Avatars */}
+                          {required > 0 && (
+                            <div className="flex items-center gap-2">
+                              <Users className="h-4 w-4 text-muted-foreground" />
+                              <div className="flex items-center -space-x-1">
+                                {volunteerInitials.map((initial, i) => (
+                                  <div
+                                    key={i}
+                                    className="flex h-7 w-7 items-center justify-center rounded-full bg-secondary border-2 border-background text-xs font-medium"
+                                  >
+                                    {initial}
+                                  </div>
+                                ))}
+                                {remainingCount > 0 && (
+                                  <div className="flex h-7 w-7 items-center justify-center rounded-full bg-muted border-2 border-background text-xs font-medium text-muted-foreground">
+                                    +{remainingCount}
+                                  </div>
+                                )}
+                              </div>
+                              <span className="text-sm text-muted-foreground">{filled} serving</span>
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </>
           )}
         </div>
       )}
 
       {/* Edit Event Dialog */}
       <EditEventDialog open={!!editEventId} onOpenChange={(open) => !open && setEditEventId(null)} event={editEvent} />
+
+      {/* Bulk Delete Confirmation */}
+      <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete {selectedEvents.size} event{selectedEvents.size > 1 ? "s" : ""}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete the selected events and all their volunteer assignments. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleBulkDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {bulkDeleteMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                "Delete"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
