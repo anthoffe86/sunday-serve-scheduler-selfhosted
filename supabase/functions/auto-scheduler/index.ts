@@ -273,6 +273,27 @@ Deno.serve(async (req) => {
       }
     });
 
+    // Track GLOBAL family assignment counts (to avoid over-assigning one family)
+    // For volunteers without a family group, we treat them as a solo family.
+    const getFamilyKey = (userId: string): string => {
+      const fg = profileMap.get(userId)?.family_group_id;
+      return fg ? fg : `__solo__:${userId}`;
+    };
+
+    const getFamilySize = (userId: string): number => {
+      const fg = profileMap.get(userId)?.family_group_id;
+      return fg ? (familyGroups.get(fg)?.length || 1) : 1;
+    };
+
+    const familyAssignmentCounts = new Map<string, number>();
+    // init
+    validProfiles.forEach(p => familyAssignmentCounts.set(getFamilyKey(p.user_id), 0));
+    // add existing
+    (existingAssignments || []).forEach(ea => {
+      const key = getFamilyKey(ea.volunteer_id);
+      familyAssignmentCounts.set(key, (familyAssignmentCounts.get(key) || 0) + 1);
+    });
+
     const newAssignments: AssignmentResult[] = [];
     const assignmentsToInsert: { event_id: string; volunteer_id: string; role: string }[] = [];
 
@@ -352,6 +373,8 @@ Deno.serve(async (req) => {
           hasFamilyOnDate: boolean;
           availableFamilyCount: number;
           familyGroupId: string | null;
+          familyKey: string;
+          familyLoad: number; // normalized: assignments per family member
           hasExplicitlyUnavailableFamilyMember: boolean;
         }[] = [];
 
@@ -387,6 +410,10 @@ Deno.serve(async (req) => {
             (fm) => dateAvail?.get(fm) === false
           );
 
+          const familyKey = getFamilyKey(userId);
+          const familySize = getFamilySize(userId);
+          const familyLoad = (familyAssignmentCounts.get(familyKey) || 0) / familySize;
+
           eligibleVolunteers.push({ 
             userId, 
             assignmentCount,
@@ -394,63 +421,74 @@ Deno.serve(async (req) => {
             hasFamilyOnDate,
             availableFamilyCount,
             familyGroupId: profile.family_group_id,
+            familyKey,
+            familyLoad,
             hasExplicitlyUnavailableFamilyMember,
           });
         }
 
-        // SORTING PRIORITY: FAMILY GROUPING IS PRIMARY
-        // 1. FIRST: Family already on date (MUST keep families together)
-        // 2. SECOND: Available family count (prefer volunteers whose family CAN be grouped)
-        // 3. THIRD: Avoid splitting families when a family member is explicitly unavailable
-        // 4. FOURTH: Assignment count (fair distribution - but only within same family tier)
-        // 5. FIFTH: Role preference
-        eligibleVolunteers.sort((a, b) => {
-          // Calculate family grouping score (higher = better for grouping)
-          // Family already assigned to this date = massive bonus (100)
-          // Each available family member = small bonus
-          const familyScoreA = (a.hasFamilyOnDate ? 100 : 0) + a.availableFamilyCount;
-          const familyScoreB = (b.hasFamilyOnDate ? 100 : 0) + b.availableFamilyCount;
-
-          // PRIMARY: Family grouping - ALWAYS prioritize keeping families together
-          if (familyScoreA !== familyScoreB) {
-            return familyScoreB - familyScoreA; // Higher score = better
-          }
-
-          // TERTIARY: Avoid splitting families when we KNOW a family member can't make this date.
-          // Only apply this penalty when they don't already have family on the date.
-          const splitRiskA = !a.hasFamilyOnDate && !!a.familyGroupId && a.hasExplicitlyUnavailableFamilyMember;
-          const splitRiskB = !b.hasFamilyOnDate && !!b.familyGroupId && b.hasExplicitlyUnavailableFamilyMember;
-          if (splitRiskA !== splitRiskB) {
-            return splitRiskA ? 1 : -1; // Non-risk first
-          }
-
-          // FOURTH: Fair distribution - only matters when family scores are equal
-          if (a.assignmentCount !== b.assignmentCount) {
-            return a.assignmentCount - b.assignmentCount;
-          }
-
-          // FIFTH: Role preference
-          if (a.preferenceScore !== b.preferenceScore) {
-            return a.preferenceScore - b.preferenceScore;
-          }
-
-          return 0;
-        });
-
         console.log(`    Found ${eligibleVolunteers.length} eligible volunteers`);
+
         if (eligibleVolunteers.length > 0) {
-          const top3 = eligibleVolunteers.slice(0, 3).map(v => {
-            const name = profileMap.get(v.userId)?.name || 'Unknown';
-            const splitRisk = !v.hasFamilyOnDate && !!v.familyGroupId && v.hasExplicitlyUnavailableFamilyMember;
-            return `${name}(cnt=${v.assignmentCount}, onDate=${v.hasFamilyOnDate}, availFam=${v.availableFamilyCount}, splitRisk=${splitRisk})`;
-          });
-          console.log(`    Top candidates: ${top3.join(', ')}`);
+          const top3Preview = eligibleVolunteers
+            .slice()
+            .sort((a, b) => (a.assignmentCount - b.assignmentCount) || (a.familyLoad - b.familyLoad))
+            .slice(0, 3)
+            .map(v => {
+              const name = profileMap.get(v.userId)?.name || 'Unknown';
+              const splitRisk = !v.hasFamilyOnDate && !!v.familyGroupId && v.hasExplicitlyUnavailableFamilyMember;
+              return `${name}(cnt=${v.assignmentCount}, famLoad=${v.familyLoad.toFixed(2)}, onDate=${v.hasFamilyOnDate}, availFam=${v.availableFamilyCount}, splitRisk=${splitRisk})`;
+            });
+          console.log(`    Sample candidates: ${top3Preview.join(', ')}`);
         }
 
-        // Assign top N volunteers
-        for (let i = 0; i < Math.min(neededCount, eligibleVolunteers.length); i++) {
-          const volunteer = eligibleVolunteers[i];
+        // Assignment strategy:
+        // - HARD fairness gate: always assign volunteers with the lowest current assignmentCount first
+        //   (so everyone gets at least 1 when possible)
+        // - Within that fairness tier, prefer family grouping
+        // - Also avoid over-assigning any one family by preferring lower familyLoad
+        let remaining = eligibleVolunteers.slice();
+
+        for (let pickIndex = 0; pickIndex < neededCount; pickIndex++) {
+          if (remaining.length === 0) break;
+
+          // Refresh dynamic fields from current global maps (because we update counts each pick)
+          remaining = remaining.map(v => {
+            const familySize = getFamilySize(v.userId);
+            const familyLoad = (familyAssignmentCounts.get(v.familyKey) || 0) / familySize;
+            return {
+              ...v,
+              assignmentCount: globalAssignmentCounts.get(v.userId) || 0,
+              familyLoad,
+            };
+          });
+
+          const minCount = Math.min(...remaining.map(v => v.assignmentCount));
+          const tier = remaining.filter(v => v.assignmentCount === minCount);
+
+          // Sort within tier by family grouping first, then avoid splits, then familyLoad, then role preference
+          tier.sort((a, b) => {
+            const familyScoreA = (a.hasFamilyOnDate ? 100 : 0) + a.availableFamilyCount;
+            const familyScoreB = (b.hasFamilyOnDate ? 100 : 0) + b.availableFamilyCount;
+            if (familyScoreA !== familyScoreB) return familyScoreB - familyScoreA;
+
+            const splitRiskA = !a.hasFamilyOnDate && !!a.familyGroupId && a.hasExplicitlyUnavailableFamilyMember;
+            const splitRiskB = !b.hasFamilyOnDate && !!b.familyGroupId && b.hasExplicitlyUnavailableFamilyMember;
+            if (splitRiskA !== splitRiskB) return splitRiskA ? 1 : -1;
+
+            // Prevent families from soaking up disproportionate assignments
+            if (a.familyLoad !== b.familyLoad) return a.familyLoad - b.familyLoad;
+
+            if (a.preferenceScore !== b.preferenceScore) return a.preferenceScore - b.preferenceScore;
+
+            return 0;
+          });
+
+          const volunteer = tier[0];
           const profile = profileMap.get(volunteer.userId)!;
+
+          // Remove chosen volunteer from remaining for this role
+          remaining = remaining.filter(v => v.userId !== volunteer.userId);
 
           // Update tracking
           if (!currentEventAssignments.has(role.role)) {
@@ -458,9 +496,12 @@ Deno.serve(async (req) => {
           }
           currentEventAssignments.get(role.role)!.add(volunteer.userId);
           dateVolunteers.add(volunteer.userId);
-          
+
           // Update global assignment count
           globalAssignmentCounts.set(volunteer.userId, (globalAssignmentCounts.get(volunteer.userId) || 0) + 1);
+
+          // Update family assignment count
+          familyAssignmentCounts.set(volunteer.familyKey, (familyAssignmentCounts.get(volunteer.familyKey) || 0) + 1);
 
           assignmentsToInsert.push({
             event_id: event.id,
@@ -476,7 +517,10 @@ Deno.serve(async (req) => {
             volunteer_name: profile.name,
           });
 
-          console.log(`    Assigned ${profile.name} to ${role.role} (total assignments: ${globalAssignmentCounts.get(volunteer.userId)})`);
+          console.log(
+            `    Assigned ${profile.name} to ${role.role} ` +
+              `(cnt=${globalAssignmentCounts.get(volunteer.userId)}, famLoad=${((familyAssignmentCounts.get(volunteer.familyKey) || 0) / getFamilySize(volunteer.userId)).toFixed(2)})`
+          );
         }
       }
     }
