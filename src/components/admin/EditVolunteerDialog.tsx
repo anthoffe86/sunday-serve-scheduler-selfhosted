@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
-import { Loader2, Save, Key, Mail } from 'lucide-react';
+import { Loader2, Save, Key, Mail, CalendarDays, Check, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Calendar } from '@/components/ui/calendar';
+import { Badge } from '@/components/ui/badge';
 import {
   Dialog,
   DialogContent,
@@ -26,10 +28,14 @@ import {
   Profile, 
   useAdminUpdateProfile, 
   useUserRolePreferences,
-  useFamilyGroups 
+  useFamilyGroups,
+  useUserAvailability,
+  useAdminToggleAvailability,
+  useAdminDeleteAvailability,
 } from '@/hooks/useVolunteerData';
 import { ROLE_LABELS } from '@/types';
 import type { Database } from '@/integrations/supabase/types';
+import { format, isSameDay, startOfMonth, endOfMonth, eachDayOfInterval, isSunday, addMonths, subMonths } from 'date-fns';
 
 type ServiceRole = Database['public']['Enums']['service_role'];
 
@@ -61,10 +67,14 @@ export function EditVolunteerDialog({
   const [selectedFamilyGroup, setSelectedFamilyGroup] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [resetLinkCopied, setResetLinkCopied] = useState(false);
+  const [currentMonth, setCurrentMonth] = useState(new Date());
 
   const updateProfile = useAdminUpdateProfile();
   const { data: rolePrefs, refetch: refetchRolePrefs } = useUserRolePreferences(volunteer?.user_id);
   const { data: familyGroups } = useFamilyGroups();
+  const { data: availability, refetch: refetchAvailability } = useUserAvailability(volunteer?.user_id);
+  const toggleAvailability = useAdminToggleAvailability();
+  const deleteAvailability = useAdminDeleteAvailability();
 
   useEffect(() => {
     if (volunteer && open) {
@@ -104,8 +114,6 @@ export function EditVolunteerDialog({
 
       // Update email if changed
       if (email.trim().toLowerCase() !== volunteer.email.toLowerCase()) {
-        const { data: { session } } = await supabase.auth.getSession();
-        
         const response = await supabase.functions.invoke('admin-user-management', {
           body: {
             action: 'update-email',
@@ -179,6 +187,37 @@ export function EditVolunteerDialog({
     }
   };
 
+  const getAvailabilityForDate = (date: Date) => {
+    const dateStr = format(date, 'yyyy-MM-dd');
+    return availability?.find(a => a.date === dateStr);
+  };
+
+  const handleToggleAvailability = async (date: Date, setAvailable: boolean | null) => {
+    if (!volunteer) return;
+
+    const dateStr = format(date, 'yyyy-MM-dd');
+    
+    try {
+      if (setAvailable === null) {
+        // Delete the availability record (reset to unset)
+        await deleteAvailability.mutateAsync({
+          userId: volunteer.user_id,
+          date: dateStr,
+        });
+      } else {
+        // Set available or unavailable
+        await toggleAvailability.mutateAsync({
+          userId: volunteer.user_id,
+          date: dateStr,
+          available: setAvailable,
+        });
+      }
+      refetchAvailability();
+    } catch (err) {
+      // Error is already handled by the mutation
+    }
+  };
+
   const handleClose = () => {
     setName('');
     setEmail('');
@@ -188,22 +227,33 @@ export function EditVolunteerDialog({
     onOpenChange(false);
   };
 
+  // Get Sundays in current month for quick access
+  const getSundaysInMonth = () => {
+    const start = startOfMonth(currentMonth);
+    const end = endOfMonth(currentMonth);
+    const days = eachDayOfInterval({ start, end });
+    return days.filter(isSunday);
+  };
+
   if (!volunteer) return null;
+
+  const sundays = getSundaysInMonth();
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Edit Volunteer</DialogTitle>
           <DialogDescription>
-            Update {volunteer.name}'s profile, role preferences, and account settings.
+            Update {volunteer.name}'s profile, role preferences, availability, and account settings.
           </DialogDescription>
         </DialogHeader>
 
         <Tabs defaultValue="profile" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="profile">Profile</TabsTrigger>
             <TabsTrigger value="roles">Roles</TabsTrigger>
+            <TabsTrigger value="availability">Availability</TabsTrigger>
             <TabsTrigger value="account">Account</TabsTrigger>
           </TabsList>
 
@@ -275,6 +325,112 @@ export function EditVolunteerDialog({
                   </Label>
                 </div>
               ))}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="availability" className="space-y-4 pt-4">
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-muted-foreground">
+                Manage availability for upcoming Sundays.
+              </p>
+              <div className="flex gap-2">
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
+                >
+                  ←
+                </Button>
+                <span className="text-sm font-medium min-w-[120px] text-center flex items-center justify-center">
+                  {format(currentMonth, 'MMMM yyyy')}
+                </span>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
+                >
+                  →
+                </Button>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center gap-4 text-xs text-muted-foreground pb-2 border-b">
+                <div className="flex items-center gap-1">
+                  <div className="w-3 h-3 rounded-full bg-green-500" />
+                  <span>Available</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <div className="w-3 h-3 rounded-full bg-red-500" />
+                  <span>Unavailable</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <div className="w-3 h-3 rounded-full bg-muted border" />
+                  <span>Not set</span>
+                </div>
+              </div>
+
+              {sundays.map((sunday) => {
+                const avail = getAvailabilityForDate(sunday);
+                const isAvailable = avail?.available;
+                const isSet = avail !== undefined;
+
+                return (
+                  <div 
+                    key={sunday.toISOString()} 
+                    className="flex items-center justify-between py-2 px-3 rounded-lg border"
+                  >
+                    <div className="flex items-center gap-3">
+                      <CalendarDays className="h-4 w-4 text-muted-foreground" />
+                      <span className="font-medium">{format(sunday, 'EEEE, MMM d')}</span>
+                      {isSet && (
+                        <Badge 
+                          variant={isAvailable ? 'default' : 'destructive'}
+                          className={isAvailable ? 'bg-green-500 hover:bg-green-600' : ''}
+                        >
+                          {isAvailable ? 'Available' : 'Unavailable'}
+                        </Badge>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant={isAvailable === true ? 'default' : 'outline'}
+                        size="sm"
+                        className={isAvailable === true ? 'bg-green-500 hover:bg-green-600' : ''}
+                        onClick={() => handleToggleAvailability(sunday, true)}
+                        disabled={toggleAvailability.isPending || deleteAvailability.isPending}
+                      >
+                        <Check className="h-3 w-3" />
+                      </Button>
+                      <Button
+                        variant={isAvailable === false ? 'destructive' : 'outline'}
+                        size="sm"
+                        onClick={() => handleToggleAvailability(sunday, false)}
+                        disabled={toggleAvailability.isPending || deleteAvailability.isPending}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                      {isSet && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleToggleAvailability(sunday, null)}
+                          disabled={toggleAvailability.isPending || deleteAvailability.isPending}
+                          className="text-muted-foreground"
+                        >
+                          Clear
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+
+              {sundays.length === 0 && (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  No Sundays in this month.
+                </p>
+              )}
             </div>
           </TabsContent>
 

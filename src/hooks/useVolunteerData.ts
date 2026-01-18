@@ -314,6 +314,25 @@ export function useAvailability() {
   });
 }
 
+// Admin hook to get availability for a specific user
+export function useUserAvailability(userId?: string) {
+  return useQuery({
+    queryKey: ['availability', userId],
+    queryFn: async () => {
+      if (!userId) return [];
+      
+      const { data, error } = await supabase
+        .from('availability')
+        .select('*')
+        .eq('user_id', userId);
+      
+      if (error) throw error;
+      return data as Availability[];
+    },
+    enabled: !!userId,
+  });
+}
+
 // Fetch all availability records for a specific date (for admin assignment)
 export function useAvailabilityForDate(date: string) {
   return useQuery({
@@ -359,6 +378,59 @@ export function useToggleAvailability() {
     },
     onError: (error) => {
       toast.error('Failed to update availability: ' + error.message);
+    },
+  });
+}
+
+// Admin hook to update availability for any user
+export function useAdminToggleAvailability() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async ({ userId, date, available }: { userId: string; date: string; available: boolean }) => {
+      // Use upsert to handle both insert and update
+      const { error } = await supabase
+        .from('availability')
+        .upsert({
+          user_id: userId,
+          date,
+          available,
+        }, {
+          onConflict: 'user_id,date',
+        });
+      
+      if (error) throw error;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['availability', variables.userId] });
+      queryClient.invalidateQueries({ queryKey: ['availability-for-date'] });
+    },
+    onError: (error) => {
+      toast.error('Failed to update availability: ' + error.message);
+    },
+  });
+}
+
+// Admin hook to delete availability for a user on a specific date
+export function useAdminDeleteAvailability() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async ({ userId, date }: { userId: string; date: string }) => {
+      const { error } = await supabase
+        .from('availability')
+        .delete()
+        .eq('user_id', userId)
+        .eq('date', date);
+      
+      if (error) throw error;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['availability', variables.userId] });
+      queryClient.invalidateQueries({ queryKey: ['availability-for-date'] });
+    },
+    onError: (error) => {
+      toast.error('Failed to delete availability: ' + error.message);
     },
   });
 }
