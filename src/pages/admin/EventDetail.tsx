@@ -125,28 +125,38 @@ const AdminEventDetail = () => {
     };
   }, [templateEvents]);
 
-  // Calculate volunteer assignment counts across all draft events
-  const volunteerAssignmentCounts = useMemo(() => {
+  // Calculate volunteer assignment counts across all events (draft and published separately)
+  const { draftAssignmentCounts, publishedAssignmentCounts } = useMemo(() => {
     const draftEvents = templateEvents.filter(e => e.status === 'draft');
-    const counts = new Map<string, { name: string; count: number }>();
+    const publishedEvents = templateEvents.filter(e => e.status === 'published');
     
-    for (const event of draftEvents) {
-      for (const assignment of event.assignments) {
-        const key = assignment.volunteer_id;
-        const existing = counts.get(key);
-        if (existing) {
-          existing.count++;
-        } else {
-          counts.set(key, { name: assignment.volunteer_name || 'Unknown', count: 1 });
+    const countAssignments = (events: typeof templateEvents) => {
+      const counts = new Map<string, { name: string; count: number }>();
+      for (const event of events) {
+        for (const assignment of event.assignments) {
+          const key = assignment.volunteer_id;
+          const existing = counts.get(key);
+          if (existing) {
+            existing.count++;
+          } else {
+            counts.set(key, { name: assignment.volunteer_name || 'Unknown', count: 1 });
+          }
         }
       }
-    }
-    
-    // Sort by count descending, then by name
-    return Array.from(counts.entries())
-      .map(([id, data]) => ({ volunteerId: id, name: data.name, count: data.count }))
-      .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+      return Array.from(counts.entries())
+        .map(([id, data]) => ({ volunteerId: id, name: data.name, count: data.count }))
+        .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+    };
+
+    return {
+      draftAssignmentCounts: countAssignments(draftEvents),
+      publishedAssignmentCounts: countAssignments(publishedEvents),
+    };
   }, [templateEvents]);
+
+  const publishedEventCount = useMemo(() => 
+    templateEvents.filter(e => e.status === 'published').length
+  , [templateEvents]);
 
   const handlePublishAll = async () => {
     const draftEventIds = templateEvents
@@ -370,7 +380,7 @@ const AdminEventDetail = () => {
       </Card>
 
       {/* Volunteer Assignment Summary (for draft events) */}
-      {volunteerAssignmentCounts.length > 0 && (
+      {draftAssignmentCounts.length > 0 && (
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2">
@@ -383,7 +393,40 @@ const AdminEventDetail = () => {
               How many times each volunteer is assigned across {publishValidation.draftCount} draft event{publishValidation.draftCount !== 1 ? 's' : ''}:
             </p>
             <div className="flex flex-wrap gap-2">
-              {volunteerAssignmentCounts.map((v) => (
+              {draftAssignmentCounts.map((v) => (
+                <Badge 
+                  key={v.volunteerId} 
+                  variant="outline" 
+                  className={cn(
+                    "text-sm py-1.5 px-3",
+                    v.count >= 3 && "border-amber-400 bg-amber-50 text-amber-800",
+                    v.count >= 4 && "border-red-400 bg-red-50 text-red-800"
+                  )}
+                >
+                  {v.name}
+                  <span className="ml-1.5 font-bold">×{v.count}</span>
+                </Badge>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Volunteer Assignment Summary (for published events) */}
+      {publishedAssignmentCounts.length > 0 && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Users className="h-4 w-4" />
+              Volunteer Assignment Summary (Published Events)
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground mb-3">
+              How many times each volunteer is assigned across {publishedEventCount} published event{publishedEventCount !== 1 ? 's' : ''}:
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {publishedAssignmentCounts.map((v) => (
                 <Badge 
                   key={v.volunteerId} 
                   variant="outline" 
