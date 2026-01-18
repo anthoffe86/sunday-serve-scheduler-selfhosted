@@ -387,8 +387,25 @@ export function CreateEventDialog({ open, onOpenChange }: CreateEventDialogProps
                               type="number" 
                               min={1}
                               max={104}
-                              {...field}
-                              onChange={(e) => field.onChange(parseInt(e.target.value, 10) || 1)}
+                              value={field.value ?? ''}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                if (val === '') {
+                                  field.onChange(undefined);
+                                } else {
+                                  const num = parseInt(val, 10);
+                                  if (!isNaN(num)) {
+                                    field.onChange(Math.min(104, Math.max(1, num)));
+                                  }
+                                }
+                              }}
+                              onBlur={(e) => {
+                                // Ensure valid value on blur
+                                const val = parseInt(e.target.value, 10);
+                                if (isNaN(val) || val < 1) {
+                                  field.onChange(1);
+                                }
+                              }}
                             />
                           </FormControl>
                           <FormDescription>
@@ -466,8 +483,24 @@ export function CreateEventDialog({ open, onOpenChange }: CreateEventDialogProps
                               <Input 
                                 type="number" 
                                 min={1}
-                                {...field}
-                                onChange={(e) => field.onChange(parseInt(e.target.value, 10) || 1)}
+                                value={field.value ?? ''}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  if (val === '') {
+                                    field.onChange(undefined);
+                                  } else {
+                                    const num = parseInt(val, 10);
+                                    if (!isNaN(num)) {
+                                      field.onChange(Math.max(1, num));
+                                    }
+                                  }
+                                }}
+                                onBlur={(e) => {
+                                  const val = parseInt(e.target.value, 10);
+                                  if (isNaN(val) || val < 1) {
+                                    field.onChange(1);
+                                  }
+                                }}
                               />
                             </FormControl>
                             <FormMessage />
