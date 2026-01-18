@@ -599,7 +599,10 @@ export function CreateEventDialog({ open, onOpenChange }: CreateEventDialogProps
                                 value={field.value ?? ""}
                                 onChange={(e) => {
                                   const val = e.target.value;
-
+                                  if (val === "") {
+                                    field.onChange(undefined);
+                                    return;
+                                  }
                                   if (!/^\d*$/.test(val)) return;
                                   const num = parseInt(val, 10);
                                   if (!isNaN(num)) {
