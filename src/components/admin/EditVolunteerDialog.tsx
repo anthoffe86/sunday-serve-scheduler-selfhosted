@@ -328,25 +328,28 @@ export function EditVolunteerDialog({
             </div>
           </TabsContent>
 
-          <TabsContent value="availability" className="space-y-4 pt-4">
-            <div className="flex items-center justify-between">
+          <TabsContent value="availability" className="space-y-3 pt-4">
+            {/* Header with month navigation */}
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <p className="text-sm text-muted-foreground">
-                Manage availability for upcoming Sundays.
+                Sundays are available by default. Mark unavailable as needed.
               </p>
-              <div className="flex gap-2">
+              <div className="flex items-center gap-1">
                 <Button 
                   variant="outline" 
-                  size="sm"
+                  size="icon"
+                  className="h-8 w-8"
                   onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
                 >
                   ←
                 </Button>
-                <span className="text-sm font-medium min-w-[120px] text-center flex items-center justify-center">
-                  {format(currentMonth, 'MMMM yyyy')}
+                <span className="text-sm font-medium min-w-[100px] text-center">
+                  {format(currentMonth, 'MMM yyyy')}
                 </span>
                 <Button 
                   variant="outline" 
-                  size="sm"
+                  size="icon"
+                  className="h-8 w-8"
                   onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
                 >
                   →
@@ -354,74 +357,57 @@ export function EditVolunteerDialog({
               </div>
             </div>
 
-            <div className="space-y-2">
-              <div className="flex items-center gap-4 text-xs text-muted-foreground pb-2 border-b">
-                <div className="flex items-center gap-1">
-                  <div className="w-3 h-3 rounded-full bg-green-500" />
-                  <span>Available</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <div className="w-3 h-3 rounded-full bg-red-500" />
-                  <span>Unavailable</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <div className="w-3 h-3 rounded-full bg-muted border" />
-                  <span>Not set</span>
-                </div>
-              </div>
-
+            {/* Sunday list */}
+            <div className="space-y-1.5">
               {sundays.map((sunday) => {
                 const avail = getAvailabilityForDate(sunday);
-                const isAvailable = avail?.available;
-                const isSet = avail !== undefined;
+                // Default to available if not explicitly set
+                const isExplicitlyUnavailable = avail?.available === false;
+                const isAvailable = avail?.available !== false; // Available by default
 
                 return (
                   <div 
                     key={sunday.toISOString()} 
-                    className="flex items-center justify-between py-2 px-3 rounded-lg border"
+                    className={`flex items-center justify-between p-2 sm:p-3 rounded-lg border transition-colors ${
+                      isExplicitlyUnavailable 
+                        ? 'bg-red-50 border-red-200 dark:bg-red-950/20 dark:border-red-900' 
+                        : 'bg-green-50 border-green-200 dark:bg-green-950/20 dark:border-green-900'
+                    }`}
                   >
-                    <div className="flex items-center gap-3">
-                      <CalendarDays className="h-4 w-4 text-muted-foreground" />
-                      <span className="font-medium">{format(sunday, 'EEEE, MMM d')}</span>
-                      {isSet && (
-                        <Badge 
-                          variant={isAvailable ? 'default' : 'destructive'}
-                          className={isAvailable ? 'bg-green-500 hover:bg-green-600' : ''}
-                        >
-                          {isAvailable ? 'Available' : 'Unavailable'}
-                        </Badge>
-                      )}
+                    {/* Date info */}
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                      <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                        isAvailable ? 'bg-green-500' : 'bg-red-500'
+                      }`} />
+                      <span className="font-medium text-sm truncate">
+                        {format(sunday, 'EEE, MMM d')}
+                      </span>
                     </div>
-                    <div className="flex items-center gap-1">
-                      <Button
-                        variant={isAvailable === true ? 'default' : 'outline'}
-                        size="sm"
-                        className={isAvailable === true ? 'bg-green-500 hover:bg-green-600' : ''}
-                        onClick={() => handleToggleAvailability(sunday, true)}
-                        disabled={toggleAvailability.isPending || deleteAvailability.isPending}
-                      >
-                        <Check className="h-3 w-3" />
-                      </Button>
-                      <Button
-                        variant={isAvailable === false ? 'destructive' : 'outline'}
-                        size="sm"
-                        onClick={() => handleToggleAvailability(sunday, false)}
-                        disabled={toggleAvailability.isPending || deleteAvailability.isPending}
-                      >
-                        <X className="h-3 w-3" />
-                      </Button>
-                      {isSet && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleToggleAvailability(sunday, null)}
-                          disabled={toggleAvailability.isPending || deleteAvailability.isPending}
-                          className="text-muted-foreground"
-                        >
-                          Clear
-                        </Button>
+
+                    {/* Toggle button */}
+                    <Button
+                      variant={isAvailable ? 'outline' : 'default'}
+                      size="sm"
+                      className={`h-7 text-xs px-2 flex-shrink-0 ${
+                        isAvailable 
+                          ? 'border-red-300 text-red-600 hover:bg-red-100 hover:text-red-700 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950' 
+                          : 'bg-green-600 hover:bg-green-700 text-white'
+                      }`}
+                      onClick={() => handleToggleAvailability(sunday, !isAvailable)}
+                      disabled={toggleAvailability.isPending || deleteAvailability.isPending}
+                    >
+                      {isAvailable ? (
+                        <>
+                          <X className="h-3 w-3 mr-1" />
+                          <span className="hidden sm:inline">Mark</span> Unavailable
+                        </>
+                      ) : (
+                        <>
+                          <Check className="h-3 w-3 mr-1" />
+                          <span className="hidden sm:inline">Mark</span> Available
+                        </>
                       )}
-                    </div>
+                    </Button>
                   </div>
                 );
               })}
