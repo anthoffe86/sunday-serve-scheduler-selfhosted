@@ -100,11 +100,11 @@ export function VolunteerScheduleTableView({
         <TableHeader>
           <TableRow className="bg-muted/50">
             <TableHead className="w-[100px] font-semibold">Date</TableHead>
-            <TableHead className="min-w-[180px] font-semibold">Sidesmen</TableHead>
-            <TableHead className="min-w-[120px] font-semibold">Reader</TableHead>
-            <TableHead className="min-w-[140px] font-semibold">Reading</TableHead>
-            <TableHead className="min-w-[120px] font-semibold">Intercessions</TableHead>
-            <TableHead className="min-w-[140px] font-semibold">Collection Count</TableHead>
+            <TableHead className="min-w-[120px] md:min-w-[180px] font-semibold">Sidesmen</TableHead>
+            <TableHead className="min-w-[100px] md:min-w-[120px] font-semibold">Reader</TableHead>
+            <TableHead className="hidden md:table-cell min-w-[140px] font-semibold">Reading</TableHead>
+            <TableHead className="hidden lg:table-cell min-w-[120px] font-semibold">Intercessions</TableHead>
+            <TableHead className="hidden lg:table-cell min-w-[140px] font-semibold">Collection Count</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -189,8 +189,8 @@ export function VolunteerScheduleTableView({
                   </div>
                 </TableCell>
 
-                {/* Reading Column */}
-                <TableCell className="py-3">
+                {/* Reading Column - Hidden on mobile */}
+                <TableCell className="py-3 hidden md:table-cell">
                   {reading ? (
                     <span className="text-sm">{reading}</span>
                   ) : (
@@ -198,8 +198,8 @@ export function VolunteerScheduleTableView({
                   )}
                 </TableCell>
 
-                {/* Intercessions Column */}
-                <TableCell className="py-3">
+                {/* Intercessions Column - Hidden on mobile/tablet */}
+                <TableCell className="py-3 hidden lg:table-cell">
                   <div className="space-y-1">
                     {intercessions.length > 0 ? (
                       intercessions.map((r, i) => (
@@ -216,8 +216,8 @@ export function VolunteerScheduleTableView({
                   </div>
                 </TableCell>
 
-                {/* Collection Count Column */}
-                <TableCell className="py-3">
+                {/* Collection Count Column - Hidden on mobile/tablet */}
+                <TableCell className="py-3 hidden lg:table-cell">
                   <div className="space-y-1">
                     {collection.length > 0 ? (
                       collection.map((r, i) => (
