@@ -34,6 +34,10 @@ const AdminDashboard = () => {
           <h1 className="font-serif text-3xl font-bold">Admin Dashboard</h1>
           <p className="text-muted-foreground">Manage volunteers, schedules, and swap requests</p>
         </div>
+        <Button className="gap-2 self-start">
+          <CalendarDays className="h-4 w-4" />
+          Generate New Schedule
+        </Button>
       </div>
 
       {/* Stats Overview */}
@@ -81,7 +85,7 @@ const AdminDashboard = () => {
           <CardContent className="space-y-4">
             <p className="text-sm text-muted-foreground">Review and edit generated schedules.</p>
             <Button variant="outline" asChild className="w-full">
-              <Link to="/schedule">Edit Schedules</Link>
+              <Link to="/admin/schedule">Edit Schedules</Link>
             </Button>
           </CardContent>
         </Card>
