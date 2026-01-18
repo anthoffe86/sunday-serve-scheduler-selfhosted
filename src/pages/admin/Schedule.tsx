@@ -118,14 +118,6 @@ const AdminSchedule = () => {
     return `${displayHour}:${minutes} ${ampm}`;
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'published': return 'bg-green-500';
-      case 'cancelled': return 'bg-red-500';
-      default: return 'bg-amber-500';
-    }
-  };
-
   const getFilledCount = (event: EventWithDetails) => {
     const totalRequired = event.roles.reduce((sum, r) => sum + r.quantity, 0);
     const totalFilled = event.assignments.length;
@@ -274,48 +266,54 @@ const AdminSchedule = () => {
           ) : (
             currentMonthEvents.map((event) => {
               const { filled, required } = getFilledCount(event);
+              const allFilled = filled >= required && required > 0;
               
               return (
                 <Card 
                   key={event.id} 
                   className={cn(
-                    'cursor-pointer hover:shadow-md transition-shadow',
+                    'cursor-pointer hover:shadow-md transition-all hover:border-primary/30',
                     event.status === 'cancelled' && 'opacity-60'
                   )}
                   onClick={() => setEditEventId(event.id)}
                 >
-                  <CardContent className="p-4">
+                  <CardContent className="p-5">
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
+                        <div className="flex items-center gap-3 mb-2">
                           <h3 className={cn(
-                            'font-medium truncate',
+                            'font-serif text-lg font-semibold truncate',
                             event.status === 'cancelled' && 'line-through'
                           )}>
                             {event.name}
                           </h3>
-                          <div className={cn('w-2 h-2 rounded-full', getStatusColor(event.status))} />
+                          <Badge 
+                            variant={event.status === 'published' ? 'default' : event.status === 'cancelled' ? 'destructive' : 'secondary'}
+                            className="shrink-0"
+                          >
+                            {event.status}
+                          </Badge>
                         </div>
-                        <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-                          <span className="flex items-center gap-1">
-                            <CalendarIcon className="h-3.5 w-3.5" />
-                            {format(parseISO(event.date), 'EEE, MMM d')}
+                        <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
+                          <span className="flex items-center gap-1.5">
+                            <CalendarIcon className="h-4 w-4" />
+                            {format(parseISO(event.date), 'EEEE, MMM d')}
                           </span>
-                          <span className="flex items-center gap-1">
-                            <Clock className="h-3.5 w-3.5" />
+                          <span className="flex items-center gap-1.5">
+                            <Clock className="h-4 w-4" />
                             {formatTime(event.start_time)}
                           </span>
                           {required > 0 && (
-                            <span className="flex items-center gap-1">
-                              <Users className="h-3.5 w-3.5" />
-                              {filled}/{required} filled
+                            <span className={cn(
+                              'flex items-center gap-1.5',
+                              allFilled ? 'text-green-600' : 'text-amber-600'
+                            )}>
+                              <Users className="h-4 w-4" />
+                              {filled}/{required} volunteers
                             </span>
                           )}
                         </div>
                       </div>
-                      <Badge variant={event.status === 'published' ? 'default' : 'secondary'}>
-                        {event.status}
-                      </Badge>
                     </div>
                   </CardContent>
                 </Card>

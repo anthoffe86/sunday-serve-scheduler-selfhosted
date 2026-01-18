@@ -109,16 +109,19 @@ export function EditEventDialog({ open, onOpenChange, event }: EditEventDialogPr
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle className="font-serif flex items-center gap-2">
-              {event.name}
+          <DialogHeader className="space-y-3">
+            <div className="flex items-center gap-3">
+              <DialogTitle className="text-2xl">
+                {event.name}
+              </DialogTitle>
               <Badge 
                 variant={event.status === 'published' ? 'default' : event.status === 'cancelled' ? 'destructive' : 'secondary'}
+                className="shrink-0"
               >
                 {event.status}
               </Badge>
-            </DialogTitle>
-            <DialogDescription className="flex flex-wrap items-center gap-4 pt-2">
+            </div>
+            <DialogDescription className="flex flex-wrap items-center gap-4">
               <span className="flex items-center gap-1.5">
                 <Calendar className="h-4 w-4" />
                 {format(parseISO(event.date), 'EEEE, MMMM d, yyyy')}
@@ -134,7 +137,7 @@ export function EditEventDialog({ open, onOpenChange, event }: EditEventDialogPr
 
           {/* Volunteer Assignments */}
           <div className="space-y-4">
-            <h4 className="font-medium flex items-center gap-2">
+            <h4 className="font-semibold flex items-center gap-2 text-base">
               <Users className="h-4 w-4" />
               Volunteer Assignments
             </h4>

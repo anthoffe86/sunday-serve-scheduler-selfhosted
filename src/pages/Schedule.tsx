@@ -269,38 +269,42 @@ const Schedule = () => {
               const { filled, required } = getFilledCount(event);
               const assigned = isUserAssigned(event);
               const userRoles = getUserRoles(event);
+              const allFilled = filled >= required && required > 0;
               
               return (
                 <Card 
                   key={event.id} 
                   className={cn(
-                    'cursor-pointer hover:shadow-md transition-shadow',
+                    'cursor-pointer hover:shadow-md transition-all hover:border-primary/30',
                     assigned && 'ring-2 ring-primary bg-primary/5'
                   )}
                   onClick={() => setSelectedEvent(event)}
                 >
-                  <CardContent className="p-4">
+                  <CardContent className="p-5">
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          {assigned && <Star className="h-4 w-4 text-primary fill-primary" />}
-                          <h3 className="font-medium truncate">
+                        <div className="flex items-center gap-3 mb-2">
+                          {assigned && <Star className="h-5 w-5 text-primary fill-primary shrink-0" />}
+                          <h3 className="font-serif text-lg font-semibold truncate">
                             {event.name}
                           </h3>
                         </div>
-                        <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-                          <span className="flex items-center gap-1">
-                            <CalendarIcon className="h-3.5 w-3.5" />
-                            {format(parseISO(event.date), 'EEE, MMM d')}
+                        <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
+                          <span className="flex items-center gap-1.5">
+                            <CalendarIcon className="h-4 w-4" />
+                            {format(parseISO(event.date), 'EEEE, MMM d')}
                           </span>
-                          <span className="flex items-center gap-1">
-                            <Clock className="h-3.5 w-3.5" />
+                          <span className="flex items-center gap-1.5">
+                            <Clock className="h-4 w-4" />
                             {formatTime(event.start_time)}
                           </span>
                           {required > 0 && (
-                            <span className="flex items-center gap-1">
-                              <Users className="h-3.5 w-3.5" />
-                              {filled}/{required} filled
+                            <span className={cn(
+                              'flex items-center gap-1.5',
+                              allFilled ? 'text-green-600' : 'text-amber-600'
+                            )}>
+                              <Users className="h-4 w-4" />
+                              {filled}/{required} volunteers
                             </span>
                           )}
                         </div>
@@ -312,10 +316,10 @@ const Schedule = () => {
                       )}
                     </div>
                     {assigned && userRoles.length > 0 && (
-                      <div className="mt-2 pt-2 border-t">
+                      <div className="mt-3 pt-3 border-t">
                         <p className="text-sm">
                           <span className="text-muted-foreground">Your role(s): </span>
-                          <span className="font-medium">{userRoles.join(', ')}</span>
+                          <span className="font-semibold">{userRoles.join(', ')}</span>
                         </p>
                       </div>
                     )}
