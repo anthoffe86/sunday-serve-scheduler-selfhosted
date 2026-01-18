@@ -25,7 +25,7 @@ const getUpcomingSundays = (count: number): string[] => {
   return sundays;
 };
 
-const upcomingSundays = getUpcomingSundays(16);
+const upcomingSundays = getUpcomingSundays(104); // ~2 years of Sundays
 
 export function AvailabilityCalendar() {
   const { user } = useAuth();
