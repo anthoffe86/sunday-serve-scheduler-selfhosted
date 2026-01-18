@@ -384,25 +384,32 @@ export function CreateEventDialog({ open, onOpenChange }: CreateEventDialogProps
                           <FormLabel>Number of Events</FormLabel>
                           <FormControl>
                             <Input 
+                              {...field}
                               type="number" 
                               min={1}
                               max={104}
-                              value={field.value ?? ''}
+                              inputMode="numeric"
+                              value={field.value === undefined || field.value === null ? '' : String(field.value)}
                               onChange={(e) => {
                                 const val = e.target.value;
                                 if (val === '') {
                                   field.onChange(undefined);
-                                } else {
-                                  const num = parseInt(val, 10);
-                                  if (!isNaN(num)) {
-                                    field.onChange(Math.min(104, Math.max(1, num)));
-                                  }
+                                  return;
+                                }
+                                const num = Number(val);
+                                if (Number.isFinite(num)) {
+                                  field.onChange(Math.min(104, Math.max(1, Math.trunc(num))));
                                 }
                               }}
                               onBlur={(e) => {
-                                // Ensure valid value on blur
-                                const val = parseInt(e.target.value, 10);
-                                if (isNaN(val) || val < 1) {
+                                field.onBlur();
+                                const val = e.target.value;
+                                if (val === '') {
+                                  // Leave empty until submit; schema will prompt if required
+                                  return;
+                                }
+                                const num = Number(val);
+                                if (!Number.isFinite(num) || num < 1) {
                                   field.onChange(1);
                                 }
                               }}
@@ -481,23 +488,28 @@ export function CreateEventDialog({ open, onOpenChange }: CreateEventDialogProps
                             {index === 0 && <FormLabel>Qty</FormLabel>}
                             <FormControl>
                               <Input 
+                                {...field}
                                 type="number" 
                                 min={1}
-                                value={field.value ?? ''}
+                                inputMode="numeric"
+                                value={field.value === undefined || field.value === null ? '' : String(field.value)}
                                 onChange={(e) => {
                                   const val = e.target.value;
                                   if (val === '') {
                                     field.onChange(undefined);
-                                  } else {
-                                    const num = parseInt(val, 10);
-                                    if (!isNaN(num)) {
-                                      field.onChange(Math.max(1, num));
-                                    }
+                                    return;
+                                  }
+                                  const num = Number(val);
+                                  if (Number.isFinite(num)) {
+                                    field.onChange(Math.max(1, Math.trunc(num)));
                                   }
                                 }}
                                 onBlur={(e) => {
-                                  const val = parseInt(e.target.value, 10);
-                                  if (isNaN(val) || val < 1) {
+                                  field.onBlur();
+                                  const val = e.target.value;
+                                  if (val === '') return;
+                                  const num = Number(val);
+                                  if (!Number.isFinite(num) || num < 1) {
                                     field.onChange(1);
                                   }
                                 }}
