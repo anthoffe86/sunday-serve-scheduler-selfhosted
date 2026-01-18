@@ -268,6 +268,7 @@ export function EditEventDialog({ open, onOpenChange, event }: EditEventDialogPr
         open={!!assignRole}
         onOpenChange={(open) => !open && setAssignRole(null)}
         eventId={event.id}
+        eventDate={event.date}
         role={assignRole || ''}
         profiles={profiles || []}
       />

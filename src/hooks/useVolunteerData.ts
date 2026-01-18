@@ -314,6 +314,25 @@ export function useAvailability() {
   });
 }
 
+// Fetch all availability records for a specific date (for admin assignment)
+export function useAvailabilityForDate(date: string) {
+  return useQuery({
+    queryKey: ['availability-for-date', date],
+    queryFn: async () => {
+      if (!date) return [];
+      
+      const { data, error } = await supabase
+        .from('availability')
+        .select('*')
+        .eq('date', date);
+      
+      if (error) throw error;
+      return data as Availability[];
+    },
+    enabled: !!date,
+  });
+}
+
 export function useToggleAvailability() {
   const queryClient = useQueryClient();
   const { user } = useAuth();

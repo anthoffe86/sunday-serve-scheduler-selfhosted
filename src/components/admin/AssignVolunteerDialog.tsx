@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Search, User } from 'lucide-react';
+import { Search, AlertCircle } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -8,11 +8,13 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Badge } from '@/components/ui/badge';
 import { useAssignVolunteer } from '@/hooks/useEventScheduler';
+import { useAvailabilityForDate } from '@/hooks/useVolunteerData';
 import { ROLE_LABELS } from '@/types';
 import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
 
 interface Profile {
   id: string;
@@ -26,6 +28,7 @@ interface AssignVolunteerDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   eventId: string;
+  eventDate: string;
   role: string;
   profiles: Profile[];
 }
@@ -33,19 +36,37 @@ interface AssignVolunteerDialogProps {
 export function AssignVolunteerDialog({ 
   open, 
   onOpenChange, 
-  eventId, 
+  eventId,
+  eventDate,
   role,
   profiles 
 }: AssignVolunteerDialogProps) {
   const [search, setSearch] = useState('');
   const assignVolunteer = useAssignVolunteer();
+  const { data: availabilityData } = useAvailabilityForDate(eventDate);
 
-  const filteredProfiles = profiles.filter(
-    p => p.active && (
+  // Build a map of user_id -> availability status (undefined = available, false = unavailable)
+  const unavailableUserIds = new Set(
+    (availabilityData || [])
+      .filter(a => a.available === false)
+      .map(a => a.user_id)
+  );
+
+  const filteredProfiles = profiles
+    .filter(p => p.active && (
       p.name.toLowerCase().includes(search.toLowerCase()) ||
       p.email.toLowerCase().includes(search.toLowerCase())
-    )
-  );
+    ))
+    .sort((a, b) => {
+      // Available volunteers first
+      const aUnavailable = unavailableUserIds.has(a.user_id);
+      const bUnavailable = unavailableUserIds.has(b.user_id);
+      if (aUnavailable !== bUnavailable) return aUnavailable ? 1 : -1;
+      return a.name.localeCompare(b.name);
+    });
+
+  const availableProfiles = filteredProfiles.filter(p => !unavailableUserIds.has(p.user_id));
+  const unavailableProfiles = filteredProfiles.filter(p => unavailableUserIds.has(p.user_id));
 
   const handleAssign = async (volunteerId: string) => {
     try {
@@ -93,22 +114,57 @@ export function AssignVolunteerDialog({
             </p>
           ) : (
             <div className="space-y-2">
-              {filteredProfiles.map((profile) => (
-                <button
-                  key={profile.id}
-                  onClick={() => handleAssign(profile.user_id)}
-                  disabled={assignVolunteer.isPending}
-                  className="w-full flex items-center gap-3 p-3 rounded-lg border hover:bg-accent transition-colors text-left"
-                >
-                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-sm font-medium text-primary">
-                    {profile.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+              {availableProfiles.length > 0 && (
+                <>
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                    Available ({availableProfiles.length})
+                  </p>
+                  {availableProfiles.map((profile) => (
+                    <button
+                      key={profile.id}
+                      onClick={() => handleAssign(profile.user_id)}
+                      disabled={assignVolunteer.isPending}
+                      className="w-full flex items-center gap-3 p-3 rounded-lg border hover:bg-accent transition-colors text-left"
+                    >
+                      <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-sm font-medium text-primary">
+                        {profile.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium truncate">{profile.name}</p>
+                        <p className="text-sm text-muted-foreground truncate">{profile.email}</p>
+                      </div>
+                    </button>
+                  ))}
+                </>
+              )}
+
+              {unavailableProfiles.length > 0 && (
+                <>
+                  <div className="flex items-center gap-2 pt-3">
+                    <AlertCircle className="h-3.5 w-3.5 text-muted-foreground" />
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                      Unavailable ({unavailableProfiles.length})
+                    </p>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium truncate">{profile.name}</p>
-                    <p className="text-sm text-muted-foreground truncate">{profile.email}</p>
-                  </div>
-                </button>
-              ))}
+                  {unavailableProfiles.map((profile) => (
+                    <div
+                      key={profile.id}
+                      className="w-full flex items-center gap-3 p-3 rounded-lg border bg-muted/50 text-left opacity-60 cursor-not-allowed"
+                    >
+                      <div className="flex h-9 w-9 items-center justify-center rounded-full bg-muted text-sm font-medium text-muted-foreground">
+                        {profile.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium truncate">{profile.name}</p>
+                        <p className="text-sm text-muted-foreground truncate">{profile.email}</p>
+                      </div>
+                      <Badge variant="secondary" className="text-xs">
+                        Unavailable
+                      </Badge>
+                    </div>
+                  ))}
+                </>
+              )}
             </div>
           )}
         </ScrollArea>
