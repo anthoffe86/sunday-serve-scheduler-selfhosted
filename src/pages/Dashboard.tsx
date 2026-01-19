@@ -1,12 +1,12 @@
 import { Link } from 'react-router-dom';
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import { format, parseISO, isThisWeek, addMonths } from 'date-fns';
 import {
   CalendarDays,
   CalendarCheck,
   Loader2,
   Clock,
-  Link as LinkIcon
+  Calendar
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -17,6 +17,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useProfile } from '@/hooks/useVolunteerData';
 import { useEvents } from '@/hooks/useEventScheduler';
 import { cn } from '@/lib/utils';
+import { downloadEventICS } from '@/lib/calendarExport';
 import { toast } from 'sonner';
 
 const Dashboard = () => {
@@ -40,29 +41,19 @@ const Dashboard = () => {
   // Get next 3 events for display
   const myUpcomingEvents = myAllEvents.slice(0, 3);
 
-  // Generate calendar subscription URL
-  const calendarFeedUrl = useMemo(() => {
-    if (!user?.id) return '';
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-    const baseUrl = supabaseUrl.replace('https://', '');
-    return `webcal://${baseUrl}/functions/v1/calendar-feed/${user.id}.ics`;
-  }, [user?.id]);
-
-  const handleCopyCalendarLink = () => {
-    if (!calendarFeedUrl) return;
-
-    // For copying, use https instead of webcal
-    const httpsUrl = calendarFeedUrl.replace('webcal://', 'https://');
-    navigator.clipboard.writeText(httpsUrl);
-    toast.success('Calendar link copied to clipboard');
-  };
-
   const formatTime = (time: string) => {
     const [hours, minutes] = time.split(':');
     const hour = parseInt(hours, 10);
     const ampm = hour >= 12 ? 'PM' : 'AM';
     const displayHour = hour % 12 || 12;
     return `${displayHour}:${minutes} ${ampm}`;
+  };
+
+  const handleAddToCalendar = (event: any, e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent opening event detail dialog
+    const assignment = event.assignments.find((a: any) => a.volunteer_id === user?.id);
+    downloadEventICS(event, assignment?.role);
+    toast.success('Calendar event downloaded');
   };
 
   if (isLoading) {
@@ -109,10 +100,9 @@ const Dashboard = () => {
                 <Card
                   key={event.id}
                   className={cn(
-                    "overflow-hidden transition-all hover:shadow-md cursor-pointer",
+                    "overflow-hidden transition-all hover:shadow-md",
                     isNextEvent && "ring-2 ring-primary/20"
                   )}
-                  onClick={() => setSelectedEvent(event)}
                 >
                   <CardContent className="p-0">
                     <div className="flex">
@@ -135,7 +125,10 @@ const Dashboard = () => {
                       </div>
 
                       {/* Content */}
-                      <div className="flex-1 p-3 sm:p-4">
+                      <div
+                        className="flex-1 p-3 sm:p-4 cursor-pointer"
+                        onClick={() => setSelectedEvent(event)}
+                      >
                         {/* Badges */}
                         <div className="flex items-center gap-2 mb-2">
                           {isNextEvent && (
@@ -163,7 +156,7 @@ const Dashboard = () => {
                         )}
 
                         {/* Time and Role */}
-                        <div className="flex flex-wrap items-center gap-3 text-sm">
+                        <div className="flex flex-wrap items-center gap-3 text-sm mb-3">
                           <span className="flex items-center gap-1.5 text-muted-foreground">
                             <Clock className="h-4 w-4" />
                             {formatTime(event.start_time)}
@@ -175,6 +168,17 @@ const Dashboard = () => {
                             </>
                           )}
                         </div>
+
+                        {/* Add to Calendar Button */}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={(e) => handleAddToCalendar(event, e)}
+                          className="w-full sm:w-auto"
+                        >
+                          <Calendar className="h-3.5 w-3.5 mr-2" />
+                          Add to Calendar
+                        </Button>
                       </div>
                     </div>
                   </CardContent>
@@ -201,7 +205,7 @@ const Dashboard = () => {
       </section>
 
       {/* Quick Actions */}
-      <section className="grid gap-4 md:grid-cols-2">
+      <section>
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 font-serif text-base sm:text-lg">
@@ -216,45 +220,6 @@ const Dashboard = () => {
             <Button asChild>
               <Link to="/availability">Update Availability</Link>
             </Button>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 font-serif text-base sm:text-lg">
-              <CalendarDays className="h-5 w-5 text-primary" />
-              Subscribe to Calendar
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-xs sm:text-sm text-muted-foreground">
-              Subscribe to auto-updating calendar feed. Events sync automatically when changes are made.
-            </p>
-            <div className="flex flex-col gap-2">
-              <Button
-                variant="default"
-                asChild
-                disabled={!user?.id}
-              >
-                <a href={calendarFeedUrl}>
-                  <CalendarDays className="h-4 w-4 mr-2" />
-                  Subscribe to Calendar
-                </a>
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleCopyCalendarLink}
-                disabled={!user?.id}
-              >
-                <LinkIcon className="h-3.5 w-3.5 mr-2" />
-                Copy Link
-              </Button>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              <strong>iOS:</strong> Tap "Subscribe" button above<br />
-              <strong>Desktop:</strong> Copy link and add in calendar app
-            </p>
           </CardContent>
         </Card>
       </section>
