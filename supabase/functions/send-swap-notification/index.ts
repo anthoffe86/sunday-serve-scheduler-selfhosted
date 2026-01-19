@@ -23,7 +23,9 @@ function escapeHtml(unsafe: string | null | undefined): string {
 // Validate and sanitize URLs
 function escapeUrl(url: string): string {
   try {
-    const parsed = new URL(url);
+    // Ensure baseUrl doesn't end with a slash to avoid double slashes in links
+    const normalizedUrl = url.endsWith('/') ? url.slice(0, -1) : url;
+    const parsed = new URL(normalizedUrl);
     if (!["http:", "https:"].includes(parsed.protocol)) {
       return "#";
     }
@@ -47,6 +49,31 @@ const handler = async (req: Request): Promise<Response> => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Check if email notifications are enabled by admin
+    const { data: setting, error: settingError } = await supabase
+      .from("system_settings")
+      .select("value")
+      .eq("key", "email_on_swap_request")
+      .maybeSingle();
+
+    console.log("Admin setting check (email_on_swap_request):", { setting, error: settingError });
+
+    if (settingError) {
+      console.error("Error fetching system setting:", settingError);
+    } else if (setting && (setting.value === false || setting.value === "false")) {
+      console.log("Swap notification emails are disabled in system settings. Returning early.");
+      return new Response(
+        JSON.stringify({
+          success: true,
+          emailsSent: 0,
+          message: "Email notifications are disabled by admin.",
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    console.log("Proceeding with swap notification emails...");
 
     const { swapRequestId, baseUrl }: SwapNotificationRequest = await req.json();
 
@@ -182,8 +209,8 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    // Format date nicely
-    const eventDate = new Date(event.date);
+    // Format date nicely - use T00:00:00 to avoid timezone shifts
+    const eventDate = new Date(event.date + "T00:00:00");
     const formattedDate = eventDate.toLocaleDateString("en-GB", {
       weekday: "long",
       day: "numeric",
@@ -264,7 +291,7 @@ const handler = async (req: Request): Promise<Response> => {
             </div>
             
             <div style="text-align: center; margin: 30px 0;">
-              <a href="${escapeUrl(baseUrl + "/swaps")}" 
+              <a href="${escapeUrl(baseUrl)}/swaps" 
                  style="display: inline-block; background: linear-gradient(135deg, #60a5fa 0%, #2563eb 100%); color: white; text-decoration: none; padding: 14px 30px; border-radius: 8px; font-weight: 600; font-size: 16px;">
                 View Swap Requests
               </a>
@@ -292,9 +319,10 @@ const handler = async (req: Request): Promise<Response> => {
     for (let i = 0; i < emailBatch.length; i += 100) {
       const batch = emailBatch.slice(i, i + 100);
       try {
+        console.log(`Sending batch of ${batch.length} emails to Resend...`);
         const { data: batchData, error: batchError } = await resend.batch.send(batch);
         if (batchError) {
-          console.error("Batch send error:", batchError);
+          console.error("Batch send error details:", batchError);
           errors.push(`Batch ${i / 100 + 1} failed: ${batchError.message}`);
         } else if (batchData) {
           emailsSent += batchData.data?.length || 0;
@@ -304,6 +332,19 @@ const handler = async (req: Request): Promise<Response> => {
         console.error("Unexpected batch send error:", err);
         errors.push(`Batch ${i / 100 + 1} unexpected error: ${err.message}`);
       }
+    }
+
+    if (errors.length > 0 && emailsSent === 0) {
+      console.error("All email batches failed:", errors);
+      return new Response(
+        JSON.stringify({
+          success: false,
+          emailsSent: 0,
+          totalEligible: eligibleProfiles.length,
+          errors,
+        }),
+        { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
     }
 
     console.log(`Swap notification complete. Sent ${emailsSent} emails.`);

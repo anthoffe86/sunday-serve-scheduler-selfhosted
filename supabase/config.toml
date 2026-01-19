@@ -23,3 +23,9 @@ verify_jwt = false
 
 [functions.accept-swap-request]
 verify_jwt = false
+
+[functions.admin-accept-swap]
+verify_jwt = false
+
+[functions.send-assignment-removal-notification]
+verify_jwt = false

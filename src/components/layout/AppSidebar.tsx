@@ -1,8 +1,8 @@
 import { NavLink, useLocation } from 'react-router-dom';
-import { 
-  CalendarDays, 
-  Home, 
-  CalendarCheck, 
+import {
+  CalendarDays,
+  Home,
+  CalendarCheck,
   ArrowLeftRight,
   Settings,
   Users,
@@ -34,6 +34,7 @@ const adminNav = [
   { to: '/admin/schedule', icon: CalendarDays, label: 'Schedule' },
   { to: '/admin/volunteers', icon: Users, label: 'Volunteers' },
   { to: '/admin/swaps', icon: ArrowLeftRight, label: 'Swap Requests' },
+  { to: '/admin/settings', icon: Settings, label: 'Settings' },
 ];
 
 function NavItem({ to, icon: Icon, label, onClick }: { to: string; icon: typeof Home; label: string; onClick?: () => void }) {

@@ -6,114 +6,138 @@ const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
 const resend = new Resend(RESEND_API_KEY);
 
 const corsHeaders = {
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Headers":
-        "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
 };
 
 interface RemovalNotificationRequest {
-    volunteerId: string;
-    eventName: string;
-    eventDate: string;
-    role: string;
-    reason?: string;
-    baseUrl: string;
+  volunteerId: string;
+  eventName: string;
+  eventDate: string;
+  role: string;
+  reason?: string;
+  baseUrl: string;
 }
 
 const formatDate = (dateStr: string): string => {
-    const date = new Date(dateStr);
-    return date.toLocaleDateString("en-GB", {
-        weekday: "long",
-        day: "numeric",
-        month: "long",
-        year: "numeric",
-    });
+  const date = new Date(dateStr);
+  return date.toLocaleDateString("en-GB", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
 };
 
 serve(async (req) => {
-    if (req.method === "OPTIONS") {
-        return new Response("ok", { headers: corsHeaders });
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
+  }
+
+  try {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Check if email notifications are enabled by admin
+    const { data: setting, error: settingError } = await supabase
+      .from("system_settings")
+      .select("value")
+      .eq("key", "email_on_assignment_remove")
+      .maybeSingle();
+
+    console.log("Admin setting check (email_on_assignment_remove):", { setting, error: settingError });
+
+    if (settingError) {
+      console.error("Error fetching system setting email_on_assignment_remove:", settingError);
+    } else if (setting && (setting.value === false || setting.value === "false")) {
+      console.log("Assignment removal emails are disabled in system settings. Returning early.");
+      return new Response(
+        JSON.stringify({
+          success: true,
+          message: "Email notifications are disabled by admin.",
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
-    try {
-        const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-        const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-        const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    console.log("Proceeding with assignment removal notification email...");
 
-        const {
-            volunteerId,
-            eventName,
-            eventDate,
-            role,
-            reason,
-            baseUrl,
-        }: RemovalNotificationRequest = await req.json();
+    const {
+      volunteerId,
+      eventName,
+      eventDate,
+      role,
+      reason,
+      baseUrl,
+    }: RemovalNotificationRequest = await req.json();
 
-        // Get volunteer email
-        const { data: profile, error: profileError } = await supabase
-            .from("profiles")
-            .select("email, name")
-            .eq("user_id", volunteerId)
-            .single();
+    // Get volunteer email
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("email, name")
+      .eq("user_id", volunteerId)
+      .single();
 
-        if (profileError || !profile || !profile.email) {
-            console.error("Profile not found or no email:", profileError);
-            return new Response(
-                JSON.stringify({ error: "Volunteer profile not found" }),
-                {
-                    status: 400,
-                    headers: { ...corsHeaders, "Content-Type": "application/json" },
-                }
-            );
+    if (profileError || !profile || !profile.email) {
+      console.error("Profile not found or no email:", profileError);
+      return new Response(
+        JSON.stringify({ error: "Volunteer profile not found" }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
         }
+      );
+    }
 
-        // HTML entity escaping to prevent XSS in email content
-        function escapeHtml(unsafe: string | null | undefined): string {
-            if (!unsafe) return "";
-            return unsafe
-                .replace(/&/g, "&amp;")
-                .replace(/</g, "&lt;")
-                .replace(/>/g, "&gt;")
-                .replace(/"/g, "&quot;")
-                .replace(/'/g, "&#039;");
+    // HTML entity escaping to prevent XSS in email content
+    function escapeHtml(unsafe: string | null | undefined): string {
+      if (!unsafe) return "";
+      return unsafe
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
+    // Validate and sanitize URLs
+    function escapeUrl(url: string): string {
+      try {
+        const parsed = new URL(url);
+        if (!["http:", "https:"].includes(parsed.protocol)) {
+          return "#";
         }
+        return parsed.href;
+      } catch {
+        return "#";
+      }
+    }
 
-        // Validate and sanitize URLs
-        function escapeUrl(url: string): string {
-            try {
-                const parsed = new URL(url);
-                if (!["http:", "https:"].includes(parsed.protocol)) {
-                    return "#";
-                }
-                return parsed.href;
-            } catch {
-                return "#";
-            }
-        }
+    const formatTimeFromDate = (dateStr: string): string => {
+      const date = new Date(dateStr);
+      const hour = date.getHours();
+      const minutes = date.getMinutes().toString().padStart(2, '0');
+      const ampm = hour >= 12 ? 'PM' : 'AM';
+      const displayHour = hour % 12 || 12;
+      return `${displayHour}:${minutes} ${ampm}`;
+    };
 
-        const formatTimeFromDate = (dateStr: string): string => {
-            const date = new Date(dateStr);
-            const hour = date.getHours();
-            const minutes = date.getMinutes().toString().padStart(2, '0');
-            const ampm = hour >= 12 ? 'PM' : 'AM';
-            const displayHour = hour % 12 || 12;
-            return `${displayHour}:${minutes} ${ampm}`;
-        };
+    const ROLE_LABELS: Record<string, string> = {
+      "sidesman-standard": "Sidesman (Standard)",
+      "sidesman-sound": "Sidesman (Sound)",
+      "sidesman-welcome": "Sidesman (Welcome)",
+      "reader": "Reader",
+      "intercessions": "Intercessions",
+      "collection": "Collection",
+    };
 
-        const ROLE_LABELS: Record<string, string> = {
-            "sidesman-standard": "Sidesman (Standard)",
-            "sidesman-sound": "Sidesman (Sound)",
-            "sidesman-welcome": "Sidesman (Welcome)",
-            "reader": "Reader",
-            "intercessions": "Intercessions",
-            "collection": "Collection",
-        };
-
-        const { data: emailData, error: emailError } = await resend.emails.send({
-            from: "Volunteer Scheduler <noreply@updates.lumotutor.co.uk>",
-            to: [profile.email],
-            subject: `Service Update: Removed from ${eventName}`,
-            html: `
+    const { data: emailData, error: emailError } = await resend.emails.send({
+      from: "Volunteer Scheduler <noreply@updates.lumotutor.co.uk>",
+      to: [profile.email],
+      subject: `Service Update: Removed from ${eventName}`,
+      html: `
             <!DOCTYPE html>
             <html>
             <head>
@@ -175,20 +199,20 @@ serve(async (req) => {
             </body>
             </html>
             `,
-        });
+    });
 
-        if (emailError) {
-            throw emailError;
-        }
-
-        return new Response(JSON.stringify(emailData), {
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-            status: 200,
-        });
-    } catch (error) {
-        return new Response(JSON.stringify({ error: error.message }), {
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-            status: 400,
-        });
+    if (emailError) {
+      throw emailError;
     }
+
+    return new Response(JSON.stringify(emailData), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 200,
+    });
+  } catch (error) {
+    return new Response(JSON.stringify({ error: error.message }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 400,
+    });
+  }
 });

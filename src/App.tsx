@@ -17,6 +17,7 @@ import AdminSchedule from "./pages/admin/Schedule";
 import AdminEvents from "./pages/admin/Events";
 import AdminEventDetail from "./pages/admin/EventDetail";
 import AdminSwapManagement from "./pages/admin/SwapManagement";
+import AdminSettings from "./pages/admin/AdminSettings";
 import Auth from "./pages/Auth";
 import InviteSignup from "./pages/InviteSignup";
 import NotFound from "./pages/NotFound";
@@ -48,6 +49,7 @@ const App = () => (
               <Route path="/admin/events" element={<AdminEvents />} />
               <Route path="/admin/events/:eventId" element={<AdminEventDetail />} />
               <Route path="/admin/swaps" element={<AdminSwapManagement />} />
+              <Route path="/admin/settings" element={<AdminSettings />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>

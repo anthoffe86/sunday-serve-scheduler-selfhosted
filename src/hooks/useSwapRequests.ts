@@ -146,7 +146,7 @@ export function useCreateSwapRequest() {
 
       // Send notification emails
       try {
-        const { error: notificationError } = await supabase.functions.invoke(
+        const { data: notificationData, error: notificationError } = await supabase.functions.invoke(
           'send-swap-notification',
           {
             body: {
@@ -157,7 +157,12 @@ export function useCreateSwapRequest() {
         );
 
         if (notificationError) {
-          console.error('Failed to send swap notifications:', notificationError);
+          console.error('Failed to send swap notifications (invoke error):', notificationError);
+        } else {
+          console.log('Swap notification result:', notificationData);
+          if (notificationData?.success === false) {
+            console.error('Swap notification logical failure:', notificationData.errors);
+          }
         }
       } catch (err) {
         console.error('Failed to send swap notifications:', err);

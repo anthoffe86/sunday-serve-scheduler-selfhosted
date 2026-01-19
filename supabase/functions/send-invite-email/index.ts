@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { Resend } from "https://esm.sh/resend@2.0.0";
 
 const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
@@ -45,6 +46,34 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Check if email notifications are enabled by admin
+    const { data: setting, error: settingError } = await supabase
+      .from("system_settings")
+      .select("value")
+      .eq("key", "email_on_invite")
+      .maybeSingle();
+
+    console.log("Admin setting check (email_on_invite):", { setting, error: settingError });
+
+    if (settingError) {
+      console.error("Error fetching system setting email_on_invite:", settingError);
+    } else if (setting && (setting.value === false || setting.value === "false")) {
+      console.log("Invite emails are disabled in system settings. Returning early.");
+      return new Response(
+        JSON.stringify({
+          success: true,
+          message: "Email notifications are disabled by admin.",
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    console.log("Proceeding with invite email...");
+
     const { name, email, inviteLink }: InviteEmailRequest = await req.json();
 
     console.log(`Sending invite email to ${email} for ${name}`);

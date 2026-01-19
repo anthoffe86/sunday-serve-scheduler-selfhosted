@@ -95,6 +95,32 @@ const handler = async (req: Request): Promise<Response> => {
 
     const { eventIds, baseUrl, userIds }: NotificationRequest = await req.json();
 
+    // Check if email notifications are enabled by admin
+    const settingKey = (userIds && userIds.length > 0) ? "email_on_assignment_add" : "email_on_publish";
+    const { data: setting, error: settingError } = await supabase
+      .from("system_settings")
+      .select("value")
+      .eq("key", settingKey)
+      .maybeSingle();
+
+    console.log(`Admin setting check (${settingKey}):`, { setting, error: settingError });
+
+    if (settingError) {
+      console.error(`Error fetching system setting ${settingKey}:`, settingError);
+    } else if (setting && (setting.value === false || setting.value === "false")) {
+      console.log(`Email notifications (${settingKey}) are disabled in system settings. Returning early.`);
+      return new Response(
+        JSON.stringify({
+          success: true,
+          emailsSent: 0,
+          message: `Email notifications (${settingKey}) are disabled by admin.`,
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    console.log(`Proceeding with ${settingKey} emails...`);
+
     console.log(`Sending notifications for ${eventIds.length} events${userIds ? ` to ${userIds.length} specific users` : ''}`);
 
     // Fetch events with their assignments

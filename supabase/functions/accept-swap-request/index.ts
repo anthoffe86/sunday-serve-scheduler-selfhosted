@@ -256,10 +256,12 @@ Deno.serve(async (req) => {
         }),
       }).catch(err => console.error("Error triggering assignment notification:", err));
 
-      // Wait for notifications best-effort
-      Promise.all([removalPromise, assignmentPromise]).then(() => {
-        console.log("Swap approval notifications processed.");
-      });
+      // Await notifications to ensure function doesn't terminate early
+      console.log("Waiting for notifications to complete...");
+      const [removalResponse, assignmentResponse] = await Promise.all([removalPromise, assignmentPromise]);
+      console.log("Removal notification status:", removalResponse?.status);
+      console.log("Assignment notification status:", assignmentResponse?.status);
+      console.log("Swap approval notifications processed.");
     }
 
     return new Response(
