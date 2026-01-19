@@ -177,8 +177,8 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     // Send emails to each volunteer
-    let emailsSent = 0;
-    const errors: string[] = [];
+    // Prepare batch emails
+    const emailBatch = [];
 
     for (const [volunteerId, data] of volunteerAssignments) {
       // Sort events by date
@@ -201,69 +201,87 @@ const handler = async (req: Request): Promise<Response> => {
         </tr>
       `).join('');
 
-      try {
-        await resend.emails.send({
-          from: "Volunteer Scheduler <noreply@updates.lumotutor.co.uk>",
-          to: [data.email],
-          subject: `Your Volunteer Schedule - ${data.events.length} Assignment${data.events.length > 1 ? 's' : ''} Confirmed`,
-          html: `
-            <!DOCTYPE html>
-            <html>
-            <head>
-              <meta charset="utf-8">
-              <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            </head>
-            <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-              <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; border-radius: 10px 10px 0 0; text-align: center;">
-                <h1 style="color: white; margin: 0; font-size: 24px;">Your Schedule is Confirmed</h1>
+      emailBatch.push({
+        from: "Volunteer Scheduler <noreply@updates.lumotutor.co.uk>",
+        to: [data.email],
+        subject: `Your Volunteer Schedule - ${data.events.length} Assignment${data.events.length > 1 ? 's' : ''} Confirmed`,
+        html: `
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          </head>
+          <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; border-radius: 10px 10px 0 0; text-align: center;">
+              <h1 style="color: white; margin: 0; font-size: 24px;">Your Schedule is Confirmed</h1>
+            </div>
+            
+            <div style="background: #f9fafb; padding: 30px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 10px 10px;">
+              <p style="font-size: 16px; margin-bottom: 20px;">Hello <strong>${escapeHtml(data.name)}</strong>,</p>
+              
+              <p style="font-size: 16px; margin-bottom: 20px;">
+                Great news! Your volunteer assignments have been published. Here's your upcoming schedule:
+              </p>
+              
+              <table style="width: 100%; border-collapse: collapse; margin: 25px 0; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                <thead>
+                  <tr style="background: #f3f4f6;">
+                    <th style="padding: 12px; text-align: left; font-weight: 600; color: #374151;">Date</th>
+                    <th style="padding: 12px; text-align: center; font-weight: 600; color: #374151;">Time</th>
+                    <th style="padding: 12px; text-align: left; font-weight: 600; color: #374151;">Role</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${eventRows}
+                </tbody>
+              </table>
+              
+              <div style="text-align: center; margin: 30px 0;">
+                <a href="${escapeUrl(baseUrl + "/schedule")}" 
+                   style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; text-decoration: none; padding: 14px 30px; border-radius: 8px; font-weight: 600; font-size: 16px;">
+                  View Full Schedule
+                </a>
               </div>
               
-              <div style="background: #f9fafb; padding: 30px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 10px 10px;">
-                <p style="font-size: 16px; margin-bottom: 20px;">Hello <strong>${escapeHtml(data.name)}</strong>,</p>
-                
-                <p style="font-size: 16px; margin-bottom: 20px;">
-                  Great news! Your volunteer assignments have been published. Here's your upcoming schedule:
-                </p>
-                
-                <table style="width: 100%; border-collapse: collapse; margin: 25px 0; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-                  <thead>
-                    <tr style="background: #f3f4f6;">
-                      <th style="padding: 12px; text-align: left; font-weight: 600; color: #374151;">Date</th>
-                      <th style="padding: 12px; text-align: center; font-weight: 600; color: #374151;">Time</th>
-                      <th style="padding: 12px; text-align: left; font-weight: 600; color: #374151;">Role</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    ${eventRows}
-                  </tbody>
-                </table>
-                
-                <div style="text-align: center; margin: 30px 0;">
-                  <a href="${escapeUrl(baseUrl + "/schedule")}" 
-                     style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; text-decoration: none; padding: 14px 30px; border-radius: 8px; font-weight: 600; font-size: 16px;">
-                    View Full Schedule
-                  </a>
-                </div>
-                
-                <p style="font-size: 14px; color: #6b7280; margin-top: 25px;">
-                  If you're unable to attend any of these dates, please log in to request a swap or update your availability.
-                </p>
-                
-                <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
-                
-                <p style="font-size: 12px; color: #9ca3af; text-align: center;">
-                  Thank you for your service!
-                </p>
-              </div>
-            </body>
-            </html>
-          `,
-        });
-        emailsSent++;
-        console.log(`Email sent to ${data.email}`);
-      } catch (emailError: any) {
-        console.error(`Failed to send email to ${data.email}:`, emailError);
-        errors.push(`${data.email}: ${emailError.message}`);
+              <p style="font-size: 14px; color: #6b7280; margin-top: 25px;">
+                If you're unable to attend any of these dates, please log in to request a swap or update your availability.
+              </p>
+              
+              <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
+              
+              <p style="font-size: 12px; color: #9ca3af; text-align: center;">
+                Thank you for your service!
+              </p>
+            </div>
+          </body>
+          </html>
+        `,
+      });
+    }
+
+    let emailsSent = 0;
+    const errors: string[] = [];
+
+    // Send in batches of 100 (Resend limit per batch request)
+    const BATCH_SIZE = 100;
+    for (let i = 0; i < emailBatch.length; i += BATCH_SIZE) {
+      const currentBatch = emailBatch.slice(i, i + BATCH_SIZE);
+      console.log(`Sending batch ${i / BATCH_SIZE + 1} (${currentBatch.length} emails)`);
+
+      try {
+        const { data: batchData, error: batchError } = await resend.batch.send(currentBatch);
+
+        if (batchError) {
+          console.error(`Batch error:`, batchError);
+          errors.push(`Batch ${i / BATCH_SIZE + 1} failed: ${batchError.message}`);
+        } else if (batchData && batchData.data) {
+          emailsSent += batchData.data.length;
+          console.log(`Successfully sent batch ${i / BATCH_SIZE + 1}`);
+        }
+      } catch (err: any) {
+        console.error(`Batch exception:`, err);
+        errors.push(`Batch ${i / BATCH_SIZE + 1} exception: ${err.message}`);
       }
     }
 

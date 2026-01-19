@@ -114,8 +114,31 @@ export function EditEventDialog({ open, onOpenChange, event }: EditEventDialogPr
 
   const handleStatusChange = async (status: 'draft' | 'published' | 'cancelled') => {
     try {
+      // If saving assignments and publishing at the same time, save first
+      if (status === 'published' && isAssignmentsDirty) {
+        await handleSaveAssignments();
+      }
+
       await updateEvent.mutateAsync({ id: event.id, status });
-      toast.success(`Event ${status === 'published' ? 'published' : status === 'cancelled' ? 'cancelled' : 'set to draft'}`);
+
+      if (status === 'published') {
+        const { data, error: notificationError } = await supabase.functions.invoke('send-event-notification', {
+          body: {
+            eventIds: [event.id],
+            baseUrl: window.location.origin,
+          },
+        });
+
+        if (notificationError) {
+          console.error('Failed to send notifications:', notificationError);
+          toast.success('Event published (but notification emails failed)');
+        } else {
+          const sent = data?.emailsSent || 0;
+          toast.success(`Event published and ${sent} volunteer${sent !== 1 ? 's' : ''} notified`);
+        }
+      } else {
+        toast.success(`Event ${status === 'cancelled' ? 'cancelled' : 'set to draft'}`);
+      }
     } catch (error) {
       toast.error('Failed to update status');
     }

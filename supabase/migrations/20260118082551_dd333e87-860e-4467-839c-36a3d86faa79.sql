@@ -1,7 +1,9 @@
 -- Create invite_tokens table for tracking volunteer invitations
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+
 CREATE TABLE public.invite_tokens (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
-  token TEXT NOT NULL UNIQUE DEFAULT encode(gen_random_bytes(32), 'hex'),
+  token TEXT NOT NULL UNIQUE DEFAULT encode(extensions.gen_random_bytes(32), 'hex'),
   email TEXT NOT NULL,
   name TEXT NOT NULL,
   invited_by UUID NOT NULL,
