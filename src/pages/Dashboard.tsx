@@ -1,12 +1,12 @@
 import { Link } from 'react-router-dom';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { format, parseISO, isThisWeek, addMonths } from 'date-fns';
 import {
   CalendarDays,
   CalendarCheck,
   Loader2,
   Clock,
-  Download
+  Link as LinkIcon
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -17,7 +17,6 @@ import { useAuth } from '@/hooks/useAuth';
 import { useProfile } from '@/hooks/useVolunteerData';
 import { useEvents } from '@/hooks/useEventScheduler';
 import { cn } from '@/lib/utils';
-import { generateICSFile, downloadICSFile } from '@/lib/calendarExport';
 import { toast } from 'sonner';
 
 const Dashboard = () => {
@@ -41,37 +40,29 @@ const Dashboard = () => {
   // Get next 3 events for display
   const myUpcomingEvents = myAllEvents.slice(0, 3);
 
+  // Generate calendar subscription URL
+  const calendarFeedUrl = useMemo(() => {
+    if (!user?.id) return '';
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    const baseUrl = supabaseUrl.replace('https://', '');
+    return `webcal://${baseUrl}/functions/v1/calendar-feed/${user.id}.ics`;
+  }, [user?.id]);
+
+  const handleCopyCalendarLink = () => {
+    if (!calendarFeedUrl) return;
+
+    // For copying, use https instead of webcal
+    const httpsUrl = calendarFeedUrl.replace('webcal://', 'https://');
+    navigator.clipboard.writeText(httpsUrl);
+    toast.success('Calendar link copied to clipboard');
+  };
+
   const formatTime = (time: string) => {
     const [hours, minutes] = time.split(':');
     const hour = parseInt(hours, 10);
     const ampm = hour >= 12 ? 'PM' : 'AM';
     const displayHour = hour % 12 || 12;
     return `${displayHour}:${minutes} ${ampm}`;
-  };
-
-  const handleExportToCalendar = () => {
-    if (myAllEvents.length === 0) {
-      toast.error('No events to export');
-      return;
-    }
-
-    try {
-      // Get user's role for each event
-      const eventsWithRoles = myAllEvents.map(event => {
-        const assignment = event.assignments.find(a => a.volunteer_id === user?.id);
-        return {
-          ...event,
-          userRole: assignment?.role
-        };
-      });
-
-      const icsContent = generateICSFile(eventsWithRoles); // Pass eventsWithRoles to include userRole
-      downloadICSFile(icsContent, 'st-matthews-service-rota.ics');
-      toast.success(`Exported ${myAllEvents.length} event${myAllEvents.length !== 1 ? 's' : ''} to calendar`);
-    } catch (error) {
-      console.error('Error exporting calendar:', error);
-      toast.error('Failed to export calendar');
-    }
   };
 
   if (isLoading) {
@@ -231,22 +222,39 @@ const Dashboard = () => {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 font-serif text-base sm:text-lg">
-              <Download className="h-5 w-5 text-primary" />
-              Export to Calendar
+              <CalendarDays className="h-5 w-5 text-primary" />
+              Subscribe to Calendar
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-xs sm:text-sm text-muted-foreground">
-              Download a calendar file with all your upcoming services. On mobile, tap the file to add events to your calendar.
+              Subscribe to auto-updating calendar feed. Events sync automatically when changes are made.
             </p>
-            <Button
-              variant="outline"
-              onClick={handleExportToCalendar}
-              disabled={myAllEvents.length === 0}
-            >
-              <Download className="h-4 w-4 mr-2" />
-              Download Calendar
-            </Button>
+            <div className="flex flex-col gap-2">
+              <Button
+                variant="default"
+                asChild
+                disabled={!user?.id}
+              >
+                <a href={calendarFeedUrl}>
+                  <CalendarDays className="h-4 w-4 mr-2" />
+                  Subscribe to Calendar
+                </a>
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleCopyCalendarLink}
+                disabled={!user?.id}
+              >
+                <LinkIcon className="h-3.5 w-3.5 mr-2" />
+                Copy Link
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              <strong>iOS:</strong> Tap "Subscribe" button above<br />
+              <strong>Desktop:</strong> Copy link and add in calendar app
+            </p>
           </CardContent>
         </Card>
       </section>
