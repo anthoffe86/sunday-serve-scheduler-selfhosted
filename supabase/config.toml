@@ -15,5 +15,11 @@ verify_jwt = false
 [functions.send-swap-notification]
 verify_jwt = false
 
+[functions.validate-invite-token]
+verify_jwt = false
+
+[functions.mark-invite-used]
+verify_jwt = false
+
 [functions.accept-swap-request]
 verify_jwt = false

@@ -8,13 +8,11 @@ import { Loader2, CheckCircle, XCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
-interface InviteToken {
+interface InviteTokenData {
   id: string;
-  token: string;
   email: string;
   name: string;
   expires_at: string;
-  used_at: string | null;
 }
 
 const InviteSignup = () => {
@@ -23,7 +21,7 @@ const InviteSignup = () => {
   const token = searchParams.get('token');
 
   const [isValidating, setIsValidating] = useState(true);
-  const [inviteData, setInviteData] = useState<InviteToken | null>(null);
+  const [inviteData, setInviteData] = useState<InviteTokenData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -37,21 +35,27 @@ const InviteSignup = () => {
         return;
       }
 
-      const { data, error } = await supabase
-        .from('invite_tokens')
-        .select('*')
-        .eq('token', token)
-        .is('used_at', null)
-        .gt('expires_at', new Date().toISOString())
-        .maybeSingle();
+      try {
+        // Validate token via edge function (server-side validation)
+        const response = await supabase.functions.invoke('validate-invite-token', {
+          body: { token },
+        });
 
-      if (error) {
-        console.error('Token validation error:', error);
+        if (response.error) {
+          console.error('Token validation error:', response.error);
+          setError('Failed to validate invitation');
+        } else if (response.data?.error) {
+          setError(response.data.error === 'Invalid or expired invitation' 
+            ? 'This invitation link is invalid or has expired'
+            : response.data.error);
+        } else if (response.data?.data) {
+          setInviteData(response.data.data);
+        } else {
+          setError('This invitation link is invalid or has expired');
+        }
+      } catch (err) {
+        console.error('Token validation error:', err);
         setError('Failed to validate invitation');
-      } else if (!data) {
-        setError('This invitation link is invalid or has expired');
-      } else {
-        setInviteData(data);
       }
       setIsValidating(false);
     };
@@ -72,7 +76,7 @@ const InviteSignup = () => {
       return;
     }
 
-    if (!inviteData) return;
+    if (!inviteData || !token) return;
 
     setIsSubmitting(true);
 
@@ -95,15 +99,10 @@ const InviteSignup = () => {
         throw new Error('Failed to create account');
       }
 
-      // Mark the invite token as used
-      const { error: updateError } = await supabase
-        .from('invite_tokens')
-        .update({ used_at: new Date().toISOString() })
-        .eq('id', inviteData.id);
-
-      if (updateError) {
-        console.error('Failed to mark token as used:', updateError);
-      }
+      // Mark the invite token as used via edge function
+      await supabase.functions.invoke('mark-invite-used', {
+        body: { token },
+      });
 
       toast.success('Account created successfully! You can now log in.');
       navigate('/auth');
