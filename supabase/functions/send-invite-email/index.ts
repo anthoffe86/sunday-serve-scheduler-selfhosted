@@ -91,14 +91,14 @@ const handler = async (req: Request): Promise<Response> => {
         </head>
         <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
           <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; border-radius: 10px 10px 0 0; text-align: center;">
-            <h1 style="color: white; margin: 0; font-size: 24px;">Welcome to Volunteer Scheduler</h1>
+            <h1 style="color: white; margin: 0; font-size: 24px;">Welcome to St Matthews Church</h1>
           </div>
           
           <div style="background: #f9fafb; padding: 30px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 10px 10px;">
             <p style="font-size: 16px; margin-bottom: 20px;">Hello <strong>${escapeHtml(name)}</strong>,</p>
             
             <p style="font-size: 16px; margin-bottom: 20px;">
-              You've been invited to join St Matthews as a volunteer. We use this platform to help manage your availability and view your assigned service roles.
+              You've been invited to join St Matthews as a volunteer. We use this platform to help manage the St Matthews Service Rota.
             </p>
             
             <p style="font-size: 16px; margin-bottom: 25px;">
