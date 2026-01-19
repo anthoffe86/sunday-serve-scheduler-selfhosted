@@ -162,11 +162,11 @@ const handler = async (req: Request): Promise<Response> => {
     // If no availability record exists for a date, we assume they're available
     const eligibleProfiles = allProfiles.filter((profile) => {
       const hasRolePreference = rolePreferenceUserIds.includes(profile.user_id);
-      
+
       // Check if they have explicitly marked themselves as unavailable
       // If no record, assume available. If record says available=true, they're available.
       const hasExplicitAvailability = availableUserIds.includes(profile.user_id);
-      
+
       // For now, let's send to all volunteers with the role preference
       // This is more inclusive and ensures the swap gets coverage
       return hasRolePreference;
@@ -212,56 +212,97 @@ const handler = async (req: Request): Promise<Response> => {
 
     const roleLabel = ROLE_LABELS[assignment.role] || assignment.role;
 
-    // Send emails to eligible volunteers
+    // Prepare batch of emails
+    const emailBatch = eligibleProfiles.map((profile) => ({
+      from: "Volunteer Scheduler <noreply@updates.lumotutor.co.uk>",
+      to: [profile.email],
+      subject: `Swap Request: ${roleLabel} on ${formattedDate}`,
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        </head>
+        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="background: linear-gradient(135deg, #60a5fa 0%, #2563eb 100%); padding: 30px; border-radius: 10px 10px 0 0; text-align: center;">
+            <h1 style="color: white; margin: 0; font-size: 24px;">Swap Request</h1>
+          </div>
+          
+          <div style="background: #f9fafb; padding: 30px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 10px 10px;">
+            <p style="font-size: 16px; margin-bottom: 20px;">Hello <strong>${escapeHtml(profile.name)}</strong>,</p>
+            
+            <p style="font-size: 16px; margin-bottom: 20px;">
+              <strong>${escapeHtml(requesterProfile.name)}</strong> has requested a swap for their volunteer assignment and you've been identified as a potential substitute.
+            </p>
+            
+            <div style="background: white; padding: 20px; border: 1px solid #e5e7eb; border-radius: 8px; margin: 25px 0; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+              <h3 style="margin-top: 0; color: #111827; font-size: 18px;">${escapeHtml(event.name)}</h3>
+              <table style="width: 100%; border-collapse: collapse; margin-top: 10px;">
+                <tr>
+                  <td style="padding: 4px 0; color: #6b7280; width: 80px; font-size: 14px;">Date:</td>
+                  <td style="padding: 4px 0; color: #111827; font-weight: 500;">${formattedDate}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 4px 0; color: #6b7280; font-size: 14px;">Time:</td>
+                  <td style="padding: 4px 0; color: #111827; font-weight: 500;">${formatTime(event.start_time)}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 4px 0; color: #6b7280; font-size: 14px;">Role:</td>
+                  <td style="padding: 4px 0;">
+                    <span style="background: #e0e7ff; color: #4338ca; padding: 2px 8px; border-radius: 12px; font-size: 13px; font-weight: 500;">
+                      ${roleLabel}
+                    </span>
+                  </td>
+                </tr>
+                ${swapRequest.notes ? `
+                <tr>
+                  <td style="padding: 8px 0 4px; color: #6b7280; font-size: 14px; vertical-align: top;">Note from ${escapeHtml(requesterProfile.name)}:</td>
+                  <td style="padding: 8px 0 4px; color: #4b5563; font-size: 14px; font-style: italic;">${escapeHtml(swapRequest.notes)}</td>
+                </tr>` : ''}
+              </table>
+            </div>
+            
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="${escapeUrl(baseUrl + "/swaps")}" 
+                 style="display: inline-block; background: linear-gradient(135deg, #60a5fa 0%, #2563eb 100%); color: white; text-decoration: none; padding: 14px 30px; border-radius: 8px; font-weight: 600; font-size: 16px;">
+                View Swap Requests
+              </a>
+            </div>
+            
+            <p style="font-size: 14px; color: #6b7280; margin-top: 25px;">
+              If you're able to cover this assignment, please log in to accept the swap request.
+            </p>
+            
+            <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
+            
+            <p style="font-size: 12px; color: #9ca3af; text-align: center;">
+              Thank you for your service!
+            </p>
+          </div>
+        </body>
+        </html>
+      `,
+    }));
+
+    // Send emails in batches of 100 (Resend limit)
     let emailsSent = 0;
     const errors: string[] = [];
 
-    for (const profile of eligibleProfiles) {
+    for (let i = 0; i < emailBatch.length; i += 100) {
+      const batch = emailBatch.slice(i, i + 100);
       try {
-        await resend.emails.send({
-          from: "Volunteer Scheduler <noreply@updates.lumotutor.co.uk>",
-          to: [profile.email],
-          subject: `Swap Request: ${roleLabel} on ${formattedDate}`,
-          html: `
-            <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-              <h1 style="color: #1a1a1a; font-size: 24px; margin-bottom: 20px;">Swap Request</h1>
-              
-              <p style="color: #333; font-size: 16px; line-height: 1.5;">
-                Hi ${escapeHtml(profile.name)},
-              </p>
-              
-              <p style="color: #333; font-size: 16px; line-height: 1.5;">
-                <strong>${escapeHtml(requesterProfile.name)}</strong> has requested a swap for their volunteer assignment and you've been identified as a potential substitute.
-              </p>
-              
-              <div style="background: #f5f5f5; border-radius: 8px; padding: 20px; margin: 20px 0;">
-                <h2 style="color: #1a1a1a; font-size: 18px; margin: 0 0 15px 0;">${escapeHtml(event.name)}</h2>
-                <p style="color: #666; margin: 5px 0;"><strong>Date:</strong> ${formattedDate}</p>
-                <p style="color: #666; margin: 5px 0;"><strong>Time:</strong> ${formatTime(event.start_time)}</p>
-                <p style="color: #666; margin: 5px 0;"><strong>Role:</strong> ${roleLabel}</p>
-                ${swapRequest.notes ? `<p style="color: #666; margin: 15px 0 5px 0;"><strong>Note from ${escapeHtml(requesterProfile.name)}:</strong> ${escapeHtml(swapRequest.notes)}</p>` : ""}
-              </div>
-              
-              <p style="color: #333; font-size: 16px; line-height: 1.5;">
-                If you're able to cover this assignment, please log in to accept the swap request.
-              </p>
-              
-              <a href="${escapeUrl(baseUrl + "/swaps")}" style="display: inline-block; background: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin: 20px 0;">
-                View Swap Requests
-              </a>
-              
-              <p style="color: #666; font-size: 14px; margin-top: 30px;">
-                Thank you for your service!<br>
-                The Volunteer Scheduler Team
-              </p>
-            </div>
-          `,
-        });
-        emailsSent++;
-        console.log(`Sent swap notification to ${profile.email}`);
-      } catch (emailError: any) {
-        console.error(`Failed to send email to ${profile.email}:`, emailError);
-        errors.push(`${profile.email}: ${emailError.message}`);
+        const { data: batchData, error: batchError } = await resend.batch.send(batch);
+        if (batchError) {
+          console.error("Batch send error:", batchError);
+          errors.push(`Batch ${i / 100 + 1} failed: ${batchError.message}`);
+        } else if (batchData) {
+          emailsSent += batchData.data?.length || 0;
+          console.log(`Successfully sent batch of ${batchData.data?.length} emails`);
+        }
+      } catch (err: any) {
+        console.error("Unexpected batch send error:", err);
+        errors.push(`Batch ${i / 100 + 1} unexpected error: ${err.message}`);
       }
     }
 

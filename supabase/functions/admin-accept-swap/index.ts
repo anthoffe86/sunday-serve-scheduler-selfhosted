@@ -22,6 +22,7 @@ Deno.serve(async (req) => {
 
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
+      console.error("Missing authorization header");
       return new Response(JSON.stringify({ error: "Missing authorization header" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -29,6 +30,7 @@ Deno.serve(async (req) => {
     }
 
     // Client to identify caller
+    console.log("Identifying caller...");
     const supabaseClient = createClient(supabaseUrl, anonKey, {
       global: { headers: { Authorization: authHeader } },
       auth: { persistSession: false, autoRefreshToken: false },
@@ -40,11 +42,13 @@ Deno.serve(async (req) => {
     } = await supabaseClient.auth.getUser();
 
     if (userError || !user) {
+      console.error("Auth error or no user:", userError);
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+    console.log("Caller identified as user:", user.id);
 
     // Service role client for DB operations
     const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
@@ -52,23 +56,33 @@ Deno.serve(async (req) => {
     });
 
     // Verify the caller is an admin
-    const { data: adminCheck } = await supabaseAdmin
+    console.log("Checking admin status for user:", user.id);
+    const { data: adminCheck, error: adminCheckError } = await supabaseAdmin
       .from("user_roles")
       .select("role")
       .eq("user_id", user.id)
       .eq("role", "admin")
       .maybeSingle();
 
+    if (adminCheckError) {
+      console.error("Error checking admin status:", adminCheckError);
+    }
+    console.log("Admin check result:", adminCheck);
+
     if (!adminCheck) {
+      console.error("User is not an admin");
       return new Response(JSON.stringify({ error: "Forbidden: Admin access required" }), {
         status: 403,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const { swapRequestId, targetUserId }: AdminAcceptSwapBody = await req.json();
-    
+    const body = await req.json();
+    console.log("Request body:", body);
+    const { swapRequestId, targetUserId }: AdminAcceptSwapBody = body;
+
     if (!swapRequestId) {
+      console.error("swapRequestId is missing");
       return new Response(JSON.stringify({ error: "swapRequestId is required" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -76,6 +90,7 @@ Deno.serve(async (req) => {
     }
 
     if (!targetUserId) {
+      console.error("targetUserId is missing");
       return new Response(JSON.stringify({ error: "targetUserId is required" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -83,6 +98,7 @@ Deno.serve(async (req) => {
     }
 
     // Load swap request
+    console.log("Loading swap request:", swapRequestId);
     const { data: swapRequest, error: swapError } = await supabaseAdmin
       .from("swap_requests")
       .select("*")
@@ -90,13 +106,16 @@ Deno.serve(async (req) => {
       .single();
 
     if (swapError || !swapRequest) {
+      console.error("Failed to fetch swap request:", swapError);
       return new Response(JSON.stringify({ error: "Swap request not found" }), {
         status: 404,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+    console.log("Swap request loaded:", swapRequest);
 
     if (swapRequest.status !== "pending") {
+      console.error("Swap request status is not pending:", swapRequest.status);
       return new Response(JSON.stringify({ error: "Swap request already processed" }), {
         status: 409,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -104,6 +123,7 @@ Deno.serve(async (req) => {
     }
 
     if (!swapRequest.event_assignment_id) {
+      console.error("Swap request missing event_assignment_id");
       return new Response(JSON.stringify({ error: "Swap request missing event_assignment_id" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -111,6 +131,7 @@ Deno.serve(async (req) => {
     }
 
     // Ensure assignment exists and still belongs to the requester
+    console.log("Checking assignment:", swapRequest.event_assignment_id);
     const { data: assignment, error: assignmentError } = await supabaseAdmin
       .from("event_assignments")
       .select("*")
@@ -118,6 +139,7 @@ Deno.serve(async (req) => {
       .single();
 
     if (assignmentError || !assignment) {
+      console.error("Assignment not found:", assignmentError);
       return new Response(JSON.stringify({ error: "Assignment not found" }), {
         status: 404,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -125,6 +147,7 @@ Deno.serve(async (req) => {
     }
 
     if (assignment.volunteer_id !== swapRequest.from_user_id) {
+      console.error("Assignment volunteer mismatch:", assignment.volunteer_id, "vs", swapRequest.from_user_id);
       return new Response(
         JSON.stringify({ error: "Assignment is no longer held by the requester" }),
         {
@@ -135,6 +158,7 @@ Deno.serve(async (req) => {
     }
 
     // Verify target user exists
+    console.log("Verifying target user:", targetUserId);
     const { data: targetProfile } = await supabaseAdmin
       .from("profiles")
       .select("user_id, name")
@@ -142,6 +166,7 @@ Deno.serve(async (req) => {
       .maybeSingle();
 
     if (!targetProfile) {
+      console.error("Target user profile not found");
       return new Response(JSON.stringify({ error: "Target user not found" }), {
         status: 404,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -149,6 +174,7 @@ Deno.serve(async (req) => {
     }
 
     // Verify target user has the required role in their preferences
+    console.log("Checking role preferences for target user:", targetUserId, "role:", assignment.role);
     const { data: rolePrefs } = await supabaseAdmin
       .from("role_preferences")
       .select("role")
@@ -157,6 +183,7 @@ Deno.serve(async (req) => {
       .maybeSingle();
 
     if (!rolePrefs) {
+      console.error("Target user does not have required role preference");
       return new Response(
         JSON.stringify({ error: `${targetProfile.name} does not have this role in their preferences` }),
         {
