@@ -182,7 +182,10 @@ export function useAcceptSwapRequest() {
   return useMutation({
     mutationFn: async (swapRequestId: string) => {
       const { data: result, error } = await supabase.functions.invoke('accept-swap-request', {
-        body: { swapRequestId },
+        body: {
+          swapRequestId,
+          baseUrl: window.location.origin
+        },
       });
 
       if (error) throw error;

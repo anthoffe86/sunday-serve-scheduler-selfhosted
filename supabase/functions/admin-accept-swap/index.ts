@@ -8,6 +8,7 @@ const corsHeaders = {
 interface AdminAcceptSwapBody {
   swapRequestId: string;
   targetUserId: string;
+  baseUrl: string;
 }
 
 Deno.serve(async (req) => {
@@ -79,7 +80,7 @@ Deno.serve(async (req) => {
 
     const body = await req.json();
     console.log("Request body:", body);
-    const { swapRequestId, targetUserId }: AdminAcceptSwapBody = body;
+    const { swapRequestId, targetUserId, baseUrl }: AdminAcceptSwapBody = body;
 
     if (!swapRequestId) {
       console.error("swapRequestId is missing");
@@ -157,6 +158,21 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Load event details for notifications
+    const { data: event, error: eventError } = await supabaseAdmin
+      .from("events")
+      .select("name, date")
+      .eq("id", assignment.event_id)
+      .single();
+
+    if (eventError || !event) {
+      console.error("Failed to fetch event details:", eventError);
+      return new Response(JSON.stringify({ error: "Event details not found" }), {
+        status: 404,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     // Verify target user exists
     console.log("Verifying target user:", targetUserId);
     const { data: targetProfile } = await supabaseAdmin
@@ -224,6 +240,47 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: "Failed to update swap request" }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Send notifications
+    if (baseUrl) {
+      console.log("Triggering notifications for swap approval...");
+
+      // Notify original volunteer of removal
+      const removalPromise = fetch(`${supabaseUrl}/functions/v1/send-assignment-removal-notification`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${serviceRoleKey}`,
+        },
+        body: JSON.stringify({
+          volunteerId: swapRequest.from_user_id,
+          eventName: event.name,
+          eventDate: event.date,
+          role: assignment.role,
+          reason: "An administrator has re-assigned this service to another volunteer.",
+          baseUrl
+        }),
+      }).catch(err => console.error("Error triggering removal notification:", err));
+
+      // Notify new volunteer of assignment
+      const assignmentPromise = fetch(`${supabaseUrl}/functions/v1/send-event-notification`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${serviceRoleKey}`,
+        },
+        body: JSON.stringify({
+          eventIds: [assignment.event_id],
+          userIds: [targetUserId],
+          baseUrl
+        }),
+      }).catch(err => console.error("Error triggering assignment notification:", err));
+
+      // Wait for notifications best-effort
+      Promise.all([removalPromise, assignmentPromise]).then(() => {
+        console.log("Swap approval notifications processed.");
       });
     }
 

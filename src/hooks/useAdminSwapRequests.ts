@@ -167,7 +167,11 @@ export function useAdminAcceptSwapRequest() {
       const { data: result, error } = await supabase.functions.invoke(
         'admin-accept-swap',
         {
-          body: { swapRequestId, targetUserId },
+          body: {
+            swapRequestId,
+            targetUserId,
+            baseUrl: window.location.origin
+          },
         }
       );
 

@@ -7,6 +7,7 @@ const corsHeaders = {
 
 interface AcceptSwapRequestBody {
   swapRequestId: string;
+  baseUrl: string;
 }
 
 Deno.serve(async (req) => {
@@ -50,7 +51,9 @@ Deno.serve(async (req) => {
       auth: { persistSession: false, autoRefreshToken: false },
     });
 
-    const { swapRequestId }: AcceptSwapRequestBody = await req.json();
+    const body: AcceptSwapRequestBody = await req.json();
+    const { swapRequestId, baseUrl } = body;
+
     if (!swapRequestId) {
       return new Response(JSON.stringify({ error: "swapRequestId is required" }), {
         status: 400,
@@ -110,10 +113,10 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Get event details to check date
+    // Get event details
     const { data: event, error: eventError } = await supabaseAdmin
       .from("events")
-      .select("date")
+      .select("name, date")
       .eq("id", assignment.event_id)
       .single();
 
@@ -215,6 +218,47 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: "Failed to update swap request" }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Send notifications
+    if (baseUrl) {
+      console.log("Triggering notifications for swap approval...");
+
+      // Notify original volunteer of removal
+      const removalPromise = fetch(`${supabaseUrl}/functions/v1/send-assignment-removal-notification`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${serviceRoleKey}`,
+        },
+        body: JSON.stringify({
+          volunteerId: swapRequest.from_user_id,
+          eventName: event.name,
+          eventDate: event.date,
+          role: assignment.role,
+          reason: "This swap request has been accepted by another volunteer.",
+          baseUrl
+        }),
+      }).catch(err => console.error("Error triggering removal notification:", err));
+
+      // Notify new volunteer of assignment
+      const assignmentPromise = fetch(`${supabaseUrl}/functions/v1/send-event-notification`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${serviceRoleKey}`,
+        },
+        body: JSON.stringify({
+          eventIds: [assignment.event_id],
+          userIds: [user.id],
+          baseUrl
+        }),
+      }).catch(err => console.error("Error triggering assignment notification:", err));
+
+      // Wait for notifications best-effort
+      Promise.all([removalPromise, assignmentPromise]).then(() => {
+        console.log("Swap approval notifications processed.");
       });
     }
 
