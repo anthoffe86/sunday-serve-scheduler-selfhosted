@@ -5,8 +5,7 @@ const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
 interface InviteEmailRequest {
@@ -27,9 +26,9 @@ const handler = async (req: Request): Promise<Response> => {
     console.log(`Sending invite email to ${email} for ${name}`);
 
     const emailResponse = await resend.emails.send({
-      from: "Volunteer Scheduler <noreply@updates.lumotutor.co.uk>",
+      from: "St Matthews Church <noreply@updates.lumotutor.co.uk>",
       to: [email],
-      subject: "You've been invited to join the Volunteer Scheduler",
+      subject: "You've been invited to join the St Matthew's family as a volunteer",
       html: `
         <!DOCTYPE html>
         <html>
@@ -46,7 +45,7 @@ const handler = async (req: Request): Promise<Response> => {
             <p style="font-size: 16px; margin-bottom: 20px;">Hello <strong>${name}</strong>,</p>
             
             <p style="font-size: 16px; margin-bottom: 20px;">
-              You've been invited to join our volunteer scheduling system. This platform will help you manage your availability and view your assigned service roles.
+              You've been invited to join St Matthews as a volunteer. We use this platform to help manage your availability and view your assigned service roles.
             </p>
             
             <p style="font-size: 16px; margin-bottom: 25px;">
@@ -90,13 +89,10 @@ const handler = async (req: Request): Promise<Response> => {
     });
   } catch (error: any) {
     console.error("Error in send-invite-email function:", error);
-    return new Response(
-      JSON.stringify({ error: error.message }),
-      {
-        status: 500,
-        headers: { "Content-Type": "application/json", ...corsHeaders },
-      }
-    );
+    return new Response(JSON.stringify({ error: error.message }), {
+      status: 500,
+      headers: { "Content-Type": "application/json", ...corsHeaders },
+    });
   }
 };
 
