@@ -16,10 +16,10 @@ import VolunteerManagement from "./pages/admin/VolunteerManagement";
 import AdminSchedule from "./pages/admin/Schedule";
 import AdminEvents from "./pages/admin/Events";
 import AdminEventDetail from "./pages/admin/EventDetail";
+import AdminSwapManagement from "./pages/admin/SwapManagement";
 import Auth from "./pages/Auth";
 import InviteSignup from "./pages/InviteSignup";
 import NotFound from "./pages/NotFound";
-
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -47,6 +47,7 @@ const App = () => (
               <Route path="/admin/schedule" element={<AdminSchedule />} />
               <Route path="/admin/events" element={<AdminEvents />} />
               <Route path="/admin/events/:eventId" element={<AdminEventDetail />} />
+              <Route path="/admin/swaps" element={<AdminSwapManagement />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>

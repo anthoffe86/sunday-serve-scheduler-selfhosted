@@ -33,6 +33,7 @@ const adminNav = [
   { to: '/admin/events', icon: CalendarPlus, label: 'Events' },
   { to: '/admin/schedule', icon: CalendarDays, label: 'Schedule' },
   { to: '/admin/volunteers', icon: Users, label: 'Volunteers' },
+  { to: '/admin/swaps', icon: ArrowLeftRight, label: 'Swap Requests' },
 ];
 
 function NavItem({ to, icon: Icon, label, onClick }: { to: string; icon: typeof Home; label: string; onClick?: () => void }) {
