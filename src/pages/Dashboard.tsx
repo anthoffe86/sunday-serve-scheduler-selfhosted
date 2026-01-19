@@ -5,7 +5,8 @@ import {
   CalendarDays,
   CalendarCheck,
   Loader2,
-  Clock
+  Clock,
+  Download
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -16,6 +17,8 @@ import { useAuth } from '@/hooks/useAuth';
 import { useProfile } from '@/hooks/useVolunteerData';
 import { useEvents } from '@/hooks/useEventScheduler';
 import { cn } from '@/lib/utils';
+import { generateICSFile, downloadICSFile } from '@/lib/calendarExport';
+import { toast } from 'sonner';
 
 const Dashboard = () => {
   const { user } = useAuth();
@@ -29,12 +32,14 @@ const Dashboard = () => {
 
   const isLoading = profileLoading || eventsLoading;
 
-  // Get next 3 events the user is assigned to
-  const myUpcomingEvents = allEvents
+  // Get all events the user is assigned to (not just next 3)
+  const myAllEvents = allEvents
     ?.filter((event) =>
       event.assignments.some((a) => a.volunteer_id === user?.id)
-    )
-    .slice(0, 3) || [];
+    ) || [];
+
+  // Get next 3 events for display
+  const myUpcomingEvents = myAllEvents.slice(0, 3);
 
   const formatTime = (time: string) => {
     const [hours, minutes] = time.split(':');
@@ -42,6 +47,31 @@ const Dashboard = () => {
     const ampm = hour >= 12 ? 'PM' : 'AM';
     const displayHour = hour % 12 || 12;
     return `${displayHour}:${minutes} ${ampm}`;
+  };
+
+  const handleExportToCalendar = () => {
+    if (myAllEvents.length === 0) {
+      toast.error('No events to export');
+      return;
+    }
+
+    try {
+      // Get user's role for each event
+      const eventsWithRoles = myAllEvents.map(event => {
+        const assignment = event.assignments.find(a => a.volunteer_id === user?.id);
+        return {
+          ...event,
+          userRole: assignment?.role
+        };
+      });
+
+      const icsContent = generateICSFile(eventsWithRoles); // Pass eventsWithRoles to include userRole
+      downloadICSFile(icsContent, 'st-matthews-service-rota.ics');
+      toast.success(`Exported ${myAllEvents.length} event${myAllEvents.length !== 1 ? 's' : ''} to calendar`);
+    } catch (error) {
+      console.error('Error exporting calendar:', error);
+      toast.error('Failed to export calendar');
+    }
   };
 
   if (isLoading) {
@@ -180,7 +210,7 @@ const Dashboard = () => {
       </section>
 
       {/* Quick Actions */}
-      <section>
+      <section className="grid gap-4 md:grid-cols-2">
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 font-serif text-base sm:text-lg">
@@ -194,6 +224,28 @@ const Dashboard = () => {
             </p>
             <Button asChild>
               <Link to="/availability">Update Availability</Link>
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 font-serif text-base sm:text-lg">
+              <Download className="h-5 w-5 text-primary" />
+              Export to Calendar
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-xs sm:text-sm text-muted-foreground">
+              Add all your upcoming services to your device calendar.
+            </p>
+            <Button
+              variant="outline"
+              onClick={handleExportToCalendar}
+              disabled={myAllEvents.length === 0}
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Download Calendar File
             </Button>
           </CardContent>
         </Card>
