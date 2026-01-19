@@ -79,7 +79,7 @@ const AdminSettings = () => {
                         Email Notifications
                     </CardTitle>
                     <CardDescription>
-                        Toggle which automated emails are sent by the system. Useful for testing or managing Resend limits.
+                        Toggle which automated emails are sent by the system.
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
