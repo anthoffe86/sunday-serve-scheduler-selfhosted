@@ -68,8 +68,8 @@ const AdminSettings = () => {
     return (
         <div className="space-y-8">
             <div>
-                <h1 className="font-serif text-3xl font-bold">Admin Settings</h1>
-                <p className="text-muted-foreground">Configure system-wide settings and email notifications</p>
+                <h1 className="font-serif text-2xl sm:text-3xl font-bold">Admin Settings</h1>
+                <p className="text-sm sm:text-base text-muted-foreground">Configure system-wide settings and email notifications</p>
             </div>
 
             <Card>
@@ -86,12 +86,12 @@ const AdminSettings = () => {
                     {emailSettings.map((setting) => {
                         const isEnabled = !!getSettingValue(setting.key);
                         return (
-                            <div key={setting.key} className="flex items-center justify-between space-x-4">
-                                <div className="flex flex-col space-y-1 truncate">
-                                    <Label htmlFor={setting.key} className="font-medium">
+                            <div key={setting.key} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+                                <div className="flex flex-col space-y-1 flex-1">
+                                    <Label htmlFor={setting.key} className="font-medium text-sm sm:text-base">
                                         {setting.label}
                                     </Label>
-                                    <p className="text-sm text-muted-foreground">
+                                    <p className="text-xs sm:text-sm text-muted-foreground">
                                         {setting.description}
                                     </p>
                                 </div>
@@ -100,6 +100,7 @@ const AdminSettings = () => {
                                     checked={isEnabled}
                                     onCheckedChange={() => handleToggle(setting.key, isEnabled)}
                                     disabled={updateSetting.isPending}
+                                    className="self-start sm:self-auto"
                                 />
                             </div>
                         );
@@ -107,10 +108,10 @@ const AdminSettings = () => {
                 </CardContent>
             </Card>
 
-            <div className="rounded-lg bg-blue-50 p-4 border border-blue-100 flex gap-3">
-                <Shield className="h-5 w-5 text-blue-600 shrink-0 mt-0.5" />
-                <div className="text-sm text-blue-800">
-                    <p className="font-semibold">Note for Admins</p>
+            <div className="rounded-lg bg-blue-50 p-3 sm:p-4 border border-blue-100 flex gap-2 sm:gap-3">
+                <Shield className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600 shrink-0 mt-0.5" />
+                <div className="text-xs sm:text-sm text-blue-800">
+                    <p className="font-semibold mb-1">Note for Admins</p>
                     <p>These settings affect all users. Disabling "Event Publication Emails" will prevent volunteers from receiving their schedules automatically when you hit publish.</p>
                 </div>
             </div>
