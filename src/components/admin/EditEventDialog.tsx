@@ -44,7 +44,6 @@ import {
   useUpdateEventRoles,
   EventWithDetails 
 } from '@/hooks/useEventScheduler';
-import { useProfiles } from '@/hooks/useVolunteerData';
 import { ROLE_LABELS, Role } from '@/types';
 import { AssignVolunteerDialog } from './AssignVolunteerDialog';
 import { toast } from 'sonner';
@@ -76,7 +75,6 @@ export function EditEventDialog({ open, onOpenChange, event }: EditEventDialogPr
   const [reading, setReading] = useState('');
   const [editedRoles, setEditedRoles] = useState<{ role: string; quantity: number }[]>([]);
   
-  const { data: profiles } = useProfiles();
   const updateEvent = useUpdateEvent();
   const deleteEvent = useDeleteEvent();
   const removeAssignment = useRemoveAssignment();
@@ -547,7 +545,7 @@ export function EditEventDialog({ open, onOpenChange, event }: EditEventDialogPr
         eventId={event.id}
         eventDate={event.date}
         role={assignRole || ''}
-        profiles={profiles || []}
+        existingAssignmentIds={event.assignments.map(a => a.volunteer_id)}
       />
 
       {/* Delete Confirmation */}
