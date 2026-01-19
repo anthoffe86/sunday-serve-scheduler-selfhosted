@@ -10,6 +10,30 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
+// HTML entity escaping to prevent XSS in email content
+function escapeHtml(unsafe: string | null | undefined): string {
+  if (!unsafe) return "";
+  return unsafe
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+// Validate and sanitize URLs
+function escapeUrl(url: string): string {
+  try {
+    const parsed = new URL(url);
+    if (!["http:", "https:"].includes(parsed.protocol)) {
+      return "#";
+    }
+    return parsed.href;
+  } catch {
+    return "#";
+  }
+}
+
 const ROLE_LABELS: Record<string, string> = {
   "sidesman-standard": "Sidesman (Standard)",
   "sidesman-sound": "Sidesman (Sound)",
@@ -154,14 +178,14 @@ const handler = async (req: Request): Promise<Response> => {
         <tr>
           <td style="padding: 12px; border-bottom: 1px solid #e5e7eb;">
             <strong>${formatDate(e.date)}</strong><br>
-            <span style="color: #6b7280; font-size: 14px;">${e.name}</span>
+            <span style="color: #6b7280; font-size: 14px;">${escapeHtml(e.name)}</span>
           </td>
           <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; text-align: center;">
             ${formatTime(e.time)}
           </td>
           <td style="padding: 12px; border-bottom: 1px solid #e5e7eb;">
             <span style="background: #ede9fe; color: #7c3aed; padding: 4px 10px; border-radius: 12px; font-size: 13px;">
-              ${ROLE_LABELS[e.role] || e.role}
+              ${ROLE_LABELS[e.role] || escapeHtml(e.role)}
             </span>
           </td>
         </tr>
@@ -185,7 +209,7 @@ const handler = async (req: Request): Promise<Response> => {
               </div>
               
               <div style="background: #f9fafb; padding: 30px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 10px 10px;">
-                <p style="font-size: 16px; margin-bottom: 20px;">Hello <strong>${data.name}</strong>,</p>
+                <p style="font-size: 16px; margin-bottom: 20px;">Hello <strong>${escapeHtml(data.name)}</strong>,</p>
                 
                 <p style="font-size: 16px; margin-bottom: 20px;">
                   Great news! Your volunteer assignments have been published. Here's your upcoming schedule:
@@ -205,7 +229,7 @@ const handler = async (req: Request): Promise<Response> => {
                 </table>
                 
                 <div style="text-align: center; margin: 30px 0;">
-                  <a href="${baseUrl}/schedule" 
+                  <a href="${escapeUrl(baseUrl + "/schedule")}" 
                      style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; text-decoration: none; padding: 14px 30px; border-radius: 8px; font-weight: 600; font-size: 16px;">
                     View Full Schedule
                   </a>

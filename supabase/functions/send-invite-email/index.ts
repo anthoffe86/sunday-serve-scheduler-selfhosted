@@ -8,6 +8,30 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// HTML entity escaping to prevent XSS in email content
+function escapeHtml(unsafe: string | null | undefined): string {
+  if (!unsafe) return "";
+  return unsafe
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+// Validate and sanitize URLs
+function escapeUrl(url: string): string {
+  try {
+    const parsed = new URL(url);
+    if (!["http:", "https:"].includes(parsed.protocol)) {
+      return "#";
+    }
+    return parsed.href;
+  } catch {
+    return "#";
+  }
+}
+
 interface InviteEmailRequest {
   name: string;
   email: string;
@@ -42,7 +66,7 @@ const handler = async (req: Request): Promise<Response> => {
           </div>
           
           <div style="background: #f9fafb; padding: 30px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 10px 10px;">
-            <p style="font-size: 16px; margin-bottom: 20px;">Hello <strong>${name}</strong>,</p>
+            <p style="font-size: 16px; margin-bottom: 20px;">Hello <strong>${escapeHtml(name)}</strong>,</p>
             
             <p style="font-size: 16px; margin-bottom: 20px;">
               You've been invited to join St Matthews as a volunteer. We use this platform to help manage your availability and view your assigned service roles.
@@ -53,7 +77,7 @@ const handler = async (req: Request): Promise<Response> => {
             </p>
             
             <div style="text-align: center; margin: 30px 0;">
-              <a href="${inviteLink}" 
+              <a href="${escapeUrl(inviteLink)}" 
                  style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; text-decoration: none; padding: 14px 30px; border-radius: 8px; font-weight: 600; font-size: 16px;">
                 Create Your Account
               </a>
@@ -63,7 +87,7 @@ const handler = async (req: Request): Promise<Response> => {
               Or copy and paste this link into your browser:
             </p>
             <p style="font-size: 12px; color: #9ca3af; word-break: break-all; background: #f3f4f6; padding: 10px; border-radius: 4px;">
-              ${inviteLink}
+              ${escapeHtml(inviteLink)}
             </p>
             
             <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">

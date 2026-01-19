@@ -110,6 +110,81 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Get event details to check date
+    const { data: event, error: eventError } = await supabaseAdmin
+      .from("events")
+      .select("date")
+      .eq("id", assignment.event_id)
+      .single();
+
+    if (eventError || !event) {
+      return new Response(JSON.stringify({ error: "Event not found" }), {
+        status: 404,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Verify user has the required role in their preferences
+    const { data: rolePrefs } = await supabaseAdmin
+      .from("role_preferences")
+      .select("role")
+      .eq("user_id", user.id)
+      .eq("role", assignment.role)
+      .maybeSingle();
+
+    if (!rolePrefs) {
+      return new Response(
+        JSON.stringify({ error: "You do not have this role in your preferences" }),
+        {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    // Verify user is available on this date (if they explicitly marked unavailable)
+    const { data: availability } = await supabaseAdmin
+      .from("availability")
+      .select("available")
+      .eq("user_id", user.id)
+      .eq("date", event.date)
+      .maybeSingle();
+
+    if (availability && availability.available === false) {
+      return new Response(
+        JSON.stringify({ error: "You are marked as unavailable on this date" }),
+        {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    // Check for conflicting assignments on the same date
+    const { data: existingAssignments } = await supabaseAdmin
+      .from("event_assignments")
+      .select("id, event_id")
+      .eq("volunteer_id", user.id);
+
+    if (existingAssignments && existingAssignments.length > 0) {
+      const eventIds = existingAssignments.map((a) => a.event_id);
+      const { data: conflictEvents } = await supabaseAdmin
+        .from("events")
+        .select("id")
+        .eq("date", event.date)
+        .in("id", eventIds);
+
+      if (conflictEvents && conflictEvents.length > 0) {
+        return new Response(
+          JSON.stringify({ error: "You already have an assignment on this date" }),
+          {
+            status: 409,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      }
+    }
+
     // Perform updates (best-effort sequential; service role bypasses RLS)
     const { error: updateAssignmentError } = await supabaseAdmin
       .from("event_assignments")

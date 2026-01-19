@@ -9,6 +9,30 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// HTML entity escaping to prevent XSS in email content
+function escapeHtml(unsafe: string | null | undefined): string {
+  if (!unsafe) return "";
+  return unsafe
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+// Validate and sanitize URLs
+function escapeUrl(url: string): string {
+  try {
+    const parsed = new URL(url);
+    if (!["http:", "https:"].includes(parsed.protocol)) {
+      return "#";
+    }
+    return parsed.href;
+  } catch {
+    return "#";
+  }
+}
+
 interface SwapNotificationRequest {
   swapRequestId: string;
   baseUrl: string;
@@ -203,26 +227,26 @@ const handler = async (req: Request): Promise<Response> => {
               <h1 style="color: #1a1a1a; font-size: 24px; margin-bottom: 20px;">Swap Request</h1>
               
               <p style="color: #333; font-size: 16px; line-height: 1.5;">
-                Hi ${profile.name},
+                Hi ${escapeHtml(profile.name)},
               </p>
               
               <p style="color: #333; font-size: 16px; line-height: 1.5;">
-                <strong>${requesterProfile.name}</strong> has requested a swap for their volunteer assignment and you've been identified as a potential substitute.
+                <strong>${escapeHtml(requesterProfile.name)}</strong> has requested a swap for their volunteer assignment and you've been identified as a potential substitute.
               </p>
               
               <div style="background: #f5f5f5; border-radius: 8px; padding: 20px; margin: 20px 0;">
-                <h2 style="color: #1a1a1a; font-size: 18px; margin: 0 0 15px 0;">${event.name}</h2>
+                <h2 style="color: #1a1a1a; font-size: 18px; margin: 0 0 15px 0;">${escapeHtml(event.name)}</h2>
                 <p style="color: #666; margin: 5px 0;"><strong>Date:</strong> ${formattedDate}</p>
                 <p style="color: #666; margin: 5px 0;"><strong>Time:</strong> ${formatTime(event.start_time)}</p>
                 <p style="color: #666; margin: 5px 0;"><strong>Role:</strong> ${roleLabel}</p>
-                ${swapRequest.notes ? `<p style="color: #666; margin: 15px 0 5px 0;"><strong>Note from ${requesterProfile.name}:</strong> ${swapRequest.notes}</p>` : ""}
+                ${swapRequest.notes ? `<p style="color: #666; margin: 15px 0 5px 0;"><strong>Note from ${escapeHtml(requesterProfile.name)}:</strong> ${escapeHtml(swapRequest.notes)}</p>` : ""}
               </div>
               
               <p style="color: #333; font-size: 16px; line-height: 1.5;">
                 If you're able to cover this assignment, please log in to accept the swap request.
               </p>
               
-              <a href="${baseUrl}/swaps" style="display: inline-block; background: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin: 20px 0;">
+              <a href="${escapeUrl(baseUrl + "/swaps")}" style="display: inline-block; background: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin: 20px 0;">
                 View Swap Requests
               </a>
               
