@@ -5,8 +5,7 @@ import {
   CalendarDays,
   CalendarCheck,
   Loader2,
-  Clock,
-  Calendar
+  Clock
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -17,8 +16,6 @@ import { useAuth } from '@/hooks/useAuth';
 import { useProfile } from '@/hooks/useVolunteerData';
 import { useEvents } from '@/hooks/useEventScheduler';
 import { cn } from '@/lib/utils';
-import { downloadEventICS } from '@/lib/calendarExport';
-import { toast } from 'sonner';
 
 const Dashboard = () => {
   const { user } = useAuth();
@@ -47,13 +44,6 @@ const Dashboard = () => {
     const ampm = hour >= 12 ? 'PM' : 'AM';
     const displayHour = hour % 12 || 12;
     return `${displayHour}:${minutes} ${ampm}`;
-  };
-
-  const handleAddToCalendar = (event: any, e: React.MouseEvent) => {
-    e.stopPropagation(); // Prevent opening event detail dialog
-    const assignment = event.assignments.find((a: any) => a.volunteer_id === user?.id);
-    downloadEventICS(event, assignment?.role);
-    toast.success('Calendar event downloaded');
   };
 
   if (isLoading) {
@@ -100,9 +90,10 @@ const Dashboard = () => {
                 <Card
                   key={event.id}
                   className={cn(
-                    "overflow-hidden transition-all hover:shadow-md",
+                    "overflow-hidden transition-all hover:shadow-md cursor-pointer",
                     isNextEvent && "ring-2 ring-primary/20"
                   )}
+                  onClick={() => setSelectedEvent(event)}
                 >
                   <CardContent className="p-0">
                     <div className="flex">
@@ -125,10 +116,7 @@ const Dashboard = () => {
                       </div>
 
                       {/* Content */}
-                      <div
-                        className="flex-1 p-3 sm:p-4 cursor-pointer"
-                        onClick={() => setSelectedEvent(event)}
-                      >
+                      <div className="flex-1 p-3 sm:p-4">
                         {/* Badges */}
                         <div className="flex items-center gap-2 mb-2">
                           {isNextEvent && (
@@ -156,7 +144,7 @@ const Dashboard = () => {
                         )}
 
                         {/* Time and Role */}
-                        <div className="flex flex-wrap items-center gap-3 text-sm mb-3">
+                        <div className="flex flex-wrap items-center gap-3 text-sm">
                           <span className="flex items-center gap-1.5 text-muted-foreground">
                             <Clock className="h-4 w-4" />
                             {formatTime(event.start_time)}
@@ -168,17 +156,6 @@ const Dashboard = () => {
                             </>
                           )}
                         </div>
-
-                        {/* Add to Calendar Button */}
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={(e) => handleAddToCalendar(event, e)}
-                          className="w-full sm:w-auto"
-                        >
-                          <Calendar className="h-3.5 w-3.5 mr-2" />
-                          Add to Calendar
-                        </Button>
                       </div>
                     </div>
                   </CardContent>
