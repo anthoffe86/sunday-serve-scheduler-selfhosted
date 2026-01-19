@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   Calendar as CalendarIcon,
   Clock,
@@ -35,7 +35,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useAuth } from "@/hooks/useAuth";
-import { Navigate } from "react-router-dom";
+import { Navigate, useLocation } from "react-router-dom";
 import { useEvents, useBulkDeleteEvents, EventWithDetails } from "@/hooks/useEventScheduler";
 import { cn } from "@/lib/utils";
 import { EditEventDialog } from "@/components/admin/EditEventDialog";
@@ -56,6 +56,7 @@ import {
 
 const AdminSchedule = () => {
   const { isAdmin, isLoading: authLoading } = useAuth();
+  const location = useLocation();
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [viewMode, setViewMode] = useState<"calendar" | "list" | "table">("table");
   const [editEventId, setEditEventId] = useState<string | null>(null);
@@ -69,6 +70,16 @@ const AdminSchedule = () => {
   const endDate = format(addMonths(endOfMonth(currentMonth), 2), "yyyy-MM-dd");
 
   const { data: events, isLoading } = useEvents({ startDate, endDate });
+
+  // Handle opening event from navigation state (e.g., from dashboard)
+  useEffect(() => {
+    const state = location.state as { openEventId?: string } | null;
+    if (state?.openEventId) {
+      setEditEventId(state.openEventId);
+      // Clear the state to prevent reopening on refresh
+      window.history.replaceState({}, document.title);
+    }
+  }, [location]);
 
   // Get the current event from fresh data (so it updates after mutations)
   const editEvent = useMemo(() => {

@@ -1,5 +1,6 @@
 import { LucideIcon } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
+import { cn } from '@/lib/utils';
 
 interface StatCardProps {
   label: string;
@@ -7,11 +8,12 @@ interface StatCardProps {
   icon: LucideIcon;
   description?: string;
   trend?: 'up' | 'down' | 'neutral';
+  className?: string;
 }
 
-export function StatCard({ label, value, icon: Icon, description }: StatCardProps) {
+export function StatCard({ label, value, icon: Icon, description, className }: StatCardProps) {
   return (
-    <Card className="relative overflow-hidden">
+    <Card className={cn("relative overflow-hidden", className)}>
       <CardContent className="p-5">
         <div className="flex items-start justify-between">
           <div>
