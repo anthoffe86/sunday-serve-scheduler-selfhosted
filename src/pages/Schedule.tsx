@@ -406,72 +406,88 @@ const Schedule = () => {
 
       {/* Event Details Dialog */}
       <Dialog open={!!selectedEvent} onOpenChange={(open) => !open && setSelectedEvent(null)}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="sm:max-w-md p-4 gap-3">
           {selectedEvent && (
             <>
-              <DialogHeader>
-                <DialogTitle className="font-serif flex items-center gap-2">
-                  {isUserAssigned(selectedEvent) && <Star className="h-5 w-5 text-primary fill-primary" />}
-                  {selectedEvent.name}
+              <DialogHeader className="space-y-1">
+                <DialogTitle className="font-serif text-xl flex flex-col gap-1">
+                  <div className="flex items-center gap-2">
+                    {isUserAssigned(selectedEvent) && <Star className="h-5 w-5 text-primary fill-primary" />}
+                    {selectedEvent.name}
+                  </div>
+                  {selectedEvent.subheading && (
+                    <span className="text-sm font-normal text-muted-foreground italic">
+                      {selectedEvent.subheading}
+                    </span>
+                  )}
                 </DialogTitle>
-                <DialogDescription className="flex flex-wrap items-center gap-4 pt-2">
-                  <span className="flex items-center gap-1.5">
-                    <CalendarIcon className="h-4 w-4" />
-                    {format(parseISO(selectedEvent.date), "EEEE, MMMM d, yyyy")}
-                  </span>
-                  <span className="flex items-center gap-1.5">
-                    <Clock className="h-4 w-4" />
-                    {formatTime(selectedEvent.start_time)}
-                  </span>
+                <DialogDescription className="flex flex-col gap-1 pt-1">
+                  <div className="flex flex-wrap items-center gap-3 text-sm">
+                    <span className="flex items-center gap-1.5">
+                      <CalendarIcon className="h-3.5 w-3.5" />
+                      {format(parseISO(selectedEvent.date), "EEEE, MMM d")}
+                    </span>
+                    <span className="flex items-center gap-1.5">
+                      <Clock className="h-3.5 w-3.5" />
+                      {formatTime(selectedEvent.start_time)}
+                    </span>
+                  </div>
+                  {selectedEvent.reading && (
+                    <div className="text-sm text-foreground/80 mt-1">
+                      <span className="font-medium">Reading:</span> {selectedEvent.reading}
+                    </div>
+                  )}
                 </DialogDescription>
               </DialogHeader>
 
               {isUserAssigned(selectedEvent) && (
-                <div className="bg-primary/10 rounded-lg p-3">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Star className="h-5 w-5 text-primary fill-primary" />
-                    <div>
-                      <p className="font-medium text-sm">You're assigned to this event</p>
-                      <p className="text-sm text-muted-foreground">
-                        Role(s): {getUserRoles(selectedEvent).join(", ")}
+                <div className="bg-primary/5 rounded-md p-2.5 border border-primary/10">
+                  <div className="flex items-start gap-2 mb-2">
+                    <Star className="h-4 w-4 text-primary fill-primary mt-0.5" />
+                    <div className="flex-1">
+                      <p className="font-medium text-sm leading-none mb-1">Your Assignment</p>
+                      <p className="text-xs text-muted-foreground">
+                        {getUserRoles(selectedEvent).join(", ")}
                       </p>
                     </div>
                   </div>
-                  
+
                   {/* Request Swap Button */}
-                  {getUserAssignments(selectedEvent).map((assignment) => (
-                    <Button
-                      key={assignment.id}
-                      variant="outline"
-                      size="sm"
-                      className="mt-2 gap-1"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleRequestSwap({ id: assignment.id, role: assignment.role });
-                      }}
-                    >
-                      <ArrowLeftRight className="h-4 w-4" />
-                      Request Swap for {ROLE_LABELS[assignment.role as Role] || assignment.role}
-                    </Button>
-                  ))}
+                  <div className="flex flex-wrap gap-2">
+                    {getUserAssignments(selectedEvent).map((assignment) => (
+                      <Button
+                        key={assignment.id}
+                        variant="outline"
+                        size="sm"
+                        className="h-7 text-xs gap-1"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleRequestSwap({ id: assignment.id, role: assignment.role });
+                        }}
+                      >
+                        <ArrowLeftRight className="h-3 w-3" />
+                        Swap {ROLE_LABELS[assignment.role as Role] || assignment.role}
+                      </Button>
+                    ))}
+                  </div>
                 </div>
               )}
 
               <Separator />
 
               {/* Volunteer Assignments */}
-              <div className="space-y-4">
-                <h4 className="font-medium flex items-center gap-2">
-                  <Users className="h-4 w-4" />
-                  Volunteer Assignments
+              <div className="space-y-3 max-h-[40vh] overflow-y-auto pr-1">
+                <h4 className="font-medium text-sm flex items-center gap-2 text-muted-foreground">
+                  <Users className="h-3.5 w-3.5" />
+                  Volunteers
                 </h4>
 
                 {selectedEvent.roles.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-4 border rounded-lg">
-                    No roles defined for this event
+                  <p className="text-xs text-muted-foreground text-center py-2 border rounded-md border-dashed">
+                    No roles defined
                   </p>
                 ) : (
-                  <div className="space-y-3">
+                  <div className="grid gap-2">
                     {selectedEvent.roles.map((role) => {
                       const assignments = selectedEvent.assignments.filter((a) => a.role === role.role);
                       const isFilled = assignments.length >= role.quantity;
@@ -480,17 +496,20 @@ const Schedule = () => {
                         <div
                           key={role.id}
                           className={cn(
-                            "rounded-lg border p-3",
-                            isFilled ? "border-green-200 bg-green-50/50" : "border-amber-200 bg-amber-50/50",
+                            "rounded-md border px-2 py-1.5",
+                            isFilled ? "border-green-200/50 bg-green-50/30" : "border-amber-200/50 bg-amber-50/30",
                           )}
                         >
-                          <div className="flex items-center justify-between mb-2">
-                            <span className="font-medium text-sm">
+                          <div className="flex items-center justify-between mb-1.5">
+                            <span className="font-medium text-xs text-foreground/90">
                               {ROLE_LABELS[role.role as keyof typeof ROLE_LABELS] || role.role}
                             </span>
-                            <Badge variant={isFilled ? "default" : "secondary"} className="text-xs">
+                            <span className={cn(
+                              "text-[10px] px-1.5 py-0.5 rounded-full font-medium",
+                              isFilled ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"
+                            )}>
                               {assignments.length}/{role.quantity}
-                            </Badge>
+                            </span>
                           </div>
 
                           <div className="space-y-1">
@@ -500,21 +519,21 @@ const Schedule = () => {
                                 <div
                                   key={assignment.id}
                                   className={cn(
-                                    "flex items-center justify-between text-sm rounded px-2 py-1.5",
-                                    isMe ? "bg-primary/20 font-medium" : "bg-background",
+                                    "flex items-center text-xs rounded px-1.5 py-1",
+                                    isMe ? "bg-primary/10 text-primary font-medium" : "bg-background/50 text-foreground/80",
                                   )}
                                 >
-                                  <span className="flex items-center gap-1.5">
-                                    {isMe && <Star className="h-3 w-3 text-primary fill-primary" />}
+                                  <span className="flex items-center gap-1.5 truncate">
+                                    {isMe && <Star className="h-2.5 w-2.5 fill-primary" />}
                                     {assignment.volunteer_name || "Unknown"}
-                                    {isMe && " (You)"}
+                                    {isMe && <span className="text-[10px] opacity-70">(You)</span>}
                                   </span>
                                 </div>
                               );
                             })}
                             {assignments.length < role.quantity && (
-                              <div className="text-sm text-muted-foreground italic px-2 py-1">
-                                {role.quantity - assignments.length} spot(s) available
+                              <div className="text-[10px] text-muted-foreground italic px-1.5">
+                                {role.quantity - assignments.length} available
                               </div>
                             )}
                           </div>
@@ -525,8 +544,8 @@ const Schedule = () => {
                 )}
               </div>
 
-              <div className="flex justify-end">
-                <Button variant="outline" onClick={() => setSelectedEvent(null)}>
+              <div className="flex justify-end pt-2">
+                <Button variant="ghost" size="sm" onClick={() => setSelectedEvent(null)} className="h-8">
                   Close
                 </Button>
               </div>
