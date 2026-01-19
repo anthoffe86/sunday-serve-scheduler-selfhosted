@@ -61,6 +61,7 @@ interface EventInfo {
 interface NotificationRequest {
   eventIds: string[];
   baseUrl: string;
+  userIds?: string[];
 }
 
 const formatDate = (dateStr: string): string => {
@@ -92,9 +93,9 @@ const handler = async (req: Request): Promise<Response> => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const { eventIds, baseUrl }: NotificationRequest = await req.json();
+    const { eventIds, baseUrl, userIds }: NotificationRequest = await req.json();
 
-    console.log(`Sending notifications for ${eventIds.length} events`);
+    console.log(`Sending notifications for ${eventIds.length} events${userIds ? ` to ${userIds.length} specific users` : ''}`);
 
     // Fetch events with their assignments
     const { data: events, error: eventsError } = await supabase
@@ -122,8 +123,17 @@ const handler = async (req: Request): Promise<Response> => {
     if (assignmentsError) throw assignmentsError;
 
     // Fetch all relevant profiles
-    const volunteerIds = [...new Set(assignments?.map(a => a.volunteer_id) || [])];
-    
+    let volunteerIds = [...new Set(assignments?.map(a => a.volunteer_id) || [])];
+
+    if (userIds && userIds.length > 0) {
+      console.log(`Filtering notifications. Request UserIDs: ${userIds.join(',')}`);
+      const originalCount = volunteerIds.length;
+      volunteerIds = volunteerIds.filter(id => userIds.includes(id));
+      console.log(`Filtered volunteers from ${originalCount} to ${volunteerIds.length}`);
+    } else {
+      console.log('No userIds filter provided (or empty). Broadcasting to all.');
+    }
+
     if (volunteerIds.length === 0) {
       return new Response(
         JSON.stringify({ success: true, emailsSent: 0, message: 'No volunteers to notify' }),
@@ -260,11 +270,11 @@ const handler = async (req: Request): Promise<Response> => {
     console.log(`Sent ${emailsSent} notification emails`);
 
     return new Response(
-      JSON.stringify({ 
-        success: true, 
-        emailsSent, 
+      JSON.stringify({
+        success: true,
+        emailsSent,
         totalVolunteers: volunteerAssignments.size,
-        errors: errors.length > 0 ? errors : undefined 
+        errors: errors.length > 0 ? errors : undefined
       }),
       {
         status: 200,

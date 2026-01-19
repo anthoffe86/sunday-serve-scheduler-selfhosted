@@ -33,7 +33,7 @@ interface AssignVolunteerDialogProps {
   eventDate: string;
   role: string;
   existingAssignmentIds: string[]; // user_ids already assigned to this event
-  onAssigned?: () => void; // callback after successful assignment
+  onAssigned?: (volunteer: Profile) => void; // callback after successful assignment
 }
 
 // Hook to get volunteers with a specific role preference
@@ -42,7 +42,7 @@ function useVolunteersWithRolePreference(role: string) {
     queryKey: ['volunteers-with-role', role],
     queryFn: async () => {
       if (!role) return [];
-      
+
       // Get role preferences for this role
       const { data: rolePrefs, error: prefsError } = await supabase
         .from('role_preferences')
@@ -115,7 +115,22 @@ export function AssignVolunteerDialog({
   const availableProfiles = filteredProfiles.filter((p) => !unavailableUserIds.has(p.user_id));
   const unavailableProfiles = filteredProfiles.filter((p) => unavailableUserIds.has(p.user_id));
 
-  const handleAssign = async (volunteerId: string) => {
+  const handleAssign = async (volunteerId: string, volunteerProfile?: Profile) => {
+    // If onAssigned callback is provided, use it (batch mode)
+    // We prefer the full profile if available, otherwise we use the ID (which shouldn't happen with updated calls)
+    if (onAssigned) {
+      if (volunteerProfile) {
+        onAssigned(volunteerProfile);
+      } else {
+        // Fallback or error if profile missing? 
+        // We should ensure profile is passed.
+        // For now, let's assume we can't really proceed without profile in batch mode unless we fetch it.
+        // But the onClick passes it.
+      }
+      onOpenChange(false);
+      return;
+    }
+
     try {
       await assignVolunteer.mutateAsync({
         event_id: eventId,
@@ -124,7 +139,6 @@ export function AssignVolunteerDialog({
       });
       toast.success('Volunteer assigned');
       setSearch('');
-      onAssigned?.();
       onOpenChange(false);
     } catch (error: any) {
       if (error?.code === '23505') {
@@ -195,7 +209,7 @@ export function AssignVolunteerDialog({
                   {availableProfiles.map((profile) => (
                     <button
                       key={profile.id}
-                      onClick={() => handleAssign(profile.user_id)}
+                      onClick={() => handleAssign(profile.user_id, profile)}
                       disabled={assignVolunteer.isPending}
                       className="w-full flex items-center gap-3 p-3 rounded-lg border hover:bg-accent transition-colors text-left"
                     >
@@ -230,7 +244,7 @@ export function AssignVolunteerDialog({
                   {unavailableProfiles.map((profile) => (
                     <button
                       key={profile.id}
-                      onClick={() => handleAssign(profile.user_id)}
+                      onClick={() => handleAssign(profile.user_id, profile)}
                       disabled={assignVolunteer.isPending}
                       className="w-full flex items-center gap-3 p-3 rounded-lg border bg-muted/30 hover:bg-accent transition-colors text-left opacity-70"
                     >

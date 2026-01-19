@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
-import { 
-  Calendar, 
-  Clock, 
-  Users, 
-  UserPlus, 
+import {
+  Calendar,
+  Clock,
+  Users,
+  UserPlus,
   Trash2,
   Check,
   X,
@@ -37,17 +37,20 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { 
-  useUpdateEvent, 
-  useDeleteEvent, 
+import {
+  useUpdateEvent,
+  useDeleteEvent,
   useRemoveAssignment,
   useUpdateEventRoles,
-  EventWithDetails 
+  useAssignVolunteer,
+  useBatchUpdateAssignments,
+  EventWithDetails
 } from '@/hooks/useEventScheduler';
 import { ROLE_LABELS, Role } from '@/types';
 import { AssignVolunteerDialog } from './AssignVolunteerDialog';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { supabase } from '@/integrations/supabase/client';
 
 interface EditEventDialogProps {
   open: boolean;
@@ -69,16 +72,22 @@ export function EditEventDialog({ open, onOpenChange, event }: EditEventDialogPr
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [isEditingDetails, setIsEditingDetails] = useState(false);
   const [isEditingRoles, setIsEditingRoles] = useState(false);
-  
+
   // Editable fields
   const [subheading, setSubheading] = useState('');
   const [reading, setReading] = useState('');
   const [editedRoles, setEditedRoles] = useState<{ role: string; quantity: number }[]>([]);
-  
+
+  // Batch Assignment State
+  const [localAssignments, setLocalAssignments] = useState<any[]>([]);
+  const [isAssignmentsDirty, setIsAssignmentsDirty] = useState(false);
+
   const updateEvent = useUpdateEvent();
   const deleteEvent = useDeleteEvent();
   const removeAssignment = useRemoveAssignment();
   const updateEventRoles = useUpdateEventRoles();
+  const assignVolunteer = useAssignVolunteer();
+  const batchUpdateAssignments = useBatchUpdateAssignments();
 
   // Reset form when event changes
   useEffect(() => {
@@ -86,6 +95,8 @@ export function EditEventDialog({ open, onOpenChange, event }: EditEventDialogPr
       setSubheading(event.subheading || '');
       setReading(event.reading || '');
       setEditedRoles(event.roles.map(r => ({ role: r.role, quantity: r.quantity })));
+      setLocalAssignments(event.assignments.map(a => ({ ...a })));
+      setIsAssignmentsDirty(false);
       setIsEditingDetails(false);
       setIsEditingRoles(false);
     }
@@ -112,8 +123,8 @@ export function EditEventDialog({ open, onOpenChange, event }: EditEventDialogPr
 
   const handleSaveDetails = async () => {
     try {
-      await updateEvent.mutateAsync({ 
-        id: event.id, 
+      await updateEvent.mutateAsync({
+        id: event.id,
         subheading: subheading.trim() || null,
         reading: reading.trim() || null,
       });
@@ -153,13 +164,105 @@ export function EditEventDialog({ open, onOpenChange, event }: EditEventDialogPr
     }
   };
 
-  const handleRemoveAssignment = async (assignmentId: string) => {
-    try {
-      await removeAssignment.mutateAsync(assignmentId);
-      toast.success('Volunteer removed');
-    } catch (error) {
-      toast.error('Failed to remove volunteer');
+  // --- Batch Assignment Logic ---
+
+  const handleLocalRemoveAssignment = (assignmentId: string) => {
+    setLocalAssignments(prev => prev.filter(a => a.id !== assignmentId && a.tempId !== assignmentId));
+    setIsAssignmentsDirty(true);
+  };
+
+  const handleLocalAssignVolunteer = (volunteer: any) => {
+    if (!assignRole) return;
+
+    // Check if valid
+    const isAlreadyAssigned = localAssignments.some(a => a.volunteer_id === volunteer.user_id);
+    if (isAlreadyAssigned) {
+      toast.error('Volunteer already assigned to this event');
+      return;
     }
+
+    const newAssignment = {
+      id: `temp-${Date.now()}`, // Temporary ID
+      tempId: `temp-${Date.now()}`,
+      volunteer_id: volunteer.user_id,
+      volunteer_name: volunteer.name,
+      role: assignRole,
+      event_id: event.id,
+      isNew: true
+    };
+
+    setLocalAssignments(prev => [...prev, newAssignment]);
+    setIsAssignmentsDirty(true);
+    // Don't close dialog yet if you want to add more? optional.
+    // setAssignRole(null); 
+  };
+
+  const handleSaveAssignments = async () => {
+    if (!isAssignmentsDirty) return;
+
+    const currentAssignments = localAssignments;
+
+    // Identify removals: present in original but not in current
+    const toRemove = event.assignments.filter(orig => !currentAssignments.some(curr => (curr.id === orig.id)));
+    const toRemoveIds = toRemove.map(a => a.id);
+
+    // Identify additions: marked as isNew
+    const toAdd = currentAssignments.filter(a => a.isNew);
+    const toAddPayload = toAdd.map(a => ({ role: a.role, volunteer_id: a.volunteer_id }));
+
+    if (toRemoveIds.length === 0 && toAddPayload.length === 0) {
+      setIsAssignmentsDirty(false);
+      return;
+    }
+
+    try {
+      // 1. Perform Batch DB Update
+      await batchUpdateAssignments.mutateAsync({
+        eventId: event.id,
+        toAdd: toAddPayload,
+        toRemove: toRemoveIds
+      });
+
+      // 2. Send Notifications (After successful DB update)
+      // Send Removal Notifications
+      for (const assignment of toRemove) {
+        await supabase.functions.invoke('send-assignment-removal-notification', {
+          body: {
+            volunteerId: assignment.volunteer_id,
+            eventName: event.name,
+            eventDate: event.date,
+            role: assignment.role,
+            reason: "Removed by administrator",
+            baseUrl: window.location.origin,
+          },
+        });
+      }
+
+      // Send Added Notifications (Batch)
+      const addedUserIds = toAdd.map(a => a.volunteer_id);
+      if (addedUserIds.length > 0) {
+        await supabase.functions.invoke('send-event-notification', {
+          body: {
+            eventIds: [event.id],
+            baseUrl: window.location.origin,
+            userIds: addedUserIds,
+          },
+        });
+      }
+
+      toast.success(`Saved: ${toAdd.length} added, ${toRemove.length} removed`);
+      setIsAssignmentsDirty(false);
+
+    } catch (error) {
+      console.error(error);
+      toast.error('Failed to save changes');
+    }
+  };
+
+  const handleCancelAssignments = () => {
+    setLocalAssignments(event.assignments.map(a => ({ ...a })));
+    setIsAssignmentsDirty(false);
+    toast.info('Changes discarded');
   };
 
   const updateRoleQuantity = (role: string, delta: number) => {
@@ -184,11 +287,11 @@ export function EditEventDialog({ open, onOpenChange, event }: EditEventDialogPr
 
   const getFilledRolesCount = (role: string) => {
     const required = event.roles.find(r => r.role === role)?.quantity || 0;
-    const filled = event.assignments.filter(a => a.role === role).length;
+    const filled = localAssignments.filter(a => a.role === role).length;
     return { filled, required };
   };
 
-  const isPending = updateEvent.isPending || deleteEvent.isPending || updateEventRoles.isPending;
+  const isPending = updateEvent.isPending || deleteEvent.isPending || updateEventRoles.isPending || batchUpdateAssignments.isPending;
 
   return (
     <>
@@ -199,7 +302,7 @@ export function EditEventDialog({ open, onOpenChange, event }: EditEventDialogPr
               <DialogTitle className="text-2xl">
                 {event.name}
               </DialogTitle>
-              <Badge 
+              <Badge
                 variant={event.status === 'published' ? 'default' : event.status === 'cancelled' ? 'destructive' : 'secondary'}
                 className="shrink-0"
               >
@@ -236,9 +339,9 @@ export function EditEventDialog({ open, onOpenChange, event }: EditEventDialogPr
                 </Button>
               ) : (
                 <div className="flex gap-1">
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     onClick={() => {
                       setSubheading(event.subheading || '');
                       setReading(event.reading || '');
@@ -247,8 +350,8 @@ export function EditEventDialog({ open, onOpenChange, event }: EditEventDialogPr
                   >
                     Cancel
                   </Button>
-                  <Button 
-                    size="sm" 
+                  <Button
+                    size="sm"
                     onClick={handleSaveDetails}
                     disabled={updateEvent.isPending}
                   >
@@ -325,8 +428,8 @@ export function EditEventDialog({ open, onOpenChange, event }: EditEventDialogPr
                   <Button variant="ghost" size="sm" onClick={handleCancelRolesEdit}>
                     Cancel
                   </Button>
-                  <Button 
-                    size="sm" 
+                  <Button
+                    size="sm"
                     onClick={handleSaveRoles}
                     disabled={updateEventRoles.isPending}
                   >
@@ -347,10 +450,10 @@ export function EditEventDialog({ open, onOpenChange, event }: EditEventDialogPr
                   const currentAssignments = event.assignments.filter(a => a.role === role);
                   const willRemoveVolunteers = quantity < currentAssignments.length;
                   const isRoleRemoved = quantity === 0 && currentAssignments.length > 0;
-                  
+
                   return (
-                    <div 
-                      key={role} 
+                    <div
+                      key={role}
                       className={cn(
                         "flex flex-col gap-1 p-2 rounded-md transition-colors",
                         isRoleRemoved && "bg-destructive/10 border border-destructive/30",
@@ -414,6 +517,13 @@ export function EditEventDialog({ open, onOpenChange, event }: EditEventDialogPr
             ) : (
               /* Volunteer Assignments */
               <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-semibold flex items-center gap-2 text-base">
+                    <Users className="h-4 w-4" />
+                    Assignments
+                  </h4>
+                </div>
+
                 {event.roles.length === 0 ? (
                   <p className="text-sm text-muted-foreground text-center py-4 border rounded-lg">
                     No roles defined for this event
@@ -422,11 +532,11 @@ export function EditEventDialog({ open, onOpenChange, event }: EditEventDialogPr
                   event.roles.map((role) => {
                     const { filled, required } = getFilledRolesCount(role.role);
                     const isFilled = filled >= required;
-                    const assignments = event.assignments.filter(a => a.role === role.role);
+                    const assignments = localAssignments.filter(a => a.role === role.role);
 
                     return (
-                      <div 
-                        key={role.id} 
+                      <div
+                        key={role.id}
                         className={cn(
                           'rounded-lg border p-3',
                           isFilled ? 'border-green-200 bg-green-50/50' : 'border-amber-200 bg-amber-50/50'
@@ -443,17 +553,26 @@ export function EditEventDialog({ open, onOpenChange, event }: EditEventDialogPr
 
                         <div className="space-y-1">
                           {assignments.map((assignment) => (
-                            <div 
-                              key={assignment.id} 
-                              className="flex items-center justify-between text-sm bg-background rounded px-2 py-1.5"
+                            <div
+                              key={assignment.id}
+                              className={cn(
+                                "flex items-center justify-between text-sm bg-background rounded px-2 py-1.5",
+                                assignment.isNew && "ring-1 ring-green-500 bg-green-50"
+                              )}
                             >
-                              <span>{assignment.volunteer_name || 'Unknown'}</span>
+                              <div className="flex items-center gap-2">
+                                <span>{assignment.volunteer_name || 'Unknown'}</span>
+                                {assignment.isNew && (
+                                  <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 border-green-500 text-green-700 bg-green-50">
+                                    New
+                                  </Badge>
+                                )}
+                              </div>
                               <Button
                                 variant="ghost"
                                 size="icon"
                                 className="h-6 w-6 text-muted-foreground hover:text-destructive"
-                                onClick={() => handleRemoveAssignment(assignment.id)}
-                                disabled={removeAssignment.isPending}
+                                onClick={() => handleLocalRemoveAssignment(assignment.id)}
                               >
                                 <X className="h-3.5 w-3.5" />
                               </Button>
@@ -521,19 +640,43 @@ export function EditEventDialog({ open, onOpenChange, event }: EditEventDialogPr
           </div>
 
           <DialogFooter className="flex-row justify-between sm:justify-between">
-            <Button
-              variant="destructive"
-              size="sm"
-              onClick={() => setDeleteConfirmOpen(true)}
-              disabled={isPending}
-              className="gap-1.5"
-            >
-              <Trash2 className="h-4 w-4" />
-              Delete
-            </Button>
-            <Button variant="outline" onClick={() => onOpenChange(false)}>
-              Close
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => setDeleteConfirmOpen(true)}
+                disabled={isPending}
+                className="gap-1.5"
+              >
+                <Trash2 className="h-4 w-4" />
+                Delete
+              </Button>
+              {isAssignmentsDirty && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={handleCancelAssignments}
+                >
+                  Discard Changes
+                </Button>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => onOpenChange(false)}>
+                Close
+              </Button>
+              {isAssignmentsDirty && (
+                <Button
+                  size="sm"
+                  onClick={handleSaveAssignments}
+                  disabled={isPending}
+                  className="gap-1"
+                >
+                  {isPending && <Loader2 className="h-3 w-3 animate-spin" />}
+                  Save Changes
+                </Button>
+              )}
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -545,7 +688,8 @@ export function EditEventDialog({ open, onOpenChange, event }: EditEventDialogPr
         eventId={event.id}
         eventDate={event.date}
         role={assignRole || ''}
-        existingAssignmentIds={event.assignments.map(a => a.volunteer_id)}
+        existingAssignmentIds={localAssignments.map(a => a.volunteer_id)}
+        onAssigned={handleLocalAssignVolunteer}
       />
 
       {/* Delete Confirmation */}
@@ -559,8 +703,8 @@ export function EditEventDialog({ open, onOpenChange, event }: EditEventDialogPr
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction 
-              onClick={handleDelete} 
+            <AlertDialogAction
+              onClick={handleDelete}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               {deleteEvent.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

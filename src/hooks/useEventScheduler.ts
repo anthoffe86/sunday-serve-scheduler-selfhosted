@@ -411,7 +411,7 @@ export function useGenerateEvents() {
       // Generate event dates
       const dates: Date[] = [];
       let currentDate = parseISO(data.startDate);
-      
+
       // Find next occurrence of the target day
       const targetDay = template.day_of_week;
       if (getDay(currentDate) !== targetDay) {
@@ -587,6 +587,56 @@ export function useRemoveAssignment() {
   });
 }
 
+// Hook: Batch update assignments (Add/Remove)
+export function useBatchUpdateAssignments() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (data: {
+      eventId: string;
+      toAdd: { role: string; volunteer_id: string }[];
+      toRemove: string[];
+    }) => {
+      const { eventId, toAdd, toRemove } = data;
+      const errors = [];
+
+      // 1. Perform Removals
+      if (toRemove.length > 0) {
+        const { error: removeError } = await supabase
+          .from('event_assignments')
+          .delete()
+          .in('id', toRemove);
+
+        if (removeError) errors.push(`Remove error: ${removeError.message}`);
+      }
+
+      // 2. Perform Additions
+      if (toAdd.length > 0) {
+        const { error: addError } = await supabase
+          .from('event_assignments')
+          .insert(
+            toAdd.map(a => ({
+              event_id: eventId,
+              role: a.role as ServiceRole,
+              volunteer_id: a.volunteer_id,
+            }))
+          );
+
+        if (addError) errors.push(`Add error: ${addError.message}`);
+      }
+
+      if (errors.length > 0) {
+        throw new Error(errors.join(', '));
+      }
+
+      return { success: true };
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['events'] });
+    },
+  });
+}
+
 // Hook: Bulk update event status
 export function useBulkUpdateEventStatus() {
   const queryClient = useQueryClient();
@@ -615,10 +665,10 @@ export function useBulkUpdateEventStatus() {
             return { count: data.eventIds.length, emailsSent: 0, emailError: true };
           }
 
-          return { 
-            count: data.eventIds.length, 
+          return {
+            count: data.eventIds.length,
             emailsSent: notificationResult?.emailsSent || 0,
-            emailError: false 
+            emailError: false
           };
         } catch (err) {
           console.error('Failed to send notifications:', err);
@@ -647,7 +697,7 @@ export function useSendEventNotifications() {
 
       if (error) throw error;
       if (result.error) throw new Error(result.error);
-      
+
       return result as {
         success: boolean;
         emailsSent: number;
@@ -670,7 +720,7 @@ export function useAutoSchedule() {
 
       if (error) throw error;
       if (result.error) throw new Error(result.error);
-      
+
       return result as {
         message: string;
         assignments: Array<{
