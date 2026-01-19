@@ -228,9 +228,9 @@ const handler = async (req: Request): Promise<Response> => {
       `).join('');
 
       emailBatch.push({
-        from: "Volunteer Scheduler <noreply@updates.lumotutor.co.uk>",
+        from: "St Matthews Church <noreply@updates.lumotutor.co.uk>",
         to: [data.email],
-        subject: `Your Volunteer Schedule - ${data.events.length} Assignment${data.events.length > 1 ? 's' : ''} Confirmed`,
+        subject: `Your St Matthews Church - ${data.events.length} Assignment${data.events.length > 1 ? 's' : ''} Confirmed`,
         html: `
           <!DOCTYPE html>
           <html>

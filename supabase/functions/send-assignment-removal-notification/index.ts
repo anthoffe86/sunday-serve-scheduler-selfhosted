@@ -134,7 +134,7 @@ serve(async (req) => {
     };
 
     const { data: emailData, error: emailError } = await resend.emails.send({
-      from: "Volunteer Scheduler <noreply@updates.lumotutor.co.uk>",
+      from: "St Matthews Church <noreply@updates.lumotutor.co.uk>",
       to: [profile.email],
       subject: `Service Update: Removed from ${eventName}`,
       html: `
