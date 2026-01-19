@@ -42,13 +42,17 @@ export function generateICSFile(events: EventWithDetails[], userRole?: string): 
         const dtend = formatICSDate(endDateTime);
         const dtstamp = formatICSDate(new Date());
 
+        // Get user's role from event if available
+        const assignment = event.assignments?.find((a: any) => a.volunteer_id === (event as any).userVolunteerId);
+        const role = assignment?.role || userRole;
+
         // Create description with role info
         let description = event.name;
         if (event.subheading) {
             description += ` - ${event.subheading}`;
         }
-        if (userRole) {
-            description += `\\nYour role: ${userRole}`;
+        if (role) {
+            description += `\\nYour role: ${role}`;
         }
 
         // Escape special characters in text fields
@@ -76,16 +80,30 @@ export function generateICSFile(events: EventWithDetails[], userRole?: string): 
 }
 
 /**
- * Downloads an ICS file for the user's browser to save
+ * Opens calendar file using data URL - works better on mobile devices including iOS
  */
-export function downloadICSFile(icsContent: string, filename: string = 'service-rota.ics'): void {
-    const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
+export function openCalendarFile(icsContent: string, filename: string = 'service-rota.ics'): void {
+    // Create a data URL
+    const dataUrl = 'data:text/calendar;charset=utf-8,' + encodeURIComponent(icsContent);
+
+    // Create a temporary link and click it
     const link = document.createElement('a');
-    link.href = url;
+    link.href = dataUrl;
     link.download = filename;
+    link.style.display = 'none';
+
     document.body.appendChild(link);
     link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+
+    // Clean up
+    setTimeout(() => {
+        document.body.removeChild(link);
+    }, 100);
+}
+
+/**
+ * Legacy download function for backwards compatibility
+ */
+export function downloadICSFile(icsContent: string, filename: string = 'service-rota.ics'): void {
+    openCalendarFile(icsContent, filename);
 }

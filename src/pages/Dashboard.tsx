@@ -237,7 +237,7 @@ const Dashboard = () => {
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-xs sm:text-sm text-muted-foreground">
-              Add all your upcoming services to your device calendar.
+              Download a calendar file with all your upcoming services. On mobile, tap the file to add events to your calendar.
             </p>
             <Button
               variant="outline"
@@ -245,7 +245,7 @@ const Dashboard = () => {
               disabled={myAllEvents.length === 0}
             >
               <Download className="h-4 w-4 mr-2" />
-              Download Calendar File
+              Download Calendar
             </Button>
           </CardContent>
         </Card>
