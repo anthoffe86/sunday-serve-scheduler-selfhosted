@@ -26,9 +26,9 @@ export function ScheduleExport({ events, monthLabel }: ScheduleExportProps) {
     event.assignments
       .filter(a => SIDESMAN_ROLES.includes(a.role))
       .forEach(a => {
-        const type = a.role === 'sidesman-standard' ? '(S)' 
-          : a.role === 'sidesman-sound' ? '(Sound)' 
-          : '(W)';
+        const type = a.role === 'sidesman-standard' ? ' '
+          : a.role === 'sidesman-sound' ? '(S)'
+            : '(W)';
         sidesmen.push(`${a.volunteer_name || 'Unknown'} ${type}`);
       });
     return sidesmen;
@@ -129,7 +129,7 @@ export function ScheduleExport({ events, monthLabel }: ScheduleExportProps) {
         </style>
       </head>
       <body>
-        <h1>Rota for 10.00am Service - ${monthLabel}</h1>
+        <h1>Rota for St Matthew's Church - ${monthLabel}</h1>
         <table>
           <thead>
             <tr>
@@ -152,7 +152,7 @@ export function ScheduleExport({ events, monthLabel }: ScheduleExportProps) {
 
   const handleExportCSV = () => {
     const headers = ['Date', 'Subheading', 'Sidesmen', 'Reader', 'Reading', 'Intercessions', 'Collection Count'];
-    
+
     const rows = events.map(event => {
       const date = parseISO(event.date);
       const dateStr = format(date, "d MMM yyyy");
@@ -201,7 +201,7 @@ export function ScheduleExport({ events, monthLabel }: ScheduleExportProps) {
   Collection Count: ${collection.length > 0 ? collection.join(', ') : 'TBC'}`;
     }).join('\n\n');
 
-    const fullText = `Rota for 10.00am Service - ${monthLabel}\n\n${textContent}`;
+    const fullText = `Rota for St Matthew's Church - ${monthLabel}\n\n${textContent}`;
 
     navigator.clipboard.writeText(fullText).then(() => {
       toast.success('Copied to clipboard - ready to paste into email');
