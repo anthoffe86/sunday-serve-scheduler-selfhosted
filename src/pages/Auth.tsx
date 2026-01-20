@@ -29,7 +29,7 @@ const Auth = () => {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     try {
       emailSchema.parse(loginEmail);
       passwordSchema.parse(loginPassword);
@@ -72,7 +72,7 @@ const Auth = () => {
           <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-primary text-primary-foreground">
             <span className="font-serif text-2xl font-bold">S</span>
           </div>
-          <h1 className="font-serif text-2xl font-bold">St. Mary's</h1>
+          <h1 className="font-serif text-2xl font-bold">St. Matthew's Church</h1>
           <p className="text-muted-foreground">Volunteer Scheduling</p>
         </div>
 
@@ -107,9 +107,9 @@ const Auth = () => {
                   required
                 />
               </div>
-              <Button 
-                type="submit" 
-                className="w-full" 
+              <Button
+                type="submit"
+                className="w-full"
                 disabled={isSubmitting}
               >
                 {isSubmitting ? (
