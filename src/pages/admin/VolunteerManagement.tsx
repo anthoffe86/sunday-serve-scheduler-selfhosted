@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Plus, Search, MoreHorizontal, Users, Loader2, UserX, UserCheck, UserPlus, Pencil } from 'lucide-react';
 import { InviteVolunteerDialog } from '@/components/admin/InviteVolunteerDialog';
 import { EditVolunteerDialog } from '@/components/admin/EditVolunteerDialog';
@@ -40,6 +40,17 @@ import {
 } from '@/hooks/useVolunteerData';
 import { useServiceHistory } from '@/hooks/useVolunteerData';
 import { useQueryClient } from '@tanstack/react-query';
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+  PaginationEllipsis,
+} from '@/components/ui/pagination';
+
+const VOLUNTEERS_PER_PAGE = 10;
 
 const VolunteerManagement = () => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -49,6 +60,7 @@ const VolunteerManagement = () => {
   const [showInviteDialog, setShowInviteDialog] = useState(false);
   const [newFamilyName, setNewFamilyName] = useState('');
   const [selectedFamilyGroup, setSelectedFamilyGroup] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
   
   const queryClient = useQueryClient();
   const { data: volunteers, isLoading } = useAllProfiles();
@@ -56,11 +68,51 @@ const VolunteerManagement = () => {
   const updateProfile = useAdminUpdateProfile();
   const createFamilyGroup = useCreateFamilyGroup();
 
-  const filteredVolunteers = volunteers?.filter(
-    (v) =>
-      v.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      v.email.toLowerCase().includes(searchQuery.toLowerCase())
-  ) || [];
+  const filteredVolunteers = useMemo(() => {
+    return volunteers?.filter(
+      (v) =>
+        v.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        v.email.toLowerCase().includes(searchQuery.toLowerCase())
+    ) || [];
+  }, [volunteers, searchQuery]);
+
+  // Reset to page 1 when search changes
+  useMemo(() => {
+    setCurrentPage(1);
+  }, [searchQuery]);
+
+  // Pagination logic
+  const totalPages = Math.ceil(filteredVolunteers.length / VOLUNTEERS_PER_PAGE);
+  const paginatedVolunteers = useMemo(() => {
+    const startIndex = (currentPage - 1) * VOLUNTEERS_PER_PAGE;
+    return filteredVolunteers.slice(startIndex, startIndex + VOLUNTEERS_PER_PAGE);
+  }, [filteredVolunteers, currentPage]);
+
+  const getPageNumbers = (): (number | 'ellipsis')[] => {
+    const pages: (number | 'ellipsis')[] = [];
+    if (totalPages <= 7) {
+      for (let i = 1; i <= totalPages; i++) {
+        pages.push(i);
+      }
+    } else {
+      if (currentPage <= 4) {
+        for (let i = 1; i <= 5; i++) pages.push(i);
+        pages.push('ellipsis');
+        pages.push(totalPages);
+      } else if (currentPage >= totalPages - 3) {
+        pages.push(1);
+        pages.push('ellipsis');
+        for (let i = totalPages - 4; i <= totalPages; i++) pages.push(i);
+      } else {
+        pages.push(1);
+        pages.push('ellipsis');
+        for (let i = currentPage - 1; i <= currentPage + 1; i++) pages.push(i);
+        pages.push('ellipsis');
+        pages.push(totalPages);
+      }
+    }
+    return pages;
+  };
 
   const handleToggleActive = async (volunteer: Profile) => {
     await updateProfile.mutateAsync({
@@ -157,7 +209,7 @@ const VolunteerManagement = () => {
 
       {/* Volunteer List */}
       <div className="grid gap-4">
-        {filteredVolunteers.map((volunteer) => (
+        {paginatedVolunteers.map((volunteer) => (
           <VolunteerCard
             key={volunteer.id}
             volunteer={volunteer}
@@ -179,6 +231,48 @@ const VolunteerManagement = () => {
           </Card>
         )}
       </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex flex-col items-center gap-2">
+          <Pagination>
+            <PaginationContent>
+              <PaginationItem>
+                <PaginationPrevious 
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  className={currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                />
+              </PaginationItem>
+              
+              {getPageNumbers().map((page, index) => (
+                <PaginationItem key={index}>
+                  {page === 'ellipsis' ? (
+                    <PaginationEllipsis />
+                  ) : (
+                    <PaginationLink
+                      onClick={() => setCurrentPage(page)}
+                      isActive={currentPage === page}
+                      className="cursor-pointer"
+                    >
+                      {page}
+                    </PaginationLink>
+                  )}
+                </PaginationItem>
+              ))}
+              
+              <PaginationItem>
+                <PaginationNext 
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  className={currentPage === totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
+          <p className="text-sm text-muted-foreground">
+            Showing {((currentPage - 1) * VOLUNTEERS_PER_PAGE) + 1} to {Math.min(currentPage * VOLUNTEERS_PER_PAGE, filteredVolunteers.length)} of {filteredVolunteers.length} volunteers
+          </p>
+        </div>
+      )}
 
       {/* Edit Volunteer Dialog */}
       <EditVolunteerDialog
