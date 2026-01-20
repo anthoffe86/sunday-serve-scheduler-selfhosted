@@ -15,7 +15,7 @@ export default {
   	extend: {
   		fontFamily: {
   			serif: [
-  				'Lora',
+  				'Merriweather',
   				'ui-serif',
   				'Georgia',
   				'Cambria',
@@ -24,7 +24,6 @@ export default {
   				'serif'
   			],
   			sans: [
-  				'Inter',
   				'ui-sans-serif',
   				'system-ui',
   				'sans-serif',
@@ -34,7 +33,6 @@ export default {
   				'Noto Color Emoji'
   			],
   			mono: [
-  				'Space Mono',
   				'ui-monospace',
   				'SFMono-Regular',
   				'Menlo',
