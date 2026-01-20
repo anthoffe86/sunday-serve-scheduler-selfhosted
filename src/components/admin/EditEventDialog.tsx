@@ -197,12 +197,16 @@ export function EditEventDialog({ open, onOpenChange, event }: EditEventDialogPr
   const handleLocalAssignVolunteer = (volunteer: any) => {
     if (!assignRole) return;
 
-    // Check if valid
-    const isAlreadyAssigned = localAssignments.some(a => a.volunteer_id === volunteer.user_id);
-    if (isAlreadyAssigned) {
-      toast.error('Volunteer already assigned to this event');
+    // Check if volunteer is already assigned to THIS SPECIFIC ROLE (prevent duplicate role assignment)
+    const isAlreadyAssignedToRole = localAssignments.some(
+      a => a.volunteer_id === volunteer.user_id && a.role === assignRole
+    );
+    if (isAlreadyAssignedToRole) {
+      toast.error('Volunteer already assigned to this role');
       return;
     }
+
+    // Note: We allow the same volunteer to be assigned to multiple different roles
 
     const newAssignment = {
       id: `temp-${Date.now()}`, // Temporary ID
@@ -216,8 +220,6 @@ export function EditEventDialog({ open, onOpenChange, event }: EditEventDialogPr
 
     setLocalAssignments(prev => [...prev, newAssignment]);
     setIsAssignmentsDirty(true);
-    // Don't close dialog yet if you want to add more? optional.
-    // setAssignRole(null); 
   };
 
   const handleSaveAssignments = async () => {
@@ -602,17 +604,18 @@ export function EditEventDialog({ open, onOpenChange, event }: EditEventDialogPr
                             </div>
                           ))}
 
-                          {filled < required && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="w-full h-8 text-xs gap-1 border-dashed border"
-                              onClick={() => setAssignRole(role.role)}
-                            >
-                              <UserPlus className="h-3.5 w-3.5" />
-                              Assign Volunteer
-                            </Button>
-                          )}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className={cn(
+                              "w-full h-8 text-xs gap-1 border-dashed border",
+                              filled >= required && "text-muted-foreground"
+                            )}
+                            onClick={() => setAssignRole(role.role)}
+                          >
+                            <UserPlus className="h-3.5 w-3.5" />
+                            {filled >= required ? 'Add Another' : 'Assign Volunteer'}
+                          </Button>
                         </div>
                       </div>
                     );
@@ -711,7 +714,8 @@ export function EditEventDialog({ open, onOpenChange, event }: EditEventDialogPr
         eventId={event.id}
         eventDate={event.date}
         role={assignRole || ''}
-        existingAssignmentIds={localAssignments.map(a => a.volunteer_id)}
+        existingAssignmentIds={localAssignments.filter(a => a.role === assignRole).map(a => a.volunteer_id)}
+        allEventAssignmentIds={localAssignments.map(a => a.volunteer_id)}
         onAssigned={handleLocalAssignVolunteer}
       />
 
