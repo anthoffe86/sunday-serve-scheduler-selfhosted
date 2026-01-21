@@ -64,7 +64,7 @@ const AdminEvents = () => {
     let needsVolunteers = 0;
     let published = 0;
     let draft = 0;
-    let awaitingConfirmation = 0;
+    let awaitingConfirmation = 0; // Count of individual assignments awaiting confirmation
 
     for (const event of futureEvents) {
       const totalRequired = event.roles.reduce((sum, r) => sum + r.quantity, 0);
@@ -72,21 +72,20 @@ const AdminEvents = () => {
       const activeAssignments = event.assignments.filter(a => a.status !== 'declined');
       const totalFilled = activeAssignments.length;
       const confirmedCount = event.assignments.filter(a => a.status === 'confirmed').length;
+      const invitedCount = event.assignments.filter(a => a.status === 'invited').length;
       const isFullyStaffed = totalFilled >= totalRequired && totalRequired > 0;
       const isFullyConfirmed = confirmedCount >= totalRequired && totalRequired > 0;
+      
+      // Count individual invited assignments awaiting response
+      awaitingConfirmation += invitedCount;
       
       if (event.status === 'published') {
         published++;
       } else if (event.status === 'draft') {
         draft++;
         if (isFullyConfirmed) {
-          // All required slots are confirmed
           readyToPublish++;
-        } else if (isFullyStaffed) {
-          // Fully assigned but awaiting confirmations
-          awaitingConfirmation++;
-        } else {
-          // Needs more volunteers assigned
+        } else if (!isFullyStaffed) {
           needsVolunteers++;
         }
       }
