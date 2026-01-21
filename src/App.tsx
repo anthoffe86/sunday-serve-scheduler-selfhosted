@@ -33,9 +33,12 @@ const App = () => (
         <Sonner />
         <BrowserRouter>
           <Routes>
+            {/* Public routes - accessible without authentication */}
             <Route path="/auth" element={<Auth />} />
             <Route path="/invite" element={<InviteSignup />} />
-            <Route path="/invitation/respond" element={<InvitationResponse />} />
+            <Route path="/respond-invitation" element={<InvitationResponse />} />
+            
+            {/* Protected routes - require authentication */}
             <Route element={
               <ProtectedRoute>
                 <AppLayout />

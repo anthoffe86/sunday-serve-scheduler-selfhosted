@@ -230,8 +230,8 @@ const handler = async (req: Request): Promise<Response> => {
       data.invitations.sort((a, b) => a.date.localeCompare(b.date));
 
       const invitationRows = data.invitations.map(inv => {
-        const acceptUrl = `${escapeUrl(baseUrl)}/invitation/respond?token=${inv.token}&action=accept`;
-        const declineUrl = `${escapeUrl(baseUrl)}/invitation/respond?token=${inv.token}&action=decline`;
+        const acceptUrl = `${escapeUrl(baseUrl)}/respond-invitation?token=${inv.token}&action=accept`;
+        const declineUrl = `${escapeUrl(baseUrl)}/respond-invitation?token=${inv.token}&action=decline`;
         
         return `
           <tr>
@@ -263,7 +263,7 @@ const handler = async (req: Request): Promise<Response> => {
 
       // Also include a bulk accept all link
       const allTokens = data.invitations.map(i => i.token).join(',');
-      const acceptAllUrl = `${escapeUrl(baseUrl)}/invitation/respond?tokens=${allTokens}&action=accept`;
+      const acceptAllUrl = `${escapeUrl(baseUrl)}/respond-invitation?tokens=${allTokens}&action=accept`;
       const viewAllUrl = `${escapeUrl(baseUrl)}/invitations`;
 
       emailBatch.push({
