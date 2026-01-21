@@ -22,8 +22,11 @@ const handler = async (req: Request): Promise<Response> => {
 
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    
+    // Service role client for database operations
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
     const body: ResponseRequest = await req.json();
     const { token, tokens, action, declineReason } = body;
@@ -45,11 +48,25 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
+    // Check for authentication - if user is logged in, validate ownership
+    const authHeader = req.headers.get('Authorization');
+    let authenticatedUserId: string | null = null;
+    
+    if (authHeader) {
+      const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey, {
+        global: { headers: { Authorization: authHeader } }
+      });
+      const { data: { user } } = await supabaseAuth.auth.getUser();
+      if (user) {
+        authenticatedUserId = user.id;
+      }
+    }
+
     const results: { token: string; success: boolean; error?: string }[] = [];
 
     for (const t of tokenList) {
       // Find the assignment by token
-      const { data: assignment, error: findError } = await supabase
+      const { data: assignment, error: findError } = await supabaseAdmin
         .from('event_assignments')
         .select('id, event_id, role, volunteer_id, status')
         .eq('invitation_token', t)
@@ -57,6 +74,12 @@ const handler = async (req: Request): Promise<Response> => {
 
       if (findError || !assignment) {
         results.push({ token: t, success: false, error: 'Invalid or expired invitation token' });
+        continue;
+      }
+
+      // If user is authenticated, verify they own this invitation
+      if (authenticatedUserId && assignment.volunteer_id !== authenticatedUserId) {
+        results.push({ token: t, success: false, error: 'This invitation belongs to another user' });
         continue;
       }
 
@@ -77,18 +100,21 @@ const handler = async (req: Request): Promise<Response> => {
       const updateData: Record<string, unknown> = {
         status: newStatus,
         responded_at: new Date().toISOString(),
+        // Clear the invitation token after use to prevent reuse
+        invitation_token: null,
       };
 
       if (action === 'decline' && declineReason) {
         updateData.decline_reason = declineReason;
       }
 
-      const { error: updateError } = await supabase
+      const { error: updateError } = await supabaseAdmin
         .from('event_assignments')
         .update(updateData)
         .eq('id', assignment.id);
 
       if (updateError) {
+        console.error('Failed to update invitation:', updateError);
         results.push({ token: t, success: false, error: 'Failed to update invitation response' });
         continue;
       }
@@ -120,10 +146,10 @@ const handler = async (req: Request): Promise<Response> => {
         headers: { "Content-Type": "application/json", ...corsHeaders },
       }
     );
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error in respond-invitation function:", error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: 'An unexpected error occurred. Please try again.' }),
       {
         status: 500,
         headers: { "Content-Type": "application/json", ...corsHeaders },
