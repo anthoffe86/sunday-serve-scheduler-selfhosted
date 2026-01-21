@@ -64,7 +64,7 @@ const AdminEvents = () => {
     let needsVolunteers = 0;
     let published = 0;
     let draft = 0;
-    let awaitingConfirmation = 0; // Count of individual assignments awaiting confirmation
+    let awaitingConfirmation = 0; // Count of events with pending invitations
 
     for (const event of futureEvents) {
       const totalRequired = event.roles.reduce((sum, r) => sum + r.quantity, 0);
@@ -76,15 +76,15 @@ const AdminEvents = () => {
       const isFullyStaffed = totalFilled >= totalRequired && totalRequired > 0;
       const isFullyConfirmed = confirmedCount >= totalRequired && totalRequired > 0;
       
-      // Count individual invited assignments awaiting response
-      awaitingConfirmation += invitedCount;
-      
       if (event.status === 'published') {
         published++;
       } else if (event.status === 'draft') {
         draft++;
         if (isFullyConfirmed) {
           readyToPublish++;
+        } else if (invitedCount > 0) {
+          // Event has invitations pending response
+          awaitingConfirmation++;
         } else if (!isFullyStaffed) {
           needsVolunteers++;
         }
