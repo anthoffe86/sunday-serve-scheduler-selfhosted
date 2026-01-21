@@ -55,6 +55,12 @@ interface InvitationRequest {
   baseUrl: string;
 }
 
+function normalizeBaseUrl(baseUrl: string): string {
+  const safe = escapeUrl(baseUrl);
+  // Remove trailing slashes so we don't generate URLs like "...com//respond-invitation"
+  return safe.replace(/\/+$/, "");
+}
+
 const formatDate = (dateStr: string): string => {
   const date = new Date(dateStr + 'T00:00:00');
   return date.toLocaleDateString('en-GB', {
@@ -229,9 +235,11 @@ const handler = async (req: Request): Promise<Response> => {
       // Sort invitations by date
       data.invitations.sort((a, b) => a.date.localeCompare(b.date));
 
+      const appBase = normalizeBaseUrl(baseUrl);
+
       const invitationRows = data.invitations.map(inv => {
-        const acceptUrl = `${escapeUrl(baseUrl)}/respond-invitation?token=${inv.token}&action=accept`;
-        const declineUrl = `${escapeUrl(baseUrl)}/respond-invitation?token=${inv.token}&action=decline`;
+        const acceptUrl = `${appBase}/respond-invitation?token=${inv.token}&action=accept`;
+        const declineUrl = `${appBase}/respond-invitation?token=${inv.token}&action=decline`;
         
         return `
           <tr>
@@ -263,8 +271,8 @@ const handler = async (req: Request): Promise<Response> => {
 
       // Also include a bulk accept all link
       const allTokens = data.invitations.map(i => i.token).join(',');
-      const acceptAllUrl = `${escapeUrl(baseUrl)}/respond-invitation?tokens=${allTokens}&action=accept`;
-      const viewAllUrl = `${escapeUrl(baseUrl)}/invitations`;
+      const acceptAllUrl = `${appBase}/respond-invitation?tokens=${allTokens}&action=accept`;
+      const viewAllUrl = `${appBase}/invitations`;
 
       emailBatch.push({
         from: "St Matthews Church <noreply@updates.lumotutor.co.uk>",
