@@ -163,30 +163,8 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Check for conflicting assignments on the same date
-    const { data: existingAssignments } = await supabaseAdmin
-      .from("event_assignments")
-      .select("id, event_id")
-      .eq("volunteer_id", user.id);
-
-    if (existingAssignments && existingAssignments.length > 0) {
-      const eventIds = existingAssignments.map((a) => a.event_id);
-      const { data: conflictEvents } = await supabaseAdmin
-        .from("events")
-        .select("id")
-        .eq("date", event.date)
-        .in("id", eventIds);
-
-      if (conflictEvents && conflictEvents.length > 0) {
-        return new Response(
-          JSON.stringify({ error: "You already have an assignment on this date" }),
-          {
-            status: 409,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          }
-        );
-      }
-    }
+    // Note: We allow volunteers to have multiple assignments on the same date
+    // The auto-scheduler enforces one-per-day, but manual assignments and swaps allow multiple roles
 
     // Perform updates (best-effort sequential; service role bypasses RLS)
     // Set status to confirmed since they're actively accepting this swap
