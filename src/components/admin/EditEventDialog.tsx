@@ -241,17 +241,50 @@ export function EditEventDialog({ open, onOpenChange, event }: EditEventDialogPr
     }
 
     try {
-      // Perform Batch DB Update only - NO emails sent here
-      // Emails are sent via:
-      // 1. "Send Invitations" action (invitation emails)
-      // 2. "Publish All" action (schedule confirmed emails)
+      // Perform Batch DB Update
       await batchUpdateAssignments.mutateAsync({
         eventId: event.id,
         toAdd: toAddPayload,
         toRemove: toRemoveIds
       });
 
-      toast.success(`Saved: ${toAdd.length} added, ${toRemove.length} removed`);
+      // For PUBLISHED events only: send notifications immediately
+      // Draft events use the invitation workflow instead
+      if (event.status === 'published') {
+        // Send removal notifications
+        for (const assignment of toRemove) {
+          await supabase.functions.invoke('send-assignment-removal-notification', {
+            body: {
+              volunteerId: assignment.volunteer_id,
+              eventName: event.name,
+              eventDate: event.date,
+              role: assignment.role,
+              reason: "Schedule change by administrator",
+              baseUrl: window.location.origin,
+            },
+          });
+        }
+
+        // Send confirmation emails to newly added volunteers
+        const addedUserIds = toAdd.map(a => a.volunteer_id);
+        if (addedUserIds.length > 0) {
+          await supabase.functions.invoke('send-event-notification', {
+            body: {
+              eventIds: [event.id],
+              baseUrl: window.location.origin,
+              userIds: addedUserIds,
+            },
+          });
+        }
+
+        const notifications = [];
+        if (toRemove.length > 0) notifications.push(`${toRemove.length} removed & notified`);
+        if (toAdd.length > 0) notifications.push(`${toAdd.length} added & notified`);
+        toast.success(`Saved: ${notifications.join(', ')}`);
+      } else {
+        toast.success(`Saved: ${toAdd.length} added, ${toRemove.length} removed`);
+      }
+
       setIsAssignmentsDirty(false);
 
     } catch (error) {
