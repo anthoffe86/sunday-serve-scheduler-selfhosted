@@ -16,7 +16,8 @@ import {
   Wand2,
   Mail,
   Send,
-  HourglassIcon
+  HourglassIcon,
+  Lock
 } from 'lucide-react';
 import { format, parseISO, isAfter, isBefore } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -64,8 +65,8 @@ const AdminEventDetail = () => {
   
   const [editTemplateOpen, setEditTemplateOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [publishConfirmOpen, setPublishConfirmOpen] = useState(false);
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
-  
   
   const { data: templates, isLoading: templatesLoading } = useEventTemplates();
   const { data: allEvents, isLoading: eventsLoading } = useEvents();
@@ -166,7 +167,27 @@ const AdminEventDetail = () => {
     };
   }, [templateEvents]);
 
-  // Calculate volunteer assignment counts across all events (draft and published separately)
+  // Check if events are ready to publish (have confirmed assignments)
+  const publishValidation = useMemo(() => {
+    const draftEvents = templateEvents.filter(e => e.status === 'draft');
+    // Events that can be published: have at least one confirmed assignment
+    const publishableEvents = draftEvents.filter(e => 
+      e.assignments.some(a => a.status === 'confirmed')
+    );
+    // Events fully confirmed: all assignments are confirmed
+    const fullyConfirmedEvents = draftEvents.filter(e => 
+      e.assignments.length > 0 && 
+      e.assignments.every(a => a.status === 'confirmed' || a.status === 'declined')
+    );
+    
+    return {
+      canPublish: publishableEvents.length > 0,
+      publishableCount: publishableEvents.length,
+      fullyConfirmedCount: fullyConfirmedEvents.length,
+      publishableEventIds: publishableEvents.map(e => e.id),
+      draftCount: draftEvents.length
+    };
+  }, [templateEvents]);
   // Also track who is NOT assigned
   const { draftAssignmentCounts, publishedAssignmentCounts, draftUnassigned, publishedUnassigned } = useMemo(() => {
     const draftEvents = templateEvents.filter(e => e.status === 'draft');
@@ -242,6 +263,26 @@ const AdminEventDetail = () => {
       }
     } catch (error) {
       toast.error('Failed to send invitations');
+    }
+  };
+
+  const handleBulkPublish = async () => {
+    if (publishValidation.publishableEventIds.length === 0) {
+      toast.error('No events ready to publish');
+      return;
+    }
+
+    try {
+      const result = await bulkUpdateStatus.mutateAsync({
+        eventIds: publishValidation.publishableEventIds,
+        status: 'published',
+        sendNotifications: false
+      });
+      
+      toast.success(`Published ${result.count} event${result.count !== 1 ? 's' : ''}`);
+      setPublishConfirmOpen(false);
+    } catch (error) {
+      toast.error('Failed to publish events');
     }
   };
 
@@ -508,6 +549,39 @@ const AdminEventDetail = () => {
         </CardContent>
       </Card>
 
+      {/* Publish Events Card */}
+      {publishValidation.canPublish && (
+        <Card className="border-green-200 bg-green-50/50">
+          <CardContent className="py-4">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2 text-green-700">
+                  <Lock className="h-5 w-5" />
+                  <span className="font-medium">
+                    {publishValidation.publishableCount} event{publishValidation.publishableCount !== 1 ? 's' : ''} ready to publish
+                  </span>
+                </div>
+                <p className="text-sm text-green-600 mt-1">
+                  {publishValidation.fullyConfirmedCount > 0 
+                    ? `${publishValidation.fullyConfirmedCount} fully confirmed`
+                    : 'Some assignments still awaiting responses'}
+                </p>
+              </div>
+              
+              <Button 
+                onClick={() => setPublishConfirmOpen(true)}
+                disabled={bulkUpdateStatus.isPending}
+                className="gap-2 shrink-0 bg-green-600 hover:bg-green-700"
+              >
+                {bulkUpdateStatus.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+                <Lock className="h-4 w-4" />
+                Publish All
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Volunteer Assignment Summary (for draft events) */}
       {(draftAssignmentCounts.length > 0 || draftUnassigned.length > 0) && invitationValidation.draftCount > 0 && (
         <Card>
@@ -771,6 +845,34 @@ const AdminEventDetail = () => {
             >
               {deleteTemplate.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Publish Confirmation */}
+      <AlertDialog open={publishConfirmOpen} onOpenChange={setPublishConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Publish {publishValidation.publishableCount} Events?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will publish all events that have confirmed volunteer assignments. 
+              Published events will be visible to all volunteers on the schedule.
+              {publishValidation.fullyConfirmedCount < publishValidation.publishableCount && (
+                <span className="block mt-2 text-amber-600">
+                  Note: {publishValidation.publishableCount - publishValidation.fullyConfirmedCount} event(s) still have pending invitations.
+                </span>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleBulkPublish}
+              className="bg-green-600 hover:bg-green-700"
+            >
+              {bulkUpdateStatus.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Publish All
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
