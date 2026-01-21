@@ -242,10 +242,12 @@ export function EditEventDialog({ open, onOpenChange, event }: EditEventDialogPr
 
     try {
       // Perform Batch DB Update
+      // Pass event status so published events get 'confirmed' status automatically
       await batchUpdateAssignments.mutateAsync({
         eventId: event.id,
         toAdd: toAddPayload,
-        toRemove: toRemoveIds
+        toRemove: toRemoveIds,
+        eventStatus: event.status
       });
 
       // For PUBLISHED events only: send notifications immediately
