@@ -109,6 +109,9 @@ const AdminEventDetail = () => {
   const getEventValidation = (event: EventWithDetails) => {
     const totalRequired = event.roles.reduce((sum, r) => sum + r.quantity, 0);
     const totalFilled = event.assignments.length;
+    const confirmedCount = event.assignments.filter(a => a.status === 'confirmed').length;
+    const invitedCount = event.assignments.filter(a => a.status === 'invited').length;
+    const proposedCount = event.assignments.filter(a => a.status === 'proposed').length;
     
     if (totalRequired === 0) {
       return { isValid: false, message: 'No roles defined', type: 'warning' as const };
@@ -122,7 +125,33 @@ const AdminEventDetail = () => {
       };
     }
     
-    return { isValid: true, message: 'Fully staffed', type: 'success' as const };
+    // Fully staffed - now check confirmation status
+    if (confirmedCount >= totalRequired) {
+      return { isValid: true, message: 'Fully confirmed', type: 'success' as const };
+    }
+    
+    if (confirmedCount > 0) {
+      return { 
+        isValid: false, 
+        message: `${confirmedCount}/${totalRequired} confirmed`, 
+        type: 'pending' as const 
+      };
+    }
+    
+    if (invitedCount > 0) {
+      return { 
+        isValid: false, 
+        message: `${invitedCount} awaiting response`, 
+        type: 'pending' as const 
+      };
+    }
+    
+    // All proposed
+    return { 
+      isValid: false, 
+      message: 'Assigned, not invited', 
+      type: 'warning' as const 
+    };
   };
 
   // Check if all draft events are valid (can send invitations)
@@ -793,11 +822,14 @@ const AdminEventDetail = () => {
                       <div className={cn(
                         "flex items-center gap-1.5 text-sm shrink-0",
                         validation.type === 'success' && "text-green-600",
+                        validation.type === 'pending' && "text-blue-600",
                         validation.type === 'error' && "text-amber-600",
                         validation.type === 'warning' && "text-muted-foreground"
                       )}>
                         {validation.type === 'success' ? (
                           <CheckCircle2 className="h-4 w-4" />
+                        ) : validation.type === 'pending' ? (
+                          <HourglassIcon className="h-4 w-4" />
                         ) : (
                           <AlertCircle className="h-4 w-4" />
                         )}
