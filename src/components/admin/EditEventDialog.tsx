@@ -241,39 +241,15 @@ export function EditEventDialog({ open, onOpenChange, event }: EditEventDialogPr
     }
 
     try {
-      // 1. Perform Batch DB Update
+      // Perform Batch DB Update only - NO emails sent here
+      // Emails are sent via:
+      // 1. "Send Invitations" action (invitation emails)
+      // 2. "Publish All" action (schedule confirmed emails)
       await batchUpdateAssignments.mutateAsync({
         eventId: event.id,
         toAdd: toAddPayload,
         toRemove: toRemoveIds
       });
-
-      // 2. Send Notifications (After successful DB update)
-      // Send Removal Notifications
-      for (const assignment of toRemove) {
-        await supabase.functions.invoke('send-assignment-removal-notification', {
-          body: {
-            volunteerId: assignment.volunteer_id,
-            eventName: event.name,
-            eventDate: event.date,
-            role: assignment.role,
-            reason: "Removed by administrator",
-            baseUrl: window.location.origin,
-          },
-        });
-      }
-
-      // Send Added Notifications (Batch)
-      const addedUserIds = toAdd.map(a => a.volunteer_id);
-      if (addedUserIds.length > 0) {
-        await supabase.functions.invoke('send-event-notification', {
-          body: {
-            eventIds: [event.id],
-            baseUrl: window.location.origin,
-            userIds: addedUserIds,
-          },
-        });
-      }
 
       toast.success(`Saved: ${toAdd.length} added, ${toRemove.length} removed`);
       setIsAssignmentsDirty(false);
