@@ -189,9 +189,15 @@ Deno.serve(async (req) => {
     }
 
     // Perform updates (best-effort sequential; service role bypasses RLS)
+    // Set status to confirmed since they're actively accepting this swap
     const { error: updateAssignmentError } = await supabaseAdmin
       .from("event_assignments")
-      .update({ volunteer_id: user.id })
+      .update({ 
+        volunteer_id: user.id,
+        status: 'confirmed',
+        responded_at: new Date().toISOString(),
+        invitation_token: null, // Clear any existing invitation token
+      })
       .eq("id", assignment.id);
 
     if (updateAssignmentError) {
