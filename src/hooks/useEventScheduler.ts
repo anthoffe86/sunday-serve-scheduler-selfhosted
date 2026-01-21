@@ -310,6 +310,41 @@ export function useDeleteEventTemplate() {
 
   return useMutation({
     mutationFn: async (id: string) => {
+      // First, get all events for this template
+      const { data: events } = await supabase
+        .from('events')
+        .select('id')
+        .eq('template_id', id);
+
+      // Delete assignments for these events
+      if (events && events.length > 0) {
+        const eventIds = events.map(e => e.id);
+        
+        await supabase
+          .from('event_assignments')
+          .delete()
+          .in('event_id', eventIds);
+
+        // Delete event roles
+        await supabase
+          .from('event_roles')
+          .delete()
+          .in('event_id', eventIds);
+
+        // Delete events
+        await supabase
+          .from('events')
+          .delete()
+          .eq('template_id', id);
+      }
+
+      // Delete template roles
+      await supabase
+        .from('event_template_roles')
+        .delete()
+        .eq('template_id', id);
+
+      // Finally delete the template
       const { error } = await supabase
         .from('event_templates')
         .delete()
@@ -320,6 +355,7 @@ export function useDeleteEventTemplate() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['event-templates'] });
+      queryClient.invalidateQueries({ queryKey: ['events'] });
     },
   });
 }
