@@ -68,7 +68,9 @@ const AdminEvents = () => {
 
     for (const event of futureEvents) {
       const totalRequired = event.roles.reduce((sum, r) => sum + r.quantity, 0);
-      const totalFilled = event.assignments.length;
+      // Only count non-declined assignments as filled
+      const activeAssignments = event.assignments.filter(a => a.status !== 'declined');
+      const totalFilled = activeAssignments.length;
       const confirmedCount = event.assignments.filter(a => a.status === 'confirmed').length;
       const isFullyStaffed = totalFilled >= totalRequired && totalRequired > 0;
       const isFullyConfirmed = confirmedCount >= totalRequired && totalRequired > 0;

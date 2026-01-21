@@ -783,7 +783,8 @@ const AdminEventDetail = () => {
               const activeAssignments = event.assignments.filter(a => a.status !== 'declined');
               const filledCount = activeAssignments.length;
               const requiredCount = event.roles.reduce((sum, r) => sum + r.quantity, 0);
-              const hasDeclines = event.assignments.some(a => a.status === 'declined');
+              // Only highlight if there are unfilled slots (declines that haven't been replaced)
+              const hasUnfilledSlots = filledCount < requiredCount;
 
               return (
                 <Card 
@@ -791,7 +792,7 @@ const AdminEventDetail = () => {
                   className={cn(
                     "cursor-pointer hover:shadow-md transition-all",
                     event.status === 'cancelled' && "opacity-60",
-                    hasDeclines && event.status !== 'cancelled' && "border-red-300 bg-red-50/30"
+                    hasUnfilledSlots && event.status !== 'cancelled' && "border-red-300 bg-red-50/30"
                   )}
                   onClick={() => setSelectedEventId(event.id)}
                 >
