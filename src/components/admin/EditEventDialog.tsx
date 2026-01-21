@@ -577,32 +577,62 @@ export function EditEventDialog({ open, onOpenChange, event }: EditEventDialogPr
                         </div>
 
                         <div className="space-y-1">
-                          {assignments.map((assignment) => (
-                            <div
-                              key={assignment.id}
-                              className={cn(
-                                "flex items-center justify-between text-sm bg-background rounded px-2 py-1.5",
-                                assignment.isNew && "ring-1 ring-green-500 bg-green-50"
-                              )}
-                            >
-                              <div className="flex items-center gap-2">
-                                <span>{assignment.volunteer_name || 'Unknown'}</span>
-                                {assignment.isNew && (
-                                  <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 border-green-500 text-green-700 bg-green-50">
-                                    New
-                                  </Badge>
+                          {assignments.map((assignment) => {
+                            const statusColors = {
+                              confirmed: 'bg-green-100 border-green-300 text-green-800',
+                              invited: 'bg-blue-100 border-blue-300 text-blue-800',
+                              proposed: 'bg-gray-100 border-gray-300 text-gray-600',
+                              declined: 'bg-red-100 border-red-300 text-red-800',
+                            };
+                            const statusLabels = {
+                              confirmed: '✓ Confirmed',
+                              invited: 'Invited',
+                              proposed: 'Proposed',
+                              declined: '✗ Declined',
+                            };
+                            const status = assignment.status as keyof typeof statusColors;
+                            
+                            return (
+                              <div
+                                key={assignment.id}
+                                className={cn(
+                                  "flex items-center justify-between text-sm rounded px-2 py-1.5",
+                                  assignment.isNew && "ring-1 ring-green-500 bg-green-50",
+                                  !assignment.isNew && status === 'confirmed' && "bg-green-50",
+                                  !assignment.isNew && status === 'declined' && "bg-red-50 opacity-60",
+                                  !assignment.isNew && status !== 'confirmed' && status !== 'declined' && "bg-background"
                                 )}
-                              </div>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-6 w-6 text-muted-foreground hover:text-destructive"
-                                onClick={() => handleLocalRemoveAssignment(assignment.id)}
                               >
-                                <X className="h-3.5 w-3.5" />
-                              </Button>
-                            </div>
-                          ))}
+                                <div className="flex items-center gap-2">
+                                  <span className={cn(
+                                    status === 'declined' && "line-through text-muted-foreground"
+                                  )}>
+                                    {assignment.volunteer_name || 'Unknown'}
+                                  </span>
+                                  {assignment.isNew ? (
+                                    <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 border-green-500 text-green-700 bg-green-50">
+                                      New
+                                    </Badge>
+                                  ) : (
+                                    <Badge 
+                                      variant="outline" 
+                                      className={cn("text-[10px] px-1.5 py-0 h-4", statusColors[status])}
+                                    >
+                                      {statusLabels[status]}
+                                    </Badge>
+                                  )}
+                                </div>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                                  onClick={() => handleLocalRemoveAssignment(assignment.id)}
+                                >
+                                  <X className="h-3.5 w-3.5" />
+                                </Button>
+                              </div>
+                            );
+                          })}
 
                           <Button
                             variant="ghost"
