@@ -6,7 +6,8 @@ import {
   ChevronRight,
   CheckCircle2,
   AlertCircle,
-  Clock
+  Clock,
+  HourglassIcon
 } from 'lucide-react';
 import { format, parseISO, isAfter } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -63,19 +64,27 @@ const AdminEvents = () => {
     let needsVolunteers = 0;
     let published = 0;
     let draft = 0;
+    let awaitingConfirmation = 0;
 
     for (const event of futureEvents) {
       const totalRequired = event.roles.reduce((sum, r) => sum + r.quantity, 0);
       const totalFilled = event.assignments.length;
+      const confirmedCount = event.assignments.filter(a => a.status === 'confirmed').length;
       const isFullyStaffed = totalFilled >= totalRequired && totalRequired > 0;
+      const isFullyConfirmed = confirmedCount >= totalRequired && totalRequired > 0;
       
       if (event.status === 'published') {
         published++;
       } else if (event.status === 'draft') {
         draft++;
-        if (isFullyStaffed) {
+        if (isFullyConfirmed) {
+          // All required slots are confirmed
           readyToPublish++;
+        } else if (isFullyStaffed) {
+          // Fully assigned but awaiting confirmations
+          awaitingConfirmation++;
         } else {
+          // Needs more volunteers assigned
           needsVolunteers++;
         }
       }
@@ -86,7 +95,8 @@ const AdminEvents = () => {
       readyToPublish, 
       needsVolunteers, 
       published,
-      draft
+      draft,
+      awaitingConfirmation
     };
   };
 
@@ -157,9 +167,11 @@ const AdminEvents = () => {
                       "w-2 rounded-l-lg",
                       stats.needsVolunteers > 0 
                         ? "bg-amber-500" 
-                        : stats.readyToPublish > 0 
-                          ? "bg-green-500" 
-                          : "bg-primary"
+                        : stats.awaitingConfirmation > 0
+                          ? "bg-blue-500"
+                          : stats.readyToPublish > 0 
+                            ? "bg-green-500" 
+                            : "bg-primary"
                     )} />
                     
                     <div className="flex-1 p-4">
@@ -216,8 +228,15 @@ const AdminEvents = () => {
                               </span>
                             )}
                             
-                            {stats.readyToPublish > 0 && (
+                            {stats.awaitingConfirmation > 0 && (
                               <span className="flex items-center gap-1.5 text-blue-600">
+                                <HourglassIcon className="h-4 w-4" />
+                                {stats.awaitingConfirmation} awaiting confirmation
+                              </span>
+                            )}
+                            
+                            {stats.readyToPublish > 0 && (
+                              <span className="flex items-center gap-1.5 text-green-600">
                                 <CheckCircle2 className="h-4 w-4" />
                                 {stats.readyToPublish} ready to publish
                               </span>
