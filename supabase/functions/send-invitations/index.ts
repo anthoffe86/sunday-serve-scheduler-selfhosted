@@ -94,26 +94,21 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log(`Sending invitations for ${eventIds.length} events`);
 
-    // Check if email notifications are enabled
+    // Check if invitation emails are enabled
     const { data: setting, error: settingError } = await supabase
       .from("system_settings")
       .select("value")
-      .eq("key", "email_on_publish")
+      .eq("key", "email_on_invitation_send")
       .maybeSingle();
 
     if (settingError) {
       console.error("Error fetching system setting:", settingError);
     } else if (setting && (setting.value === false || setting.value === "false")) {
-      console.log("Email notifications are disabled. Returning early.");
-      return new Response(
-        JSON.stringify({
-          success: true,
-          emailsSent: 0,
-          message: "Email notifications are disabled by admin.",
-        }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      console.log("Invitation email notifications are disabled. Still updating statuses but not sending emails.");
+      // Note: We continue to update assignment statuses to 'invited' but skip email sending
     }
+
+    const emailsEnabled = !setting || (setting.value !== false && setting.value !== "false");
 
     // Fetch events
     const { data: events, error: eventsError } = await supabase
@@ -346,29 +341,34 @@ const handler = async (req: Request): Promise<Response> => {
     let emailsSent = 0;
     const errors: string[] = [];
 
-    // Send in batches of 100 (Resend limit)
-    const BATCH_SIZE = 100;
-    for (let i = 0; i < emailBatch.length; i += BATCH_SIZE) {
-      const currentBatch = emailBatch.slice(i, i + BATCH_SIZE);
-      console.log(`Sending batch ${i / BATCH_SIZE + 1} (${currentBatch.length} emails)`);
+    // Only send emails if enabled
+    if (emailsEnabled && emailBatch.length > 0) {
+      // Send in batches of 100 (Resend limit)
+      const BATCH_SIZE = 100;
+      for (let i = 0; i < emailBatch.length; i += BATCH_SIZE) {
+        const currentBatch = emailBatch.slice(i, i + BATCH_SIZE);
+        console.log(`Sending batch ${i / BATCH_SIZE + 1} (${currentBatch.length} emails)`);
 
-      try {
-        const { data: batchData, error: batchError } = await resend.batch.send(currentBatch);
+        try {
+          const { data: batchData, error: batchError } = await resend.batch.send(currentBatch);
 
-        if (batchError) {
-          console.error(`Batch error:`, batchError);
-          errors.push(`Batch ${i / BATCH_SIZE + 1} failed: ${batchError.message}`);
-        } else if (batchData && batchData.data) {
-          emailsSent += batchData.data.length;
-          console.log(`Successfully sent batch ${i / BATCH_SIZE + 1}`);
+          if (batchError) {
+            console.error(`Batch error:`, batchError);
+            errors.push(`Batch ${i / BATCH_SIZE + 1} failed: ${batchError.message}`);
+          } else if (batchData && batchData.data) {
+            emailsSent += batchData.data.length;
+            console.log(`Successfully sent batch ${i / BATCH_SIZE + 1}`);
+          }
+        } catch (err: any) {
+          console.error(`Batch exception:`, err);
+          errors.push(`Batch ${i / BATCH_SIZE + 1} exception: ${err.message}`);
         }
-      } catch (err: any) {
-        console.error(`Batch exception:`, err);
-        errors.push(`Batch ${i / BATCH_SIZE + 1} exception: ${err.message}`);
       }
-    }
 
-    console.log(`Sent ${emailsSent} invitation emails`);
+      console.log(`Sent ${emailsSent} invitation emails`);
+    } else if (!emailsEnabled) {
+      console.log(`Email sending disabled - skipped ${emailBatch.length} emails`);
+    }
 
     return new Response(
       JSON.stringify({

@@ -44,19 +44,19 @@ const AdminSettings = () => {
             description: 'Send an email when a new volunteer is invited to the system.'
         },
         {
+            key: 'email_on_invitation_send',
+            label: 'Schedule Invitation Emails',
+            description: 'Send invitation emails when "Send Invitations" is clicked, asking volunteers to accept or decline.'
+        },
+        {
             key: 'email_on_publish',
             label: 'Event Publication Emails',
-            description: 'Send bulk emails to all volunteers when a new schedule is published.'
+            description: 'Send confirmation emails to volunteers when events are published/locked.'
         },
         {
             key: 'email_on_swap_request',
             label: 'Swap Notification Emails',
             description: 'Send emails to eligible substitutes when a swap is requested.'
-        },
-        {
-            key: 'email_on_assignment_add',
-            label: 'New Assignment Emails',
-            description: 'Send an email to a volunteer when they are added to an event by an admin.'
         },
         {
             key: 'email_on_assignment_remove',
