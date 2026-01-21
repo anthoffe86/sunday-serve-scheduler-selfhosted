@@ -13,7 +13,10 @@ import {
   Check,
   X,
   UserPlus,
-  Wand2
+  Wand2,
+  Mail,
+  Send,
+  HourglassIcon
 } from 'lucide-react';
 import { format, parseISO, isAfter, isBefore } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -22,6 +25,7 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
+import { Progress } from '@/components/ui/progress';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -61,7 +65,7 @@ const AdminEventDetail = () => {
   const [editTemplateOpen, setEditTemplateOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
-  const [sendNotifications, setSendNotifications] = useState(true);
+  
   
   const { data: templates, isLoading: templatesLoading } = useEventTemplates();
   const { data: allEvents, isLoading: eventsLoading } = useEvents();
@@ -71,6 +75,7 @@ const AdminEventDetail = () => {
   const deleteTemplate = useDeleteEventTemplate();
   const bulkUpdateStatus = useBulkUpdateEventStatus();
   const autoSchedule = useAutoSchedule();
+  const sendInvitations = useSendInvitations();
 
   // Find the template
   const template = useMemo(() => {
@@ -119,16 +124,45 @@ const AdminEventDetail = () => {
     return { isValid: true, message: 'Fully staffed', type: 'success' as const };
   };
 
-  // Check if all draft events are valid (can publish all)
-  const publishValidation = useMemo(() => {
+  // Check if all draft events are valid (can send invitations)
+  const invitationValidation = useMemo(() => {
     const draftEvents = templateEvents.filter(e => e.status === 'draft');
+    const proposedEvents = draftEvents.filter(e => 
+      e.assignments.some(a => a.status === 'proposed')
+    );
     const invalidEvents = draftEvents.filter(e => !getEventValidation(e).isValid);
     
     return {
-      canPublishAll: draftEvents.length > 0 && invalidEvents.length === 0,
+      canSendInvitations: proposedEvents.length > 0 && invalidEvents.length === 0,
       draftCount: draftEvents.length,
       invalidCount: invalidEvents.length,
-      readyCount: draftEvents.length - invalidEvents.length
+      readyCount: draftEvents.length - invalidEvents.length,
+      proposedCount: proposedEvents.reduce((sum, e) => 
+        sum + e.assignments.filter(a => a.status === 'proposed').length, 0
+      )
+    };
+  }, [templateEvents]);
+
+  // Calculate schedule confidence across all events
+  const scheduleConfidence = useMemo(() => {
+    const allAssignments = templateEvents.flatMap(e => e.assignments);
+    if (allAssignments.length === 0) return null;
+    
+    const proposed = allAssignments.filter(a => a.status === 'proposed').length;
+    const invited = allAssignments.filter(a => a.status === 'invited').length;
+    const confirmed = allAssignments.filter(a => a.status === 'confirmed').length;
+    const declined = allAssignments.filter(a => a.status === 'declined').length;
+    const total = allAssignments.length;
+    
+    return {
+      proposed,
+      invited,
+      confirmed,
+      declined,
+      total,
+      confirmedPercent: Math.round((confirmed / total) * 100),
+      pendingPercent: Math.round(((proposed + invited) / total) * 100),
+      declinedPercent: Math.round((declined / total) * 100)
     };
   }, [templateEvents]);
 
@@ -188,32 +222,26 @@ const AdminEventDetail = () => {
     templateEvents.filter(e => e.status === 'published').length
   , [templateEvents]);
 
-  const handlePublishAll = async () => {
+  const handleSendInvitations = async () => {
     const draftEventIds = templateEvents
       .filter(e => e.status === 'draft' && getEventValidation(e).isValid)
       .map(e => e.id);
     
     if (draftEventIds.length === 0) {
-      toast.error('No events ready to publish');
+      toast.error('No events ready for invitations');
       return;
     }
 
     try {
-      const result = await bulkUpdateStatus.mutateAsync({ 
-        eventIds: draftEventIds, 
-        status: 'published',
-        sendNotifications 
-      });
+      const result = await sendInvitations.mutateAsync({ eventIds: draftEventIds });
       
-      if (sendNotifications && result.emailsSent && result.emailsSent > 0) {
-        toast.success(`Published ${draftEventIds.length} event${draftEventIds.length !== 1 ? 's' : ''} and sent ${result.emailsSent} notification email${result.emailsSent !== 1 ? 's' : ''}`);
-      } else if (sendNotifications && result.emailError) {
-        toast.success(`Published ${draftEventIds.length} event${draftEventIds.length !== 1 ? 's' : ''} (email notifications failed)`);
+      if (result.emailsSent > 0) {
+        toast.success(`Sent ${result.emailsSent} invitation${result.emailsSent !== 1 ? 's' : ''} to ${result.totalVolunteers} volunteer${result.totalVolunteers !== 1 ? 's' : ''}`);
       } else {
-        toast.success(`Published ${draftEventIds.length} event${draftEventIds.length !== 1 ? 's' : ''}`);
+        toast.info('No new invitations to send');
       }
     } catch (error) {
-      toast.error('Failed to publish events');
+      toast.error('Failed to send invitations');
     }
   };
 
@@ -322,7 +350,7 @@ const AdminEventDetail = () => {
             variant="outline" 
             size="sm" 
             onClick={handleAutoSchedule}
-            disabled={autoSchedule.isPending || publishValidation.draftCount === 0}
+            disabled={autoSchedule.isPending || invitationValidation.draftCount === 0}
             className="gap-1.5"
           >
             {autoSchedule.isPending ? (
@@ -372,71 +400,116 @@ const AdminEventDetail = () => {
         </CardContent>
       </Card>
 
-      {/* Publishing Status */}
+      {/* Schedule Confidence */}
+      {scheduleConfidence && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <CheckCircle2 className="h-4 w-4" />
+              Schedule Confidence
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center gap-4">
+              <div className="flex-1">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium">
+                    {scheduleConfidence.confirmedPercent}% Confirmed
+                  </span>
+                  <span className="text-sm text-muted-foreground">
+                    {scheduleConfidence.confirmed}/{scheduleConfidence.total} assignments
+                  </span>
+                </div>
+                <Progress value={scheduleConfidence.confirmedPercent} className="h-2" />
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-4 text-sm">
+              <div className="flex items-center gap-2">
+                <Badge variant="outline" className="bg-green-100 border-green-300 text-green-800">
+                  <CheckCircle2 className="h-3 w-3 mr-1" />
+                  {scheduleConfidence.confirmed} Confirmed
+                </Badge>
+              </div>
+              <div className="flex items-center gap-2">
+                <Badge variant="outline" className="bg-amber-100 border-amber-300 text-amber-800">
+                  <HourglassIcon className="h-3 w-3 mr-1" />
+                  {scheduleConfidence.invited} Awaiting Response
+                </Badge>
+              </div>
+              <div className="flex items-center gap-2">
+                <Badge variant="outline" className="bg-blue-100 border-blue-300 text-blue-800">
+                  <Mail className="h-3 w-3 mr-1" />
+                  {scheduleConfidence.proposed} Proposed
+                </Badge>
+              </div>
+              {scheduleConfidence.declined > 0 && (
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className="bg-red-100 border-red-300 text-red-800">
+                    <X className="h-3 w-3 mr-1" />
+                    {scheduleConfidence.declined} Declined
+                  </Badge>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Invitation Status */}
       <Card className={cn(
-        publishValidation.canPublishAll 
-          ? "border-green-200 bg-green-50/50" 
-          : publishValidation.draftCount > 0 
+        invitationValidation.canSendInvitations 
+          ? "border-primary/50 bg-primary/5" 
+          : invitationValidation.draftCount > 0 
             ? "border-amber-200 bg-amber-50/50"
             : ""
       )}>
         <CardContent className="py-4">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
-              {publishValidation.canPublishAll ? (
-                <div className="flex items-center gap-2 text-green-700">
-                  <CheckCircle2 className="h-5 w-5" />
+              {invitationValidation.canSendInvitations ? (
+                <div className="flex items-center gap-2 text-primary">
+                  <Mail className="h-5 w-5" />
                   <span className="font-medium">
-                    All {publishValidation.draftCount} draft events are ready to publish
+                    {invitationValidation.proposedCount} proposed assignment{invitationValidation.proposedCount !== 1 ? 's' : ''} ready to invite
                   </span>
                 </div>
-              ) : publishValidation.draftCount > 0 ? (
+              ) : invitationValidation.invalidCount > 0 ? (
                 <div className="flex items-center gap-2 text-amber-700">
                   <AlertCircle className="h-5 w-5" />
                   <span className="font-medium">
-                    {publishValidation.invalidCount} of {publishValidation.draftCount} draft events need volunteers assigned
+                    {invitationValidation.invalidCount} of {invitationValidation.draftCount} events need volunteers assigned
                   </span>
+                </div>
+              ) : invitationValidation.draftCount > 0 ? (
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <CheckCircle2 className="h-5 w-5" />
+                  <span className="font-medium">All assignments have been invited</span>
                 </div>
               ) : (
                 <div className="flex items-center gap-2 text-muted-foreground">
                   <CheckCircle2 className="h-5 w-5" />
-                  <span className="font-medium">All events are published</span>
+                  <span className="font-medium">No draft events</span>
                 </div>
               )}
             </div>
             
-            {publishValidation.draftCount > 0 && (
-              <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-                <div className="flex items-center space-x-2">
-                  <Checkbox 
-                    id="sendNotifications" 
-                    checked={sendNotifications}
-                    onCheckedChange={(checked) => setSendNotifications(checked === true)}
-                  />
-                  <Label 
-                    htmlFor="sendNotifications" 
-                    className="text-sm font-normal cursor-pointer"
-                  >
-                    Send email notifications to volunteers
-                  </Label>
-                </div>
-                <Button 
-                  onClick={handlePublishAll}
-                  disabled={!publishValidation.canPublishAll || bulkUpdateStatus.isPending}
-                  className="gap-2 shrink-0"
-                >
-                  {bulkUpdateStatus.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-                  <Check className="h-4 w-4" />
-                  Publish All ({publishValidation.readyCount})
-                </Button>
-              </div>
+            {invitationValidation.canSendInvitations && (
+              <Button 
+                onClick={handleSendInvitations}
+                disabled={sendInvitations.isPending}
+                className="gap-2 shrink-0"
+              >
+                {sendInvitations.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+                <Send className="h-4 w-4" />
+                Send Invitations
+              </Button>
             )}
           </div>
         </CardContent>
       </Card>
 
       {/* Volunteer Assignment Summary (for draft events) */}
-      {(draftAssignmentCounts.length > 0 || draftUnassigned.length > 0) && publishValidation.draftCount > 0 && (
+      {(draftAssignmentCounts.length > 0 || draftUnassigned.length > 0) && invitationValidation.draftCount > 0 && (
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2">
@@ -448,7 +521,7 @@ const AdminEventDetail = () => {
             {draftAssignmentCounts.length > 0 && (
               <div>
                 <p className="text-sm text-muted-foreground mb-3">
-                  How many times each volunteer is assigned across {publishValidation.draftCount} draft event{publishValidation.draftCount !== 1 ? 's' : ''}:
+                  How many times each volunteer is assigned across {invitationValidation.draftCount} draft event{invitationValidation.draftCount !== 1 ? 's' : ''}:
                 </p>
                 <div className="flex flex-wrap gap-2">
                   {draftAssignmentCounts.map((v) => (
