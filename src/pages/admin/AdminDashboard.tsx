@@ -143,7 +143,7 @@ const AdminDashboard = () => {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {templateConfidence.map(({ template, eventCount, required, confirmed, invited, proposed, declined, confidencePercent }) => (
+              {templateConfidence.map(({ template, eventCount, required, confirmed, invited, proposed, declined, unfilled, confidencePercent }) => (
                 <Link 
                   key={template.id} 
                   to={`/admin/events/${template.id}`}
@@ -151,14 +151,14 @@ const AdminDashboard = () => {
                 >
                   <div className={cn(
                     "rounded-lg border p-4 hover:shadow-md transition-shadow cursor-pointer",
-                    declined > 0 && "border-red-300 bg-red-50/50"
+                    unfilled > 0 && "border-red-300 bg-red-50/50"
                   )}>
-                    {/* Decline Alert Banner */}
-                    {declined > 0 && (
+                    {/* Alert Banner - only show if there are unfilled slots */}
+                    {unfilled > 0 && (
                       <div className="flex items-center gap-2 text-red-700 bg-red-100 rounded-md px-3 py-2 mb-3 -mt-1 -mx-1">
                         <AlertTriangle className="h-4 w-4 shrink-0" />
                         <span className="text-sm font-medium">
-                          {declined} volunteer{declined !== 1 ? 's' : ''} declined — action needed
+                          {unfilled} slot{unfilled !== 1 ? 's' : ''} unfilled — action needed
                         </span>
                       </div>
                     )}
