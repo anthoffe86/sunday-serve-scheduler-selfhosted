@@ -1,7 +1,8 @@
-import { Users, CalendarDays, AlertCircle, ArrowLeftRight, Loader2 } from "lucide-react";
+import { Users, CalendarDays, AlertCircle, ArrowLeftRight, Loader2, TrendingUp } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import {
   Dialog,
   DialogContent,
@@ -11,18 +12,19 @@ import {
 } from "@/components/ui/dialog";
 import { StatCard } from "@/components/StatCard";
 import { useProfiles } from "@/hooks/useVolunteerData";
-import { useEvents } from "@/hooks/useEventScheduler";
+import { useEvents, useEventTemplates, calculateScheduleConfidence } from "@/hooks/useEventScheduler";
 import { useSwapRequests } from "@/hooks/useSwapRequests";
 import { useAuth } from "@/hooks/useAuth";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 import { useMemo, useState } from "react";
-import { format, parseISO } from "date-fns";
+import { format, parseISO, isAfter, startOfToday } from "date-fns";
 import { cn } from "@/lib/utils";
 
 const AdminDashboard = () => {
   const { isAdmin, isLoading: authLoading } = useAuth();
   const { data: profiles, isLoading: profilesLoading } = useProfiles();
   const { data: events, isLoading: eventsLoading } = useEvents();
+  const { data: templates, isLoading: templatesLoading } = useEventTemplates();
   const { data: swapRequests, isLoading: swapsLoading } = useSwapRequests();
   const navigate = useNavigate();
 
@@ -44,6 +46,32 @@ const AdminDashboard = () => {
     }).sort((a, b) => a.date.localeCompare(b.date));
   }, [events]);
 
+  // Calculate schedule confidence per template
+  const templateConfidence = useMemo(() => {
+    if (!events || !templates) return [];
+    
+    const today = startOfToday();
+    
+    return templates.map(template => {
+      // Get future events for this template
+      const templateEvents = events.filter(e => 
+        e.template_id === template.id && 
+        isAfter(parseISO(e.date), today) &&
+        e.status !== 'cancelled'
+      );
+      
+      // Aggregate all assignments from these events
+      const allAssignments = templateEvents.flatMap(e => e.assignments);
+      const confidence = calculateScheduleConfidence(allAssignments);
+      
+      return {
+        template,
+        eventCount: templateEvents.length,
+        ...confidence,
+      };
+    }).filter(t => t.eventCount > 0);
+  }, [events, templates]);
+
   const formatTime = (time: string) => {
     const [hours, minutes] = time.split(':');
     const hour = parseInt(hours, 10);
@@ -52,7 +80,7 @@ const AdminDashboard = () => {
     return `${displayHour}:${minutes} ${ampm}`;
   };
 
-  if (authLoading || profilesLoading || eventsLoading || swapsLoading) {
+  if (authLoading || profilesLoading || eventsLoading || swapsLoading || templatesLoading) {
     return (
       <div className="flex items-center justify-center py-12">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -136,6 +164,82 @@ const AdminDashboard = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Schedule Confidence per Event Type */}
+      {templateConfidence.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 font-serif text-lg sm:text-xl">
+              <TrendingUp className="h-5 w-5 text-primary" />
+              Schedule Confidence
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {templateConfidence.map(({ template, eventCount, total, confirmed, invited, proposed, declined, confidencePercent }) => (
+                <Link 
+                  key={template.id} 
+                  to={`/admin/events/${template.id}`}
+                  className="block"
+                >
+                  <div className="rounded-lg border p-4 hover:shadow-md transition-shadow cursor-pointer">
+                    <div className="flex items-center justify-between mb-3">
+                      <div>
+                        <h3 className="font-semibold">{template.name}</h3>
+                        <p className="text-sm text-muted-foreground">
+                          {eventCount} upcoming {eventCount === 1 ? 'event' : 'events'}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <div className={cn(
+                          "text-2xl font-bold",
+                          confidencePercent >= 80 ? "text-green-600" :
+                          confidencePercent >= 50 ? "text-amber-600" : "text-red-600"
+                        )}>
+                          {confidencePercent}%
+                        </div>
+                        <p className="text-xs text-muted-foreground">confirmed</p>
+                      </div>
+                    </div>
+                    
+                    <Progress 
+                      value={confidencePercent} 
+                      className={cn(
+                        "h-2 mb-3",
+                        confidencePercent >= 80 ? "[&>div]:bg-green-600" :
+                        confidencePercent >= 50 ? "[&>div]:bg-amber-500" : "[&>div]:bg-red-500"
+                      )}
+                    />
+                    
+                    <div className="flex flex-wrap gap-2 text-xs">
+                      {confirmed > 0 && (
+                        <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                          {confirmed} confirmed
+                        </Badge>
+                      )}
+                      {invited > 0 && (
+                        <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                          {invited} invited
+                        </Badge>
+                      )}
+                      {proposed > 0 && (
+                        <Badge variant="outline" className="bg-gray-50 text-gray-700 border-gray-200">
+                          {proposed} proposed
+                        </Badge>
+                      )}
+                      {declined > 0 && (
+                        <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
+                          {declined} declined
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Active Volunteers */}
       <Card>
