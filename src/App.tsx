@@ -11,6 +11,8 @@ import Schedule from "./pages/Schedule";
 import Availability from "./pages/Availability";
 import Swaps from "./pages/Swaps";
 import Profile from "./pages/Profile";
+import Invitations from "./pages/Invitations";
+import InvitationResponse from "./pages/InvitationResponse";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import VolunteerManagement from "./pages/admin/VolunteerManagement";
 import AdminSchedule from "./pages/admin/Schedule";
@@ -33,6 +35,7 @@ const App = () => (
           <Routes>
             <Route path="/auth" element={<Auth />} />
             <Route path="/invite" element={<InviteSignup />} />
+            <Route path="/invitation/respond" element={<InvitationResponse />} />
             <Route element={
               <ProtectedRoute>
                 <AppLayout />
@@ -42,6 +45,7 @@ const App = () => (
               <Route path="/schedule" element={<Schedule />} />
               <Route path="/availability" element={<Availability />} />
               <Route path="/swaps" element={<Swaps />} />
+              <Route path="/invitations" element={<Invitations />} />
               <Route path="/profile" element={<Profile />} />
               <Route path="/admin" element={<AdminDashboard />} />
               <Route path="/admin/volunteers" element={<VolunteerManagement />} />
