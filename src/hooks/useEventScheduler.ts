@@ -660,8 +660,9 @@ export function useBatchUpdateAssignments() {
       eventId: string;
       toAdd: { role: string; volunteer_id: string }[];
       toRemove: string[];
+      eventStatus?: string; // Pass event status to determine assignment status
     }) => {
-      const { eventId, toAdd, toRemove } = data;
+      const { eventId, toAdd, toRemove, eventStatus } = data;
       const errors = [];
 
       // 1. Perform Removals
@@ -675,7 +676,11 @@ export function useBatchUpdateAssignments() {
       }
 
       // 2. Perform Additions
+      // For published events, set status to 'confirmed' immediately
+      // For draft events, use 'proposed' (default)
       if (toAdd.length > 0) {
+        const assignmentStatus: 'confirmed' | 'proposed' = eventStatus === 'published' ? 'confirmed' : 'proposed';
+        
         const { error: addError } = await supabase
           .from('event_assignments')
           .insert(
@@ -683,6 +688,7 @@ export function useBatchUpdateAssignments() {
               event_id: eventId,
               role: a.role as ServiceRole,
               volunteer_id: a.volunteer_id,
+              status: assignmentStatus,
             }))
           );
 
