@@ -82,25 +82,40 @@ export type Database = {
       event_assignments: {
         Row: {
           created_at: string
+          decline_reason: string | null
           event_id: string
           id: string
+          invitation_token: string | null
+          invited_at: string | null
+          responded_at: string | null
           role: Database["public"]["Enums"]["service_role"]
+          status: Database["public"]["Enums"]["assignment_status"]
           updated_at: string
           volunteer_id: string
         }
         Insert: {
           created_at?: string
+          decline_reason?: string | null
           event_id: string
           id?: string
+          invitation_token?: string | null
+          invited_at?: string | null
+          responded_at?: string | null
           role: Database["public"]["Enums"]["service_role"]
+          status?: Database["public"]["Enums"]["assignment_status"]
           updated_at?: string
           volunteer_id: string
         }
         Update: {
           created_at?: string
+          decline_reason?: string | null
           event_id?: string
           id?: string
+          invitation_token?: string | null
+          invited_at?: string | null
+          responded_at?: string | null
           role?: Database["public"]["Enums"]["service_role"]
+          status?: Database["public"]["Enums"]["assignment_status"]
           updated_at?: string
           volunteer_id?: string
         }
@@ -237,6 +252,7 @@ export type Database = {
           created_at: string
           date: string
           id: string
+          invitations_sent_at: string | null
           name: string
           notes: string | null
           reading: string | null
@@ -250,6 +266,7 @@ export type Database = {
           created_at?: string
           date: string
           id?: string
+          invitations_sent_at?: string | null
           name: string
           notes?: string | null
           reading?: string | null
@@ -263,6 +280,7 @@ export type Database = {
           created_at?: string
           date?: string
           id?: string
+          invitations_sent_at?: string | null
           name?: string
           notes?: string | null
           reading?: string | null
@@ -550,6 +568,7 @@ export type Database = {
     }
     Enums: {
       app_role: "volunteer" | "admin"
+      assignment_status: "proposed" | "invited" | "confirmed" | "declined"
       schedule_status: "draft" | "published"
       service_role:
         | "sidesman-standard"
@@ -687,6 +706,7 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["volunteer", "admin"],
+      assignment_status: ["proposed", "invited", "confirmed", "declined"],
       schedule_status: ["draft", "published"],
       service_role: [
         "sidesman-standard",

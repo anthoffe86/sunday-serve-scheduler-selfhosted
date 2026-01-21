@@ -40,6 +40,8 @@ import {
   useDeleteEventTemplate,
   useBulkUpdateEventStatus,
   useAutoSchedule,
+  useSendInvitations,
+  calculateScheduleConfidence,
   EventWithDetails,
   EventTemplateWithRoles
 } from '@/hooks/useEventScheduler';

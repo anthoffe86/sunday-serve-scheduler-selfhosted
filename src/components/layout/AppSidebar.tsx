@@ -9,7 +9,8 @@ import {
   LayoutDashboard,
   CalendarPlus,
   X,
-  Shield
+  Shield,
+  Mail
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -23,6 +24,7 @@ interface AppSidebarProps {
 const volunteerNav = [
   { to: '/', icon: Home, label: 'Dashboard' },
   { to: '/schedule', icon: CalendarDays, label: 'Schedule' },
+  { to: '/invitations', icon: Mail, label: 'Invitations' },
   { to: '/availability', icon: CalendarCheck, label: 'My Availability' },
   { to: '/swaps', icon: ArrowLeftRight, label: 'Swap Requests' },
   { to: '/profile', icon: Settings, label: 'Preferences' },

@@ -58,6 +58,11 @@ export interface EventAssignment {
   event_id: string;
   role: string;
   volunteer_id: string;
+  status: 'proposed' | 'invited' | 'confirmed' | 'declined';
+  invited_at: string | null;
+  responded_at: string | null;
+  decline_reason: string | null;
+  invitation_token: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -65,6 +70,7 @@ export interface EventAssignment {
 export interface EventWithDetails extends Event {
   roles: EventRole[];
   assignments: (EventAssignment & { volunteer_name?: string; volunteer_email?: string })[];
+  invitations_sent_at?: string | null;
 }
 
 export interface EventTemplateWithRoles extends EventTemplate {
@@ -684,7 +690,7 @@ export function useBulkUpdateEventStatus() {
   });
 }
 
-// Hook: Send event notifications
+// Hook: Send event notifications (legacy - for backward compatibility)
 export function useSendEventNotifications() {
   return useMutation({
     mutationFn: async (data: { eventIds: string[] }) => {
@@ -706,6 +712,98 @@ export function useSendEventNotifications() {
       };
     },
   });
+}
+
+// Hook: Send invitations to volunteers (new invitation-based workflow)
+export function useSendInvitations() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (data: { eventIds: string[] }) => {
+      const { data: result, error } = await supabase.functions.invoke('send-invitations', {
+        body: {
+          eventIds: data.eventIds,
+          baseUrl: window.location.origin,
+        },
+      });
+
+      if (error) throw error;
+      if (result.error) throw new Error(result.error);
+
+      return result as {
+        success: boolean;
+        emailsSent: number;
+        totalVolunteers: number;
+        totalAssignments: number;
+        errors?: string[];
+      };
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['events'] });
+    },
+  });
+}
+
+// Hook: Respond to an invitation (for in-app response)
+export function useRespondToInvitation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (data: { token: string; action: 'accept' | 'decline'; declineReason?: string }) => {
+      const { data: result, error } = await supabase.functions.invoke('respond-invitation', {
+        body: data,
+      });
+
+      if (error) throw error;
+      if (result.error) throw new Error(result.error);
+
+      return result as {
+        success: boolean;
+        message: string;
+        successCount: number;
+        failCount: number;
+      };
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['events'] });
+    },
+  });
+}
+
+// Helper function to calculate schedule confidence
+export function calculateScheduleConfidence(assignments: EventAssignment[]): {
+  total: number;
+  proposed: number;
+  invited: number;
+  confirmed: number;
+  declined: number;
+  confidencePercent: number;
+} {
+  const stats = {
+    total: assignments.length,
+    proposed: 0,
+    invited: 0,
+    confirmed: 0,
+    declined: 0,
+    confidencePercent: 0,
+  };
+
+  for (const a of assignments) {
+    switch (a.status) {
+      case 'proposed': stats.proposed++; break;
+      case 'invited': stats.invited++; break;
+      case 'confirmed': stats.confirmed++; break;
+      case 'declined': stats.declined++; break;
+    }
+  }
+
+  // Confidence = confirmed / (total - declined)
+  const activeAssignments = stats.total - stats.declined;
+  stats.confidencePercent = activeAssignments > 0 
+    ? Math.round((stats.confirmed / activeAssignments) * 100) 
+    : 0;
+
+  return stats;
 }
 
 // Hook: Auto-schedule volunteers for events
