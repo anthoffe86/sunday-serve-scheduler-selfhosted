@@ -43,22 +43,22 @@ export function VolunteerScheduleTableView({
     );
   };
 
-  // Get volunteers for a specific role from an event
+  // Get volunteers for a specific role from an event (exclude declined)
   const getVolunteersForRole = (event: EventWithDetails, role: string) => {
     return event.assignments
-      .filter(a => a.role === role)
+      .filter(a => a.role === role && a.status !== 'declined')
       .map(a => ({
         name: a.volunteer_name || 'Unknown',
         isCurrentUser: a.volunteer_id === currentUserId
       }));
   };
 
-  // Get all sidesman volunteers with their type indicator
+  // Get all sidesman volunteers with their type indicator (exclude declined)
   const getSidesmenDisplay = (event: EventWithDetails) => {
     const sidesmen: { name: string; type: string; isCurrentUser: boolean }[] = [];
     
     event.assignments
-      .filter(a => SIDESMAN_ROLES.includes(a.role))
+      .filter(a => SIDESMAN_ROLES.includes(a.role) && a.status !== 'declined')
       .forEach(a => {
         const type = a.role === 'sidesman-standard' ? 'S' 
           : a.role === 'sidesman-sound' ? 'Sound' 
