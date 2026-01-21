@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 import { useParams, Navigate, useNavigate } from 'react-router-dom';
 import { 
   ArrowLeft,
@@ -343,13 +344,29 @@ const AdminEventDetail = () => {
     }
 
     try {
+      // First, update status to published
       const result = await bulkUpdateStatus.mutateAsync({
         eventIds: publishValidation.publishableEventIds,
         status: 'published',
-        sendNotifications: false
+        sendNotifications: false // We'll send our own notifications below
       });
       
-      toast.success(`Published ${result.count} event${result.count !== 1 ? 's' : ''}`);
+      // Then send "schedule confirmed" emails to all volunteers with confirmed assignments
+      const { data, error: notificationError } = await supabase.functions.invoke('send-event-notification', {
+        body: {
+          eventIds: publishValidation.publishableEventIds,
+          baseUrl: window.location.origin,
+        },
+      });
+
+      if (notificationError) {
+        console.error('Failed to send notifications:', notificationError);
+        toast.success(`Published ${result.count} event${result.count !== 1 ? 's' : ''} (but notification emails failed)`);
+      } else {
+        const sent = data?.emailsSent || 0;
+        toast.success(`Published ${result.count} event${result.count !== 1 ? 's' : ''} and notified ${sent} volunteer${sent !== 1 ? 's' : ''}`);
+      }
+      
       setPublishConfirmOpen(false);
     } catch (error) {
       toast.error('Failed to publish events');
