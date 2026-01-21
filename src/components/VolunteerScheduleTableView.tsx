@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/table";
 import { EventWithDetails } from "@/hooks/useEventScheduler";
 import { Badge } from "@/components/ui/badge";
-import { Star } from "lucide-react";
+import { Star, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface VolunteerScheduleTableViewProps {
@@ -26,9 +26,14 @@ export function VolunteerScheduleTableView({
   currentUserId 
 }: VolunteerScheduleTableViewProps) {
   
-  // Check if user is assigned to an event
+  // Check if user is assigned to an event (with confirmed status)
   const isUserAssigned = (event: EventWithDetails) => {
-    return event.assignments.some((a) => a.volunteer_id === currentUserId);
+    return event.assignments.some((a) => a.volunteer_id === currentUserId && a.status === 'confirmed');
+  };
+
+  // Check if event is pending (draft status)
+  const isEventPending = (event: EventWithDetails) => {
+    return event.status === 'draft';
   };
 
   // Check if user is assigned to a specific role
@@ -117,14 +122,17 @@ export function VolunteerScheduleTableView({
             const intercessions = getVolunteersForRole(event, 'intercessions');
             const collection = getVolunteersForRole(event, 'collection');
             const userAssigned = isUserAssigned(event);
+            const isPending = isEventPending(event);
 
             return (
               <TableRow
                 key={event.id}
                 className={cn(
                   "cursor-pointer transition-colors",
-                  userAssigned 
+                  userAssigned && !isPending
                     ? "bg-primary/10 hover:bg-primary/20 border-l-4 border-l-primary" 
+                    : userAssigned && isPending
+                    ? "bg-amber-50 hover:bg-amber-100 border-l-4 border-l-amber-500"
                     : "hover:bg-muted/50"
                 )}
                 onClick={() => onEventClick(event)}
@@ -132,14 +140,22 @@ export function VolunteerScheduleTableView({
                 {/* Date Column */}
                 <TableCell className="py-3">
                   <div className="flex items-center gap-2">
-                    {userAssigned && (
+                    {userAssigned && !isPending && (
                       <Star className="h-4 w-4 text-primary fill-primary flex-shrink-0" />
+                    )}
+                    {userAssigned && isPending && (
+                      <Clock className="h-4 w-4 text-amber-500 flex-shrink-0" />
                     )}
                     <div>
                       <div className="font-medium">
                         {day} {month}
                       </div>
-                      {subheading && (
+                      {isPending && userAssigned && (
+                        <div className="text-xs text-amber-600 font-medium">
+                          Pending
+                        </div>
+                      )}
+                      {subheading && !isPending && (
                         <div className="text-xs text-muted-foreground italic">
                           {subheading}
                         </div>

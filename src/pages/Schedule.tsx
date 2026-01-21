@@ -42,21 +42,36 @@ const Schedule = () => {
   const [viewMode, setViewMode] = useState<"calendar" | "list" | "table">("table");
   const [selectedEvent, setSelectedEvent] = useState<EventWithDetails | null>(null);
 
-  // Fetch only published events
+  // Fetch events including drafts where user has confirmed assignments
   const startDate = format(subMonths(startOfMonth(currentMonth), 1), "yyyy-MM-dd");
   const endDate = format(addMonths(endOfMonth(currentMonth), 2), "yyyy-MM-dd");
 
   const { data: allEvents, isLoading } = useEvents({ startDate, endDate });
 
-  // Filter to only show published events for volunteers
+  // Filter to show published events OR events where user has a confirmed assignment
   const events = useMemo(() => {
-    if (!allEvents) return [];
-    return allEvents.filter((e) => e.status === "published");
-  }, [allEvents]);
+    if (!allEvents || !user?.id) return [];
+    return allEvents.filter((e) => {
+      // Always show published events
+      if (e.status === "published") return true;
+      // Show draft events where user has confirmed assignment
+      if (e.status === "draft") {
+        return e.assignments.some(
+          (a) => a.volunteer_id === user.id && a.status === "confirmed"
+        );
+      }
+      return false;
+    });
+  }, [allEvents, user?.id]);
 
-  // Check if user is assigned to an event
+  // Check if user is assigned to an event (with confirmed status)
   const isUserAssigned = (event: EventWithDetails) => {
-    return event.assignments.some((a) => a.volunteer_id === user?.id);
+    return event.assignments.some((a) => a.volunteer_id === user?.id && a.status === "confirmed");
+  };
+
+  // Check if assignment is pending (event is draft)
+  const isEventPending = (event: EventWithDetails) => {
+    return event.status === "draft";
   };
 
   // Get user's assignments in an event
@@ -224,6 +239,7 @@ const Schedule = () => {
                       <div className="space-y-1">
                         {dayEvents.slice(0, 3).map((event) => {
                           const assigned = isUserAssigned(event);
+                          const pending = isEventPending(event);
                           return (
                             <button
                               key={event.id}
@@ -231,8 +247,10 @@ const Schedule = () => {
                               className={cn(
                                 "w-full text-left text-xs p-1 rounded truncate",
                                 "hover:opacity-80 transition-opacity",
-                                assigned
+                                assigned && !pending
                                   ? "bg-primary text-primary-foreground font-medium"
+                                  : assigned && pending
+                                  ? "bg-amber-500 text-white font-medium"
                                   : "bg-primary/10 text-primary",
                               )}
                             >
@@ -271,6 +289,7 @@ const Schedule = () => {
           currentMonthEvents.map((event, index) => {
             const { filled, required } = getFilledCount(event);
             const assigned = isUserAssigned(event);
+            const pending = isEventPending(event);
             const userRoles = getUserRoles(event);
             const eventDate = parseISO(event.date);
             const isNextEvent = index === 0;
@@ -292,7 +311,8 @@ const Schedule = () => {
                 key={event.id}
                 className={cn(
                   "cursor-pointer hover:shadow-md transition-all overflow-hidden",
-                  assigned && "ring-2 ring-primary",
+                  assigned && !pending && "ring-2 ring-primary",
+                  assigned && pending && "ring-2 ring-amber-500",
                   isNextEvent && !assigned && "ring-1 ring-primary/30",
                 )}
                 onClick={() => setSelectedEvent(event)}
@@ -303,7 +323,9 @@ const Schedule = () => {
                     <div
                       className={cn(
                         "flex flex-col items-center justify-center px-4 py-4 min-w-[72px]",
-                        assigned ? "bg-primary text-primary-foreground" : "bg-secondary text-secondary-foreground",
+                        assigned && !pending ? "bg-primary text-primary-foreground" : "",
+                        assigned && pending ? "bg-amber-500 text-white" : "",
+                        !assigned && "bg-secondary text-secondary-foreground",
                       )}
                     >
                       <span className="text-xs font-semibold uppercase tracking-wide">
@@ -316,10 +338,16 @@ const Schedule = () => {
                     <div className="flex-1 p-4">
                       {/* Badges */}
                       <div className="flex flex-wrap gap-2 mb-2">
-                        {assigned && (
+                        {assigned && pending && (
+                          <Badge variant="outline" className="text-xs gap-1 border-amber-500 text-amber-600 bg-amber-50">
+                            <Clock className="h-3 w-3" />
+                            Pending Confirmation
+                          </Badge>
+                        )}
+                        {assigned && !pending && (
                           <Badge variant="outline" className="text-xs gap-1 border-primary text-primary">
                             <Star className="h-3 w-3 fill-primary" />
-                            You're Serving
+                            Confirmed
                           </Badge>
                         )}
                       </div>
