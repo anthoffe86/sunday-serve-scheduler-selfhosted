@@ -129,7 +129,7 @@ export function AddUnavailableDatesDialog({
               <div className="flex justify-center">
                 <Calendar
                   mode="range"
-                  selected={dateRange.from && dateRange.to ? { from: dateRange.from, to: dateRange.to } : undefined}
+                  selected={dateRange.from ? { from: dateRange.from, to: dateRange.to } : undefined}
                   onSelect={(range) => setDateRange({ from: range?.from, to: range?.to })}
                   disabled={(date) => isBefore(date, today)}
                   numberOfMonths={1}
