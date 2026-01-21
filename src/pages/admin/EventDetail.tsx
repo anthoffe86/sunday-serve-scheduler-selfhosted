@@ -160,13 +160,20 @@ const AdminEventDetail = () => {
     const proposedEvents = draftEvents.filter(e => 
       e.assignments.some(a => a.status === 'proposed')
     );
-    const invalidEvents = draftEvents.filter(e => !getEventValidation(e).isValid);
+    
+    // For invitation purposes, an event is "ready" if it has enough assignments (regardless of status)
+    const understaffedEvents = draftEvents.filter(e => {
+      const totalRequired = e.roles.reduce((sum, r) => sum + r.quantity, 0);
+      const totalFilled = e.assignments.length;
+      return totalRequired > 0 && totalFilled < totalRequired;
+    });
     
     return {
-      canSendInvitations: proposedEvents.length > 0 && invalidEvents.length === 0,
+      // Can send invitations if there are proposed assignments and no understaffed events
+      canSendInvitations: proposedEvents.length > 0 && understaffedEvents.length === 0,
       draftCount: draftEvents.length,
-      invalidCount: invalidEvents.length,
-      readyCount: draftEvents.length - invalidEvents.length,
+      understaffedCount: understaffedEvents.length,
+      readyCount: draftEvents.length - understaffedEvents.length,
       proposedCount: proposedEvents.reduce((sum, e) => 
         sum + e.assignments.filter(a => a.status === 'proposed').length, 0
       )
@@ -543,11 +550,11 @@ const AdminEventDetail = () => {
                     {invitationValidation.proposedCount} proposed assignment{invitationValidation.proposedCount !== 1 ? 's' : ''} ready to invite
                   </span>
                 </div>
-              ) : invitationValidation.invalidCount > 0 ? (
+              ) : invitationValidation.understaffedCount > 0 ? (
                 <div className="flex items-center gap-2 text-amber-700">
                   <AlertCircle className="h-5 w-5" />
                   <span className="font-medium">
-                    {invitationValidation.invalidCount} of {invitationValidation.draftCount} events need volunteers assigned
+                    {invitationValidation.understaffedCount} of {invitationValidation.draftCount} events need volunteers assigned
                   </span>
                 </div>
               ) : invitationValidation.draftCount > 0 ? (
