@@ -5,6 +5,17 @@ const NotFound = () => {
   const location = useLocation();
 
   useEffect(() => {
+    // Recover from accidentally double-slashed paths coming from external links
+    // e.g. "//respond-invitation". Some environments will briefly render NotFound
+    // before other normalizers run.
+    if (location.pathname.includes("//")) {
+      const normalizedPathname = location.pathname.replace(/\/{2,}/g, "/");
+      const target = `${normalizedPathname}${location.search}${location.hash}`;
+      window.history.replaceState(null, "", target);
+      // Force re-render on the corrected URL
+      window.location.replace(target);
+      return;
+    }
     console.error("404 Error: User attempted to access non-existent route:", location.pathname);
   }, [location.pathname]);
 
