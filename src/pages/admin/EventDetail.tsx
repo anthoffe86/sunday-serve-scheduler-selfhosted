@@ -108,13 +108,25 @@ const AdminEventDetail = () => {
   // Calculate validation status for each event
   const getEventValidation = (event: EventWithDetails) => {
     const totalRequired = event.roles.reduce((sum, r) => sum + r.quantity, 0);
-    const totalFilled = event.assignments.length;
+    // Only count non-declined assignments as "filled"
+    const activeAssignments = event.assignments.filter(a => a.status !== 'declined');
+    const totalFilled = activeAssignments.length;
     const confirmedCount = event.assignments.filter(a => a.status === 'confirmed').length;
     const invitedCount = event.assignments.filter(a => a.status === 'invited').length;
     const proposedCount = event.assignments.filter(a => a.status === 'proposed').length;
+    const declinedCount = event.assignments.filter(a => a.status === 'declined').length;
     
     if (totalRequired === 0) {
       return { isValid: false, message: 'No roles defined', type: 'warning' as const };
+    }
+    
+    // Check for declines first - these need attention
+    if (declinedCount > 0 && totalFilled < totalRequired) {
+      return { 
+        isValid: false, 
+        message: `${declinedCount} declined, ${totalRequired - totalFilled} to fill`, 
+        type: 'error' as const 
+      };
     }
     
     if (totalFilled < totalRequired) {
@@ -185,11 +197,21 @@ const AdminEventDetail = () => {
     const allAssignments = templateEvents.flatMap(e => e.assignments);
     if (allAssignments.length === 0) return null;
     
+    // Calculate total required slots
+    const totalRequired = templateEvents.reduce((sum, e) => 
+      sum + e.roles.reduce((roleSum, r) => roleSum + r.quantity, 0), 0
+    );
+    
     const proposed = allAssignments.filter(a => a.status === 'proposed').length;
     const invited = allAssignments.filter(a => a.status === 'invited').length;
     const confirmed = allAssignments.filter(a => a.status === 'confirmed').length;
     const declined = allAssignments.filter(a => a.status === 'declined').length;
     const total = allAssignments.length;
+    
+    // Confidence is confirmed / required (declines don't reduce requirement)
+    const confidencePercent = totalRequired > 0 
+      ? Math.round((confirmed / totalRequired) * 100) 
+      : 0;
     
     return {
       proposed,
@@ -197,9 +219,10 @@ const AdminEventDetail = () => {
       confirmed,
       declined,
       total,
-      confirmedPercent: Math.round((confirmed / total) * 100),
-      pendingPercent: Math.round(((proposed + invited) / total) * 100),
-      declinedPercent: Math.round((declined / total) * 100)
+      required: totalRequired,
+      confirmedPercent: confidencePercent,
+      pendingPercent: Math.round(((proposed + invited) / totalRequired) * 100),
+      declinedPercent: Math.round((declined / totalRequired) * 100)
     };
   }, [templateEvents]);
 
@@ -752,15 +775,19 @@ const AdminEventDetail = () => {
             {templateEvents.map((event) => {
               const validation = getEventValidation(event);
               const eventDate = parseISO(event.date);
-              const filledCount = event.assignments.length;
+              // Count only non-declined assignments as filled
+              const activeAssignments = event.assignments.filter(a => a.status !== 'declined');
+              const filledCount = activeAssignments.length;
               const requiredCount = event.roles.reduce((sum, r) => sum + r.quantity, 0);
+              const hasDeclines = event.assignments.some(a => a.status === 'declined');
 
               return (
                 <Card 
                   key={event.id}
                   className={cn(
                     "cursor-pointer hover:shadow-md transition-all",
-                    event.status === 'cancelled' && "opacity-60"
+                    event.status === 'cancelled' && "opacity-60",
+                    hasDeclines && event.status !== 'cancelled' && "border-red-300 bg-red-50/30"
                   )}
                   onClick={() => setSelectedEventId(event.id)}
                 >
@@ -814,14 +841,29 @@ const AdminEventDetail = () => {
                           <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
                             {event.roles.map((role) => {
                               const roleAssignments = event.assignments.filter(a => a.role === role.role);
-                              if (roleAssignments.length === 0) return null;
+                              // Filter out declined and show active volunteers
+                              const activeAssignments = roleAssignments.filter(a => a.status !== 'declined');
+                              const declinedCount = roleAssignments.filter(a => a.status === 'declined').length;
+                              const unfilledCount = role.quantity - activeAssignments.length;
+                              
+                              if (roleAssignments.length === 0 && role.quantity === 0) return null;
+                              
                               return (
                                 <div key={role.id} className="flex items-center gap-1">
                                   <span className="text-muted-foreground text-xs">
                                     {ROLE_LABELS[role.role as keyof typeof ROLE_LABELS]?.split(' ')[0] || role.role}:
                                   </span>
                                   <span className="font-medium">
-                                    {roleAssignments.map(a => a.volunteer_name?.split(' ')[0] || 'Unknown').join(', ')}
+                                    {activeAssignments.length > 0 
+                                      ? activeAssignments.map(a => a.volunteer_name?.split(' ')[0] || 'Unknown').join(', ')
+                                      : null
+                                    }
+                                    {activeAssignments.length > 0 && unfilledCount > 0 && ', '}
+                                    {unfilledCount > 0 && (
+                                      <span className="text-red-600 italic">
+                                        {Array(unfilledCount).fill('Missing').join(', ')}
+                                      </span>
+                                    )}
                                   </span>
                                 </div>
                               );

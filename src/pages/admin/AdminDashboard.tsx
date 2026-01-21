@@ -1,4 +1,4 @@
-import { Users, CalendarDays, ArrowLeftRight, Loader2, TrendingUp } from "lucide-react";
+import { Users, CalendarDays, ArrowLeftRight, Loader2, TrendingUp, AlertTriangle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -42,9 +42,14 @@ const AdminDashboard = () => {
         e.status !== 'published'
       );
       
+      // Calculate total required slots across all events
+      const requiredTotal = templateEvents.reduce((sum, e) => 
+        sum + e.roles.reduce((roleSum, r) => roleSum + r.quantity, 0), 0
+      );
+      
       // Aggregate all assignments from these events
       const allAssignments = templateEvents.flatMap(e => e.assignments);
-      const confidence = calculateScheduleConfidence(allAssignments);
+      const confidence = calculateScheduleConfidence(allAssignments, requiredTotal);
       
       return {
         template,
@@ -138,18 +143,31 @@ const AdminDashboard = () => {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {templateConfidence.map(({ template, eventCount, confirmed, invited, proposed, declined, confidencePercent }) => (
+              {templateConfidence.map(({ template, eventCount, required, confirmed, invited, proposed, declined, confidencePercent }) => (
                 <Link 
                   key={template.id} 
                   to={`/admin/events/${template.id}`}
                   className="block"
                 >
-                  <div className="rounded-lg border p-4 hover:shadow-md transition-shadow cursor-pointer">
+                  <div className={cn(
+                    "rounded-lg border p-4 hover:shadow-md transition-shadow cursor-pointer",
+                    declined > 0 && "border-red-300 bg-red-50/50"
+                  )}>
+                    {/* Decline Alert Banner */}
+                    {declined > 0 && (
+                      <div className="flex items-center gap-2 text-red-700 bg-red-100 rounded-md px-3 py-2 mb-3 -mt-1 -mx-1">
+                        <AlertTriangle className="h-4 w-4 shrink-0" />
+                        <span className="text-sm font-medium">
+                          {declined} volunteer{declined !== 1 ? 's' : ''} declined — action needed
+                        </span>
+                      </div>
+                    )}
+                    
                     <div className="flex items-center justify-between mb-3">
                       <div>
                         <h3 className="font-semibold">{template.name}</h3>
                         <p className="text-sm text-muted-foreground">
-                          {eventCount} pending {eventCount === 1 ? 'event' : 'events'}
+                          {eventCount} pending {eventCount === 1 ? 'event' : 'events'} • {confirmed}/{required} slots confirmed
                         </p>
                       </div>
                       <div className="text-right">

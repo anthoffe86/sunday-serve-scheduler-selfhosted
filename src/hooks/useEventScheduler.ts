@@ -793,13 +793,18 @@ export function useRespondToInvitation() {
 }
 
 // Helper function to calculate schedule confidence
-export function calculateScheduleConfidence(assignments: EventAssignment[]): {
+// requiredTotal: the total number of roles/slots that SHOULD be filled
+export function calculateScheduleConfidence(
+  assignments: EventAssignment[],
+  requiredTotal?: number
+): {
   total: number;
   proposed: number;
   invited: number;
   confirmed: number;
   declined: number;
   confidencePercent: number;
+  required: number;
 } {
   const stats = {
     total: assignments.length,
@@ -808,6 +813,7 @@ export function calculateScheduleConfidence(assignments: EventAssignment[]): {
     confirmed: 0,
     declined: 0,
     confidencePercent: 0,
+    required: requiredTotal ?? assignments.length,
   };
 
   for (const a of assignments) {
@@ -819,10 +825,10 @@ export function calculateScheduleConfidence(assignments: EventAssignment[]): {
     }
   }
 
-  // Confidence = confirmed / (total - declined)
-  const activeAssignments = stats.total - stats.declined;
-  stats.confidencePercent = activeAssignments > 0 
-    ? Math.round((stats.confirmed / activeAssignments) * 100) 
+  // Confidence = confirmed / required slots (not affected by declines)
+  // A decline doesn't reduce the requirement, it creates a vacancy
+  stats.confidencePercent = stats.required > 0 
+    ? Math.round((stats.confirmed / stats.required) * 100) 
     : 0;
 
   return stats;
