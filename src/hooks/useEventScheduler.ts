@@ -510,6 +510,17 @@ export function useDeleteEvent() {
 
   return useMutation({
     mutationFn: async (id: string) => {
+      // First delete all assignments for this event (in case CASCADE doesn't work)
+      const { error: assignmentError } = await supabase
+        .from('event_assignments')
+        .delete()
+        .eq('event_id', id);
+
+      if (assignmentError) {
+        console.warn('Failed to delete assignments:', assignmentError);
+      }
+
+      // Then delete the event
       const { error } = await supabase
         .from('events')
         .delete()
@@ -530,6 +541,17 @@ export function useBulkDeleteEvents() {
 
   return useMutation({
     mutationFn: async (ids: string[]) => {
+      // First delete all assignments for these events
+      const { error: assignmentError } = await supabase
+        .from('event_assignments')
+        .delete()
+        .in('event_id', ids);
+
+      if (assignmentError) {
+        console.warn('Failed to delete assignments:', assignmentError);
+      }
+
+      // Then delete the events
       const { error } = await supabase
         .from('events')
         .delete()
