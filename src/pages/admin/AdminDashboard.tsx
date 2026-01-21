@@ -1,34 +1,19 @@
-import { Users, CalendarDays, AlertCircle, ArrowLeftRight, Loader2, TrendingUp } from "lucide-react";
+import { Users, CalendarDays, ArrowLeftRight, Loader2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { StatCard } from "@/components/StatCard";
 import { useProfiles } from "@/hooks/useVolunteerData";
-import { useEvents, useEventTemplates, calculateScheduleConfidence } from "@/hooks/useEventScheduler";
+import { useEvents } from "@/hooks/useEventScheduler";
 import { useSwapRequests } from "@/hooks/useSwapRequests";
 import { useAuth } from "@/hooks/useAuth";
-import { Link, Navigate, useNavigate } from "react-router-dom";
-import { useMemo, useState } from "react";
-import { format, parseISO, isAfter, startOfToday } from "date-fns";
-import { cn } from "@/lib/utils";
+import { Link, Navigate } from "react-router-dom";
+import { useMemo } from "react";
 
 const AdminDashboard = () => {
   const { isAdmin, isLoading: authLoading } = useAuth();
   const { data: profiles, isLoading: profilesLoading } = useProfiles();
-  const { data: events, isLoading: eventsLoading } = useEvents();
-  const { data: templates, isLoading: templatesLoading } = useEventTemplates();
+  const { isLoading: eventsLoading } = useEvents();
   const { data: swapRequests, isLoading: swapsLoading } = useSwapRequests();
-  const navigate = useNavigate();
-
-  const [understaffedDialogOpen, setUnderstaffedDialogOpen] = useState(false);
 
   const activeVolunteers = useMemo(() => profiles?.filter((v) => v.active) || [], [profiles]);
 
@@ -37,50 +22,7 @@ const AdminDashboard = () => {
     [swapRequests]
   );
 
-  const understaffedEvents = useMemo(() => {
-    if (!events) return [];
-    return events.filter((event) => {
-      const totalRequired = event.roles.reduce((sum, r) => sum + r.quantity, 0);
-      const totalFilled = event.assignments.length;
-      return totalRequired > 0 && totalFilled < totalRequired && event.status !== 'cancelled';
-    }).sort((a, b) => a.date.localeCompare(b.date));
-  }, [events]);
-
-  // Calculate schedule confidence per template
-  const templateConfidence = useMemo(() => {
-    if (!events || !templates) return [];
-    
-    const today = startOfToday();
-    
-    return templates.map(template => {
-      // Get future events for this template
-      const templateEvents = events.filter(e => 
-        e.template_id === template.id && 
-        isAfter(parseISO(e.date), today) &&
-        e.status !== 'cancelled'
-      );
-      
-      // Aggregate all assignments from these events
-      const allAssignments = templateEvents.flatMap(e => e.assignments);
-      const confidence = calculateScheduleConfidence(allAssignments);
-      
-      return {
-        template,
-        eventCount: templateEvents.length,
-        ...confidence,
-      };
-    }).filter(t => t.eventCount > 0);
-  }, [events, templates]);
-
-  const formatTime = (time: string) => {
-    const [hours, minutes] = time.split(':');
-    const hour = parseInt(hours, 10);
-    const ampm = hour >= 12 ? 'PM' : 'AM';
-    const displayHour = hour % 12 || 12;
-    return `${displayHour}:${minutes} ${ampm}`;
-  };
-
-  if (authLoading || profilesLoading || eventsLoading || swapsLoading || templatesLoading) {
+  if (authLoading || profilesLoading || eventsLoading || swapsLoading) {
     return (
       <div className="flex items-center justify-center py-12">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -92,11 +34,6 @@ const AdminDashboard = () => {
     return <Navigate to="/" replace />;
   }
 
-  const handleEventClick = (eventId: string) => {
-    setUnderstaffedDialogOpen(false);
-    // Navigate to admin schedule with event ID to open edit dialog
-    navigate('/admin/schedule', { state: { openEventId: eventId } });
-  };
 
   return (
     <div className="space-y-8">
@@ -108,7 +45,7 @@ const AdminDashboard = () => {
       </div>
 
       {/* Stats Overview */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2">
         <StatCard
           label="Active Volunteers"
           value={activeVolunteers.length}
@@ -121,15 +58,6 @@ const AdminDashboard = () => {
           icon={ArrowLeftRight}
           description="Awaiting review"
         />
-        <div onClick={() => understaffedEvents.length > 0 && setUnderstaffedDialogOpen(true)}>
-          <StatCard
-            label="Understaffed Events"
-            value={understaffedEvents.length}
-            icon={AlertCircle}
-            description="Need more volunteers"
-            className={understaffedEvents.length > 0 ? "cursor-pointer hover:shadow-md transition-shadow" : ""}
-          />
-        </div>
       </div>
 
       {/* Quick Links */}
@@ -165,82 +93,6 @@ const AdminDashboard = () => {
         </Card>
       </div>
 
-      {/* Schedule Confidence per Event Type */}
-      {templateConfidence.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 font-serif text-lg sm:text-xl">
-              <TrendingUp className="h-5 w-5 text-primary" />
-              Schedule Confidence
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {templateConfidence.map(({ template, eventCount, total, confirmed, invited, proposed, declined, confidencePercent }) => (
-                <Link 
-                  key={template.id} 
-                  to={`/admin/events/${template.id}`}
-                  className="block"
-                >
-                  <div className="rounded-lg border p-4 hover:shadow-md transition-shadow cursor-pointer">
-                    <div className="flex items-center justify-between mb-3">
-                      <div>
-                        <h3 className="font-semibold">{template.name}</h3>
-                        <p className="text-sm text-muted-foreground">
-                          {eventCount} upcoming {eventCount === 1 ? 'event' : 'events'}
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <div className={cn(
-                          "text-2xl font-bold",
-                          confidencePercent >= 80 ? "text-green-600" :
-                          confidencePercent >= 50 ? "text-amber-600" : "text-red-600"
-                        )}>
-                          {confidencePercent}%
-                        </div>
-                        <p className="text-xs text-muted-foreground">confirmed</p>
-                      </div>
-                    </div>
-                    
-                    <Progress 
-                      value={confidencePercent} 
-                      className={cn(
-                        "h-2 mb-3",
-                        confidencePercent >= 80 ? "[&>div]:bg-green-600" :
-                        confidencePercent >= 50 ? "[&>div]:bg-amber-500" : "[&>div]:bg-red-500"
-                      )}
-                    />
-                    
-                    <div className="flex flex-wrap gap-2 text-xs">
-                      {confirmed > 0 && (
-                        <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                          {confirmed} confirmed
-                        </Badge>
-                      )}
-                      {invited > 0 && (
-                        <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-                          {invited} invited
-                        </Badge>
-                      )}
-                      {proposed > 0 && (
-                        <Badge variant="outline" className="bg-gray-50 text-gray-700 border-gray-200">
-                          {proposed} proposed
-                        </Badge>
-                      )}
-                      {declined > 0 && (
-                        <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
-                          {declined} declined
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
       {/* Active Volunteers */}
       <Card>
         <CardHeader>
@@ -275,73 +127,6 @@ const AdminDashboard = () => {
           </Button>
         </CardContent>
       </Card>
-
-      {/* Understaffed Events Dialog */}
-      <Dialog open={understaffedDialogOpen} onOpenChange={setUnderstaffedDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="font-serif text-xl">Understaffed Events</DialogTitle>
-            <DialogDescription>
-              These events need more volunteers. Click on an event to add volunteers.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-3 mt-4">
-            {understaffedEvents.map((event) => {
-              const totalRequired = event.roles.reduce((sum, r) => sum + r.quantity, 0);
-              const totalFilled = event.assignments.length;
-              const needed = totalRequired - totalFilled;
-              const eventDate = parseISO(event.date);
-
-              return (
-                <Card
-                  key={event.id}
-                  className="cursor-pointer hover:shadow-md transition-all"
-                  onClick={() => handleEventClick(event.id)}
-                >
-                  <CardContent className="p-4">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <h3 className="font-semibold text-base truncate">{event.name}</h3>
-                          <Badge variant={event.status === 'published' ? 'default' : 'secondary'} className="text-xs shrink-0">
-                            {event.status}
-                          </Badge>
-                        </div>
-                        {event.subheading && (
-                          <p className="text-sm text-muted-foreground italic mb-2">{event.subheading}</p>
-                        )}
-                        <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
-                          <span className="flex items-center gap-1">
-                            <CalendarDays className="h-3.5 w-3.5" />
-                            {format(eventDate, 'EEE, MMM d, yyyy')}
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <Users className="h-3.5 w-3.5" />
-                            {formatTime(event.start_time)}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="text-right shrink-0">
-                        <div className={cn(
-                          "text-lg font-bold",
-                          needed > 2 ? "text-red-600" : "text-amber-600"
-                        )}>
-                          {needed}
-                        </div>
-                        <div className="text-xs text-muted-foreground">needed</div>
-                        <div className="text-xs text-muted-foreground mt-1">
-                          {totalFilled}/{totalRequired}
-                        </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 };
