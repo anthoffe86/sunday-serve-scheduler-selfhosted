@@ -195,20 +195,23 @@ const AdminEventDetail = () => {
   // Calculate schedule confidence across all events
   const scheduleConfidence = useMemo(() => {
     const allAssignments = templateEvents.flatMap(e => e.assignments);
-    if (allAssignments.length === 0) return null;
     
     // Calculate total required slots
     const totalRequired = templateEvents.reduce((sum, e) => 
       sum + e.roles.reduce((roleSum, r) => roleSum + r.quantity, 0), 0
     );
     
+    if (totalRequired === 0) return null;
+    
+    // Only count non-declined assignments as active
+    const activeAssignments = allAssignments.filter(a => a.status !== 'declined');
     const proposed = allAssignments.filter(a => a.status === 'proposed').length;
     const invited = allAssignments.filter(a => a.status === 'invited').length;
     const confirmed = allAssignments.filter(a => a.status === 'confirmed').length;
     const declined = allAssignments.filter(a => a.status === 'declined').length;
-    const total = allAssignments.length;
+    const active = activeAssignments.length;
     
-    // Confidence is confirmed / required (declines don't reduce requirement)
+    // Confidence is confirmed / required
     const confidencePercent = totalRequired > 0 
       ? Math.round((confirmed / totalRequired) * 100) 
       : 0;
@@ -218,7 +221,8 @@ const AdminEventDetail = () => {
       invited,
       confirmed,
       declined,
-      total,
+      total: active, // Total is only active (non-declined) assignments
+      active,
       required: totalRequired,
       confirmedPercent: confidencePercent,
       pendingPercent: Math.round(((proposed + invited) / totalRequired) * 100),
@@ -524,7 +528,7 @@ const AdminEventDetail = () => {
                     {scheduleConfidence.confirmedPercent}% Confirmed
                   </span>
                   <span className="text-sm text-muted-foreground">
-                    {scheduleConfidence.confirmed}/{scheduleConfidence.total} assignments
+                    {scheduleConfidence.confirmed}/{scheduleConfidence.required} slots
                   </span>
                 </div>
                 <Progress value={scheduleConfidence.confirmedPercent} className="h-2" />

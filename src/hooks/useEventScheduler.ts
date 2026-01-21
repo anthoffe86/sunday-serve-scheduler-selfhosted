@@ -799,21 +799,28 @@ export function calculateScheduleConfidence(
   requiredTotal?: number
 ): {
   total: number;
+  active: number;
   proposed: number;
   invited: number;
   confirmed: number;
   declined: number;
+  unfilled: number;
   confidencePercent: number;
   required: number;
 } {
+  // Filter out declined - they don't count toward filled slots
+  const activeAssignments = assignments.filter(a => a.status !== 'declined');
+  
   const stats = {
-    total: assignments.length,
+    total: activeAssignments.length, // Only count active (non-declined)
+    active: activeAssignments.length,
     proposed: 0,
     invited: 0,
     confirmed: 0,
     declined: 0,
+    unfilled: 0,
     confidencePercent: 0,
-    required: requiredTotal ?? assignments.length,
+    required: requiredTotal ?? activeAssignments.length,
   };
 
   for (const a of assignments) {
@@ -825,8 +832,10 @@ export function calculateScheduleConfidence(
     }
   }
 
-  // Confidence = confirmed / required slots (not affected by declines)
-  // A decline doesn't reduce the requirement, it creates a vacancy
+  // Calculate unfilled slots (required - active assignments)
+  stats.unfilled = Math.max(0, stats.required - stats.active);
+
+  // Confidence = confirmed / required slots
   stats.confidencePercent = stats.required > 0 
     ? Math.round((stats.confirmed / stats.required) * 100) 
     : 0;
