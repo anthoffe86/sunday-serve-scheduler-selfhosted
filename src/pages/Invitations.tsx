@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Loader2, Mail, CheckCircle, XCircle, Clock, Calendar } from 'lucide-react';
+import { Loader2, Mail, CheckCircle, XCircle, Calendar } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -36,46 +36,32 @@ const Invitations = () => {
   } | null>(null);
   const [declineReason, setDeclineReason] = useState('');
 
-  // Get all invitations for the current user
-  const myInvitations = useMemo(() => {
-    if (!events || !user) return { pending: [], confirmed: [], declined: [] };
-    
-    const pending: typeof invitations = [];
-    const confirmed: typeof invitations = [];
-    const declined: typeof invitations = [];
+  // Get pending invitations for the current user
+  const pendingInvitations = useMemo(() => {
+    if (!events || !user) return [];
     
     type InvitationItem = {
       assignment: typeof events[0]['assignments'][0];
       event: typeof events[0];
     };
     
-    const invitations: InvitationItem[] = [];
+    const pending: InvitationItem[] = [];
     
     for (const event of events) {
       for (const assignment of event.assignments) {
-        if (assignment.volunteer_id === user.id) {
-          const item = { assignment, event };
-          
-          if (assignment.status === 'invited') {
-            pending.push(item);
-          } else if (assignment.status === 'confirmed') {
-            confirmed.push(item);
-          } else if (assignment.status === 'declined') {
-            declined.push(item);
-          }
+        if (assignment.volunteer_id === user.id && assignment.status === 'invited') {
+          pending.push({ assignment, event });
         }
       }
     }
     
     // Sort by date
     pending.sort((a, b) => a.event.date.localeCompare(b.event.date));
-    confirmed.sort((a, b) => a.event.date.localeCompare(b.event.date));
-    declined.sort((a, b) => a.event.date.localeCompare(b.event.date));
     
-    return { pending, confirmed, declined };
+    return pending;
   }, [events, user]);
 
-  const handleAccept = async (assignment: typeof myInvitations.pending[0]['assignment']) => {
+  const handleAccept = async (assignment: typeof pendingInvitations[0]['assignment']) => {
     if (!assignment.invitation_token) {
       toast.error('No invitation token found');
       return;
@@ -110,8 +96,8 @@ const Invitations = () => {
   };
 
   const openDeclineDialog = (
-    assignment: typeof myInvitations.pending[0]['assignment'],
-    event: typeof myInvitations.pending[0]['event']
+    assignment: typeof pendingInvitations[0]['assignment'],
+    event: typeof pendingInvitations[0]['event']
   ) => {
     if (!assignment.invitation_token) {
       toast.error('No invitation token found');
@@ -144,15 +130,14 @@ const Invitations = () => {
     );
   }
 
-  const hasPendingInvitations = myInvitations.pending.length > 0;
-  const hasConfirmedInvitations = myInvitations.confirmed.length > 0;
+  const hasPendingInvitations = pendingInvitations.length > 0;
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="font-serif text-3xl font-bold">Invitations</h1>
         <p className="text-muted-foreground">
-          Respond to service invitations and view your confirmed commitments
+          Respond to service invitations
         </p>
       </div>
 
@@ -164,7 +149,7 @@ const Invitations = () => {
             Pending Invitations
             {hasPendingInvitations && (
               <Badge variant="secondary" className="ml-2">
-                {myInvitations.pending.length}
+                {pendingInvitations.length}
               </Badge>
             )}
           </CardTitle>
@@ -177,7 +162,7 @@ const Invitations = () => {
         {hasPendingInvitations && (
           <CardContent>
             <div className="space-y-3">
-              {myInvitations.pending.map(({ assignment, event }) => (
+              {pendingInvitations.map(({ assignment, event }) => (
                 <div
                   key={assignment.id}
                   className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 bg-background rounded-lg border"
@@ -218,60 +203,6 @@ const Invitations = () => {
                       <XCircle className="h-4 w-4 mr-1" />
                       Decline
                     </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        )}
-      </Card>
-
-      {/* Confirmed Commitments */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <CheckCircle className="h-5 w-5 text-green-600" />
-            Confirmed Commitments
-            {hasConfirmedInvitations && (
-              <Badge variant="secondary" className="ml-2">
-                {myInvitations.confirmed.length}
-              </Badge>
-            )}
-          </CardTitle>
-          <CardDescription>
-            {hasConfirmedInvitations 
-              ? "Your upcoming confirmed service dates"
-              : "No confirmed commitments yet"}
-          </CardDescription>
-        </CardHeader>
-        {hasConfirmedInvitations && (
-          <CardContent>
-            <div className="space-y-3">
-              {myInvitations.confirmed.map(({ assignment, event }) => (
-                <div
-                  key={assignment.id}
-                  className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 bg-green-50/50 rounded-lg border border-green-200"
-                >
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <Calendar className="h-4 w-4 text-muted-foreground" />
-                      <span className="font-medium">
-                        {format(parseISO(event.date), 'EEEE, MMMM d, yyyy')}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                      <span>{event.name}</span>
-                      <span>•</span>
-                      <span>{formatTime(event.start_time)}</span>
-                      <span>•</span>
-                      <Badge variant="outline" className="bg-green-100 border-green-300">
-                        {ROLE_LABELS[assignment.role as keyof typeof ROLE_LABELS] || assignment.role}
-                      </Badge>
-                    </div>
-                  </div>
-                  <div className="text-sm text-green-600 font-medium flex items-center gap-1">
-                    <CheckCircle className="h-4 w-4" />
-                    Confirmed
                   </div>
                 </div>
               ))}
