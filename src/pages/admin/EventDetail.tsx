@@ -280,8 +280,15 @@ const AdminEventDetail = () => {
   , [templateEvents]);
 
   const handleSendInvitations = async () => {
+    // Get draft events that have proposed assignments and are fully staffed
     const draftEventIds = templateEvents
-      .filter(e => e.status === 'draft' && getEventValidation(e).isValid)
+      .filter(e => {
+        if (e.status !== 'draft') return false;
+        const hasProposed = e.assignments.some(a => a.status === 'proposed');
+        const totalRequired = e.roles.reduce((sum, r) => sum + r.quantity, 0);
+        const totalFilled = e.assignments.length;
+        return hasProposed && totalFilled >= totalRequired;
+      })
       .map(e => e.id);
     
     if (draftEventIds.length === 0) {
