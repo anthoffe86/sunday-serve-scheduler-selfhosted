@@ -24,7 +24,7 @@ export function ScheduleExport({ events, monthLabel }: ScheduleExportProps) {
   const getSidesmenDisplay = (event: EventWithDetails) => {
     const sidesmen: string[] = [];
     event.assignments
-      .filter(a => SIDESMAN_ROLES.includes(a.role))
+      .filter(a => SIDESMAN_ROLES.includes(a.role) && a.status !== 'declined')
       .forEach(a => {
         const type = a.role === 'sidesman-standard' ? ' '
           : a.role === 'sidesman-sound' ? '(S)'
@@ -36,7 +36,7 @@ export function ScheduleExport({ events, monthLabel }: ScheduleExportProps) {
 
   const getVolunteersForRole = (event: EventWithDetails, role: string) => {
     return event.assignments
-      .filter(a => a.role === role)
+      .filter(a => a.role === role && a.status !== 'declined')
       .map(a => a.volunteer_name || 'Unknown');
   };
 
