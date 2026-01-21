@@ -99,8 +99,74 @@ Deno.serve(async (req) => {
     }
 
     try {
-        const url = new URL(req.url);
-        const userId = url.pathname.split('/').pop()?.replace('.ics', '');
+        const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+        const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
+        
+        // Check for Authorization header first (authenticated request)
+        const authHeader = req.headers.get('Authorization');
+        
+        let userId: string | null = null;
+        
+        if (authHeader) {
+            // Authenticated request - validate user and use their ID
+            const supabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
+                global: { headers: { Authorization: authHeader } }
+            });
+            
+            const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
+            
+            if (authError || !user) {
+                return new Response('Unauthorized', {
+                    status: 401,
+                    headers: { ...corsHeaders, 'Content-Type': 'text/plain' }
+                });
+            }
+            
+            userId = user.id;
+        } else {
+            // No auth header - this is a calendar subscription URL
+            // External calendar apps (Google Calendar, Apple Calendar) cannot send auth headers
+            // We require the token parameter for security
+            const url = new URL(req.url);
+            const token = url.searchParams.get('token');
+            const pathUserId = url.pathname.split('/').pop()?.replace('.ics', '');
+            
+            if (!token || !pathUserId) {
+                return new Response('Calendar feed requires authentication or a valid token. Please generate a new calendar link from your profile.', {
+                    status: 401,
+                    headers: { ...corsHeaders, 'Content-Type': 'text/plain' }
+                });
+            }
+            
+            // Validate token against the user's calendar_feed_token in profiles
+            const supabaseAdmin = createClient(
+                supabaseUrl,
+                Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+            );
+            
+            const { data: profile, error: profileError } = await supabaseAdmin
+                .from('profiles')
+                .select('user_id, calendar_feed_token')
+                .eq('user_id', pathUserId)
+                .single();
+            
+            if (profileError || !profile) {
+                return new Response('Invalid user', {
+                    status: 404,
+                    headers: { ...corsHeaders, 'Content-Type': 'text/plain' }
+                });
+            }
+            
+            // Verify the token matches
+            if (!profile.calendar_feed_token || profile.calendar_feed_token !== token) {
+                return new Response('Invalid or expired calendar token. Please generate a new calendar link from your profile.', {
+                    status: 403,
+                    headers: { ...corsHeaders, 'Content-Type': 'text/plain' }
+                });
+            }
+            
+            userId = profile.user_id;
+        }
 
         if (!userId) {
             return new Response('User ID required', {
@@ -109,10 +175,7 @@ Deno.serve(async (req) => {
             });
         }
 
-        const supabaseClient = createClient(
-            Deno.env.get('SUPABASE_URL') ?? '',
-            Deno.env.get('SUPABASE_ANON_KEY') ?? ''
-        );
+        const supabaseClient = createClient(supabaseUrl, supabaseAnonKey);
 
         // Get events for the next 6 months where user is assigned
         const today = new Date();
@@ -154,7 +217,7 @@ Deno.serve(async (req) => {
 
         // Filter events where user is assigned
         const userEvents = (events || []).filter(event =>
-            event.assignments.some((a: any) => a.volunteer_id === userId)
+            event.assignments.some((a: { volunteer_id: string }) => a.volunteer_id === userId)
         );
 
         const icsContent = generateICS(userEvents as Event[], userId);

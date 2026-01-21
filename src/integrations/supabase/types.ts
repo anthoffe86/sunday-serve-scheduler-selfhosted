@@ -357,6 +357,7 @@ export type Database = {
       profiles: {
         Row: {
           active: boolean
+          calendar_feed_token: string | null
           created_at: string
           email: string
           family_group_id: string | null
@@ -367,6 +368,7 @@ export type Database = {
         }
         Insert: {
           active?: boolean
+          calendar_feed_token?: string | null
           created_at?: string
           email: string
           family_group_id?: string | null
@@ -377,6 +379,7 @@ export type Database = {
         }
         Update: {
           active?: boolean
+          calendar_feed_token?: string | null
           created_at?: string
           email?: string
           family_group_id?: string | null
@@ -525,6 +528,13 @@ export type Database = {
             referencedRelation: "event_assignments"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "swap_requests_event_assignment_id_fkey"
+            columns: ["event_assignment_id"]
+            isOneToOne: false
+            referencedRelation: "event_assignments_safe"
+            referencedColumns: ["id"]
+          },
         ]
       }
       system_settings: {
@@ -574,7 +584,56 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      event_assignments_safe: {
+        Row: {
+          created_at: string | null
+          decline_reason: string | null
+          event_id: string | null
+          id: string | null
+          invitation_token: string | null
+          invited_at: string | null
+          responded_at: string | null
+          role: Database["public"]["Enums"]["service_role"] | null
+          status: Database["public"]["Enums"]["assignment_status"] | null
+          updated_at: string | null
+          volunteer_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          decline_reason?: string | null
+          event_id?: string | null
+          id?: string | null
+          invitation_token?: never
+          invited_at?: string | null
+          responded_at?: string | null
+          role?: Database["public"]["Enums"]["service_role"] | null
+          status?: Database["public"]["Enums"]["assignment_status"] | null
+          updated_at?: string | null
+          volunteer_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          decline_reason?: string | null
+          event_id?: string | null
+          id?: string | null
+          invitation_token?: never
+          invited_at?: string | null
+          responded_at?: string | null
+          role?: Database["public"]["Enums"]["service_role"] | null
+          status?: Database["public"]["Enums"]["assignment_status"] | null
+          updated_at?: string | null
+          volunteer_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_assignments_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       has_role: {
