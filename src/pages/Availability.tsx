@@ -57,17 +57,25 @@ const Availability = () => {
 
       {/* Default Available Banner */}
       <Card className="border-primary/20 bg-gradient-to-r from-primary/5 to-primary/10">
-        <CardContent className="flex items-center gap-4 p-6">
-          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
-            <CalendarHeart className="h-6 w-6 text-primary" />
+        <CardContent className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:p-6">
+          <div className="flex items-center gap-3 sm:block">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 sm:h-12 sm:w-12">
+              <CalendarHeart className="h-5 w-5 text-primary sm:h-6 sm:w-6" />
+            </div>
+            <div className="sm:hidden">
+              <h3 className="font-serif text-base font-semibold">You're available by default</h3>
+              <p className="text-sm text-muted-foreground">
+                Add dates you can't serve below.
+              </p>
+            </div>
           </div>
-          <div className="flex-1">
+          <div className="hidden flex-1 sm:block">
             <h3 className="font-serif text-lg font-semibold">You're available by default</h3>
             <p className="text-sm text-muted-foreground">
               You'll be considered for scheduling unless you add dates you can't serve.
             </p>
           </div>
-          <Button onClick={() => setIsDialogOpen(true)} className="gap-2">
+          <Button onClick={() => setIsDialogOpen(true)} className="w-full gap-2 sm:w-auto">
             <Plus className="h-4 w-4" />
             Add dates I can't serve
           </Button>
