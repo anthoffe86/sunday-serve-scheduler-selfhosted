@@ -1,12 +1,16 @@
-import { useState, useEffect } from 'react';
-import { Loader2, Save, Key, Mail, Check, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
+import { Loader2, Save, Key, Mail, CalendarHeart, CalendarX, Plus, MoreVertical } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Calendar } from '@/components/ui/calendar';
-import { Badge } from '@/components/ui/badge';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import {
   Dialog,
   DialogContent,
@@ -36,7 +40,9 @@ import {
 } from '@/hooks/useVolunteerData';
 import { ROLE_LABELS } from '@/types';
 import type { Database } from '@/integrations/supabase/types';
-import { format, isSameDay, startOfMonth, endOfMonth, eachDayOfInterval, isSunday, addMonths, subMonths } from 'date-fns';
+import { format, parseISO, differenceInDays, addDays } from 'date-fns';
+import { AddUnavailableDatesDialog } from '@/components/AddUnavailableDatesDialog';
+import { EditUnavailableDateDialog } from '@/components/EditUnavailableDateDialog';
 
 type ServiceRole = Database['public']['Enums']['service_role'];
 
@@ -68,7 +74,9 @@ export function EditVolunteerDialog({
   const [selectedFamilyGroup, setSelectedFamilyGroup] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [resetLinkCopied, setResetLinkCopied] = useState(false);
-  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [editingRange, setEditingRange] = useState<{ startDate: string; notes?: string | null } | null>(null);
+  
 
   const updateProfile = useAdminUpdateProfile();
   const { data: rolePrefs, refetch: refetchRolePrefs } = useUserRolePreferences(volunteer?.user_id);
@@ -188,35 +196,129 @@ export function EditVolunteerDialog({
     }
   };
 
-  const getAvailabilityForDate = (date: Date) => {
-    const dateStr = format(date, 'yyyy-MM-dd');
-    return availability?.find(a => a.date === dateStr);
+  // Get unavailable dates as grouped ranges (similar to volunteer's view)
+  const unavailableRanges = useMemo(() => {
+    if (!availability) return [];
+    
+    // Filter to only unavailable dates and sort
+    const unavailableDates = availability
+      .filter(a => a.available === false)
+      .sort((a, b) => a.date.localeCompare(b.date));
+    
+    if (unavailableDates.length === 0) return [];
+    
+    // Group consecutive dates with the same notes
+    const ranges: { startDate: string; endDate: string; notes?: string | null }[] = [];
+    let currentRange: { startDate: string; endDate: string; notes?: string | null } | null = null;
+    
+    for (const item of unavailableDates) {
+      if (!currentRange) {
+        currentRange = { startDate: item.date, endDate: item.date, notes: item.notes };
+      } else {
+        const prevDate = parseISO(currentRange.endDate);
+        const currDate = parseISO(item.date);
+        const dayDiff = differenceInDays(currDate, prevDate);
+        
+        if (dayDiff === 1 && currentRange.notes === item.notes) {
+          currentRange.endDate = item.date;
+        } else {
+          ranges.push(currentRange);
+          currentRange = { startDate: item.date, endDate: item.date, notes: item.notes };
+        }
+      }
+    }
+    
+    if (currentRange) {
+      ranges.push(currentRange);
+    }
+    
+    return ranges;
+  }, [availability]);
+
+  const existingDates = useMemo(() => {
+    return availability?.filter(a => a.available === false).map(a => a.date) || [];
+  }, [availability]);
+
+  const handleAddUnavailableDates = async (dates: string[], notes?: string) => {
+    if (!volunteer) return;
+    
+    // Insert each date as unavailable
+    const records = dates.map(date => ({
+      user_id: volunteer.user_id,
+      date,
+      available: false,
+      notes: notes || null,
+    }));
+    
+    const { error } = await supabase
+      .from('availability')
+      .upsert(records, { onConflict: 'user_id,date' });
+    
+    if (error) {
+      toast.error('Failed to add unavailable dates');
+      throw error;
+    }
+    
+    toast.success('Unavailable dates added');
+    refetchAvailability();
   };
 
-  const handleToggleAvailability = async (date: Date, setAvailable: boolean | null) => {
+  const handleRemoveRange = async (startDate: string, endDate: string) => {
     if (!volunteer) return;
-
-    const dateStr = format(date, 'yyyy-MM-dd');
     
-    try {
-      if (setAvailable === null) {
-        // Delete the availability record (reset to unset)
-        await deleteAvailability.mutateAsync({
-          userId: volunteer.user_id,
-          date: dateStr,
-        });
-      } else {
-        // Set available or unavailable
-        await toggleAvailability.mutateAsync({
-          userId: volunteer.user_id,
-          date: dateStr,
-          available: setAvailable,
-        });
-      }
-      refetchAvailability();
-    } catch (err) {
-      // Error is already handled by the mutation
+    // Get all dates in the range
+    const start = parseISO(startDate);
+    const end = parseISO(endDate);
+    const dates: string[] = [];
+    let current = start;
+    while (current <= end) {
+      dates.push(format(current, 'yyyy-MM-dd'));
+      current = addDays(current, 1);
     }
+    
+    // Delete all dates in the range
+    const { error } = await supabase
+      .from('availability')
+      .delete()
+      .eq('user_id', volunteer.user_id)
+      .in('date', dates);
+    
+    if (error) {
+      toast.error('Failed to remove dates');
+      return;
+    }
+    
+    toast.success('Dates removed');
+    refetchAvailability();
+  };
+
+  const handleUpdateNotes = async (startDate: string, endDate: string, notes?: string) => {
+    if (!volunteer) return;
+    
+    // Get all dates in the range
+    const start = parseISO(startDate);
+    const end = parseISO(endDate);
+    const dates: string[] = [];
+    let current = start;
+    while (current <= end) {
+      dates.push(format(current, 'yyyy-MM-dd'));
+      current = addDays(current, 1);
+    }
+    
+    // Update notes for all dates in the range
+    const { error } = await supabase
+      .from('availability')
+      .update({ notes: notes || null })
+      .eq('user_id', volunteer.user_id)
+      .in('date', dates);
+    
+    if (error) {
+      toast.error('Failed to update notes');
+      throw error;
+    }
+    
+    toast.success('Notes updated');
+    refetchAvailability();
   };
 
   const handleClose = () => {
@@ -225,20 +327,11 @@ export function EditVolunteerDialog({
     setSelectedRoles([]);
     setSelectedFamilyGroup(null);
     setResetLinkCopied(false);
+    setEditingRange(null);
     onOpenChange(false);
   };
 
-  // Get Sundays in current month for quick access
-  const getSundaysInMonth = () => {
-    const start = startOfMonth(currentMonth);
-    const end = endOfMonth(currentMonth);
-    const days = eachDayOfInterval({ start, end });
-    return days.filter(isSunday);
-  };
-
   if (!volunteer) return null;
-
-  const sundays = getSundaysInMonth();
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -330,100 +423,100 @@ export function EditVolunteerDialog({
           </TabsContent>
 
           <TabsContent value="availability" className="space-y-4 pt-4">
-            {/* Month Navigation */}
-            <div className="flex items-center justify-between">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <h3 className="font-serif text-lg font-semibold">
-                {format(currentMonth, 'MMMM yyyy')}
-              </h3>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
-              >
-                <ChevronRight className="h-4 w-4" />
+            {/* Default Available Banner */}
+            <div className="flex items-center gap-3 rounded-lg border border-primary/20 bg-primary/5 p-3">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10">
+                <CalendarHeart className="h-4 w-4 text-primary" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium">Available by default</p>
+                <p className="text-xs text-muted-foreground">Add dates they can't serve</p>
+              </div>
+              <Button size="sm" onClick={() => setIsAddDialogOpen(true)} className="gap-1.5 shrink-0">
+                <Plus className="h-3.5 w-3.5" />
+                Add
               </Button>
             </div>
 
-            {/* Legend */}
-            <div className="flex flex-wrap gap-4 text-sm">
-              <div className="flex items-center gap-2">
-                <div className="h-3 w-3 rounded-full bg-status-available" />
-                <span>Available</span>
+            {/* Unavailable Dates List */}
+            {unavailableRanges.length === 0 ? (
+              <div className="py-6 text-center text-sm text-muted-foreground">
+                No unavailable dates recorded
               </div>
-              <div className="flex items-center gap-2">
-                <div className="h-3 w-3 rounded-full bg-status-unavailable" />
-                <span>Unavailable</span>
-              </div>
-            </div>
-
-            {/* Sundays Grid */}
-            <div className="grid gap-3 sm:grid-cols-2">
-              {sundays.length === 0 ? (
-                <p className="col-span-2 py-8 text-center text-muted-foreground">
-                  No Sundays in this month.
-                </p>
-              ) : (
-                sundays.map((sunday) => {
-                  const avail = getAvailabilityForDate(sunday);
-                  const isAvailable = avail?.available !== false; // Available by default
+            ) : (
+              <div className="space-y-2">
+                {unavailableRanges.map((range) => {
+                  const startDate = parseISO(range.startDate);
+                  const endDate = parseISO(range.endDate);
+                  const isRange = range.startDate !== range.endDate;
+                  
+                  const label = isRange
+                    ? `${format(startDate, 'MMM d')} – ${format(endDate, 'MMM d, yyyy')}`
+                    : format(startDate, 'MMM d, yyyy');
 
                   return (
                     <div
-                      key={sunday.toISOString()}
-                      className={cn(
-                        'group relative rounded-xl border-2 p-4 transition-all',
-                        isAvailable
-                          ? 'border-status-available/30 bg-status-available/5 hover:border-status-available/50'
-                          : 'border-status-unavailable/30 bg-status-unavailable/5 hover:border-status-unavailable/50'
-                      )}
+                      key={`${range.startDate}-${range.endDate}`}
+                      className="group flex items-center justify-between rounded-lg border bg-card p-3"
                     >
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <p className="font-serif text-lg font-semibold">
-                            {format(sunday, 'd')}
-                          </p>
-                          <p className="text-sm text-muted-foreground">
-                            {format(sunday, 'MMMM')}
-                          </p>
+                      <div className="flex items-start gap-2 min-w-0">
+                        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-destructive/10">
+                          <CalendarX className="h-3.5 w-3.5 text-destructive" />
                         </div>
-
-                        <Button
-                          variant={isAvailable ? 'outline' : 'secondary'}
-                          size="sm"
-                          onClick={() => handleToggleAvailability(sunday, !isAvailable)}
-                          disabled={toggleAvailability.isPending || deleteAvailability.isPending}
-                          className={cn(
-                            'gap-1.5',
-                            isAvailable
-                              ? 'border-status-available text-status-available hover:bg-status-available hover:text-white'
-                              : 'border-status-unavailable text-status-unavailable hover:bg-status-unavailable hover:text-white'
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium">{label}</p>
+                          {range.notes && (
+                            <p className="text-xs text-muted-foreground line-clamp-1">{range.notes}</p>
                           )}
-                        >
-                          {isAvailable ? (
-                            <>
-                              <Check className="h-3.5 w-3.5" />
-                              Available
-                            </>
-                          ) : (
-                            <>
-                              <X className="h-3.5 w-3.5" />
-                              Unavailable
-                            </>
-                          )}
-                        </Button>
+                        </div>
                       </div>
+
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0">
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => setEditingRange({ startDate: range.startDate, notes: range.notes })}>
+                            Edit notes
+                          </DropdownMenuItem>
+                          <DropdownMenuItem 
+                            className="text-destructive"
+                            onClick={() => handleRemoveRange(range.startDate, range.endDate)}
+                          >
+                            Remove
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
                   );
-                })
-              )}
-            </div>
+                })}
+              </div>
+            )}
+
+            {/* Add Unavailable Dates Dialog */}
+            <AddUnavailableDatesDialog
+              open={isAddDialogOpen}
+              onOpenChange={setIsAddDialogOpen}
+              onSave={handleAddUnavailableDates}
+              existingDates={existingDates}
+            />
+
+            {/* Edit Notes Dialog */}
+            <EditUnavailableDateDialog
+              open={!!editingRange}
+              onOpenChange={(open) => !open && setEditingRange(null)}
+              currentNotes={editingRange?.notes}
+              onSave={async (notes) => {
+                if (editingRange) {
+                  const range = unavailableRanges.find(r => r.startDate === editingRange.startDate);
+                  if (range) {
+                    await handleUpdateNotes(range.startDate, range.endDate, notes);
+                  }
+                }
+              }}
+            />
           </TabsContent>
 
           <TabsContent value="account" className="space-y-4 pt-4">
