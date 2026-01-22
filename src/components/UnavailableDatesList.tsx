@@ -153,21 +153,29 @@ export function UnavailableDatesList({
             ? `${format(startDate, 'EEE, MMM d')} – ${format(endDate, 'EEE, MMM d, yyyy')}`
             : format(startDate, 'EEEE, MMMM d, yyyy');
 
+          // Format label differently for mobile
+          const mobileLabel = isRange
+            ? `${format(startDate, 'MMM d')} – ${format(endDate, 'MMM d, yyyy')}`
+            : format(startDate, 'MMM d, yyyy');
+
           return (
             <div
               key={`${range.startDate}-${range.endDate}`}
               className={cn(
-                "group flex items-center justify-between rounded-lg border bg-card p-4 transition-colors hover:bg-muted/50"
+                "group flex items-center justify-between rounded-lg border bg-card p-3 transition-colors hover:bg-muted/50 sm:p-4"
               )}
             >
-              <div className="flex items-start gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-destructive/10">
-                  <CalendarX className="h-5 w-5 text-destructive" />
+              <div className="flex items-start gap-2 sm:gap-3">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-destructive/10 sm:h-10 sm:w-10">
+                  <CalendarX className="h-4 w-4 text-destructive sm:h-5 sm:w-5" />
                 </div>
-                <div>
-                  <p className="font-medium">{label}</p>
+                <div className="min-w-0">
+                  <p className="font-medium text-sm sm:text-base">
+                    <span className="sm:hidden">{mobileLabel}</span>
+                    <span className="hidden sm:inline">{label}</span>
+                  </p>
                   {range.notes && (
-                    <p className="mt-0.5 text-sm text-muted-foreground">{range.notes}</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground sm:text-sm line-clamp-1">{range.notes}</p>
                   )}
                   {isRange && (
                     <p className="mt-0.5 text-xs text-muted-foreground">
@@ -179,7 +187,7 @@ export function UnavailableDatesList({
 
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="opacity-0 group-hover:opacity-100">
+                  <Button variant="ghost" size="icon" className="shrink-0 opacity-100 sm:opacity-0 sm:group-hover:opacity-100">
                     <MoreVertical className="h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
