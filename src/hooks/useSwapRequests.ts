@@ -9,12 +9,21 @@ export interface SwapRequest {
   assignment_id: string | null;
   from_user_id: string;
   to_user_id: string | null;
+  offered_assignment_id: string | null;
   status: 'pending' | 'approved' | 'denied';
   notes: string | null;
   approved_by: string | null;
   approved_at: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface OfferedAssignmentDetails {
+  id: string;
+  event_name: string;
+  event_date: string;
+  event_start_time: string;
+  role: string;
 }
 
 export interface SwapRequestWithDetails extends SwapRequest {
@@ -25,6 +34,7 @@ export interface SwapRequestWithDetails extends SwapRequest {
   event_date: string;
   event_start_time: string;
   role: string;
+  offered_assignment?: OfferedAssignmentDetails;
 }
 
 // Fetch all swap requests visible to the current user
@@ -45,17 +55,18 @@ export function useSwapRequests() {
       if (error) throw error;
       if (!swapRequests || swapRequests.length === 0) return [];
 
-      // Get all event assignments
-      const eventAssignmentIds = swapRequests
-        .map((sr) => sr.event_assignment_id)
-        .filter(Boolean) as string[];
+      // Get all event assignments (including offered ones)
+      const allAssignmentIds = [
+        ...swapRequests.map((sr) => sr.event_assignment_id).filter(Boolean),
+        ...swapRequests.map((sr) => sr.offered_assignment_id).filter(Boolean),
+      ] as string[];
 
-      if (eventAssignmentIds.length === 0) return [];
+      if (allAssignmentIds.length === 0) return [];
 
       const { data: assignments, error: assignmentsError } = await supabase
         .from('event_assignments')
         .select('*')
-        .in('id', eventAssignmentIds);
+        .in('id', allAssignmentIds);
 
       if (assignmentsError) throw assignmentsError;
 
@@ -97,6 +108,24 @@ export function useSwapRequests() {
             ? profiles?.find((p) => p.user_id === sr.to_user_id)
             : null;
 
+          // Get offered assignment details if present
+          let offeredAssignmentDetails: OfferedAssignmentDetails | undefined;
+          if (sr.offered_assignment_id) {
+            const offeredAssignment = assignments?.find((a) => a.id === sr.offered_assignment_id);
+            if (offeredAssignment) {
+              const offeredEvent = events?.find((e) => e.id === offeredAssignment.event_id);
+              if (offeredEvent) {
+                offeredAssignmentDetails = {
+                  id: offeredAssignment.id,
+                  event_name: offeredEvent.name,
+                  event_date: offeredEvent.date,
+                  event_start_time: offeredEvent.start_time,
+                  role: offeredAssignment.role,
+                };
+              }
+            }
+          }
+
           return {
             ...sr,
             from_user_name: fromProfile?.name || 'Unknown',
@@ -106,6 +135,7 @@ export function useSwapRequests() {
             event_date: event.date,
             event_start_time: event.start_time,
             role: assignment.role,
+            offered_assignment: offeredAssignmentDetails,
           };
         })
         .filter(Boolean) as SwapRequestWithDetails[];
@@ -180,7 +210,7 @@ export function useCreateSwapRequest() {
   });
 }
 
-// Accept a swap request
+// Accept a swap request (legacy - direct takeover without offering an assignment)
 export function useAcceptSwapRequest() {
   const queryClient = useQueryClient();
 
@@ -205,6 +235,78 @@ export function useAcceptSwapRequest() {
     },
     onError: (error) => {
       toast.error('Failed to accept swap: ' + error.message);
+    },
+  });
+}
+
+// Offer your assignment in exchange for a swap (new two-step flow)
+export function useOfferSwap() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      swapRequestId,
+      offeredAssignmentId,
+    }: {
+      swapRequestId: string;
+      offeredAssignmentId: string;
+    }) => {
+      const { data: result, error } = await supabase.functions.invoke('offer-swap', {
+        body: {
+          swapRequestId,
+          offeredAssignmentId,
+          baseUrl: window.location.origin,
+        },
+      });
+
+      if (error) throw error;
+      if (result?.error) throw new Error(result.error);
+
+      return result as { success: boolean; swapRequestId: string; offeredAssignmentId: string };
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['swap-requests'] });
+      queryClient.invalidateQueries({ queryKey: ['events'] });
+      toast.success('Swap offer submitted! The original volunteer will be notified.');
+    },
+    onError: (error) => {
+      toast.error('Failed to offer swap: ' + error.message);
+    },
+  });
+}
+
+// Confirm or reject a swap offer (original requester responds)
+export function useConfirmSwap() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      swapRequestId,
+      accept,
+    }: {
+      swapRequestId: string;
+      accept: boolean;
+    }) => {
+      const { data: result, error } = await supabase.functions.invoke('confirm-swap', {
+        body: {
+          swapRequestId,
+          accept,
+          baseUrl: window.location.origin,
+        },
+      });
+
+      if (error) throw error;
+      if (result?.error) throw new Error(result.error);
+
+      return result as { success: boolean; action: string; message: string };
+    },
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ['swap-requests'] });
+      queryClient.invalidateQueries({ queryKey: ['events'] });
+      toast.success(result.message);
+    },
+    onError: (error) => {
+      toast.error('Failed to process swap: ' + error.message);
     },
   });
 }
@@ -279,5 +381,58 @@ export function useExistingSwapRequest(eventAssignmentId?: string) {
       return data;
     },
     enabled: !!user && !!eventAssignmentId,
+  });
+}
+
+// Fetch user's assignments for offering in swaps
+export function useUserAssignmentsForSwap() {
+  const { user } = useAuth();
+
+  return useQuery({
+    queryKey: ['user-assignments-for-swap', user?.id],
+    queryFn: async () => {
+      if (!user) return [];
+
+      const today = new Date().toISOString().split('T')[0];
+
+      const { data: assignments, error: assignmentsError } = await supabase
+        .from('event_assignments')
+        .select('id, role, volunteer_id, event_id')
+        .eq('volunteer_id', user.id);
+
+      if (assignmentsError) throw assignmentsError;
+      if (!assignments || assignments.length === 0) return [];
+
+      const eventIds = [...new Set(assignments.map((a) => a.event_id))];
+      const { data: events, error: eventsError } = await supabase
+        .from('events')
+        .select('id, name, date, start_time, status')
+        .in('id', eventIds)
+        .gte('date', today)
+        .order('date', { ascending: true });
+
+      if (eventsError) throw eventsError;
+
+      // Combine assignments with event details
+      const assignmentsWithEvents = assignments
+        .map((a) => {
+          const event = events?.find((e) => e.id === a.event_id);
+          if (!event) return null;
+          return {
+            id: a.id,
+            role: a.role,
+            event_id: a.event_id,
+            event_name: event.name,
+            event_date: event.date,
+            event_start_time: event.start_time,
+            event_status: event.status,
+          };
+        })
+        .filter(Boolean)
+        .sort((a, b) => a!.event_date.localeCompare(b!.event_date));
+
+      return assignmentsWithEvents;
+    },
+    enabled: !!user,
   });
 }
