@@ -483,6 +483,7 @@ export type Database = {
           from_user_id: string
           id: string
           notes: string | null
+          offered_assignment_id: string | null
           status: Database["public"]["Enums"]["swap_status"]
           to_user_id: string | null
           updated_at: string
@@ -496,6 +497,7 @@ export type Database = {
           from_user_id: string
           id?: string
           notes?: string | null
+          offered_assignment_id?: string | null
           status?: Database["public"]["Enums"]["swap_status"]
           to_user_id?: string | null
           updated_at?: string
@@ -509,6 +511,7 @@ export type Database = {
           from_user_id?: string
           id?: string
           notes?: string | null
+          offered_assignment_id?: string | null
           status?: Database["public"]["Enums"]["swap_status"]
           to_user_id?: string | null
           updated_at?: string
@@ -531,6 +534,20 @@ export type Database = {
           {
             foreignKeyName: "swap_requests_event_assignment_id_fkey"
             columns: ["event_assignment_id"]
+            isOneToOne: false
+            referencedRelation: "event_assignments_safe"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "swap_requests_offered_assignment_id_fkey"
+            columns: ["offered_assignment_id"]
+            isOneToOne: false
+            referencedRelation: "event_assignments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "swap_requests_offered_assignment_id_fkey"
+            columns: ["offered_assignment_id"]
             isOneToOne: false
             referencedRelation: "event_assignments_safe"
             referencedColumns: ["id"]
