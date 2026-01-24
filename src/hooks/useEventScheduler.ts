@@ -393,7 +393,7 @@ export function useEvents(options?: { startDate?: string; endDate?: string; stat
 
       const [rolesResult, assignmentsResult, profilesResult] = await Promise.all([
         supabase.from('event_roles').select('*').in('event_id', eventIds),
-        supabase.from('event_assignments').select('*').in('event_id', eventIds),
+        supabase.from('event_assignments_safe').select('*').in('event_id', eventIds),
         supabase.from('profiles').select('user_id, name, email'),
       ]);
 

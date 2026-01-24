@@ -61,7 +61,30 @@ const handler = async (req: Request): Promise<Response> => {
 
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+    // Verify user authentication
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
+    const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } }
+    });
+    
+    const { data: { user }, error: authError } = await supabaseAuth.auth.getUser();
+    if (authError || !user) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // Check if email notifications are enabled
@@ -92,6 +115,24 @@ const handler = async (req: Request): Promise<Response> => {
         JSON.stringify({ error: "Swap request not found" }),
         { status: 404, headers: { "Content-Type": "application/json", ...corsHeaders } }
       );
+    }
+
+    // Verify the authenticated user is the one making the offer (to_user_id)
+    if (swapRequest.to_user_id !== user.id) {
+      // Check if user is admin
+      const { data: adminCheck } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id)
+        .eq('role', 'admin')
+        .maybeSingle();
+      
+      if (!adminCheck) {
+        return new Response(
+          JSON.stringify({ error: 'Forbidden: You can only send notifications for your own swap offers' }),
+          { status: 403, headers: { "Content-Type": "application/json", ...corsHeaders } }
+        );
+      }
     }
 
     if (!swapRequest.to_user_id || !swapRequest.offered_assignment_id) {

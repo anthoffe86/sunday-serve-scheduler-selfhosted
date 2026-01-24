@@ -47,7 +47,30 @@ const handler = async (req: Request): Promise<Response> => {
 
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+    // Verify user authentication (any authenticated user can trigger swap notifications for their own swaps)
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
+    const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } }
+    });
+    
+    const { data: { user }, error: authError } = await supabaseAuth.auth.getUser();
+    if (authError || !user) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // Check if email notifications are enabled by admin
@@ -92,6 +115,24 @@ const handler = async (req: Request): Promise<Response> => {
         JSON.stringify({ error: "Swap request not found" }),
         { status: 404, headers: { "Content-Type": "application/json", ...corsHeaders } }
       );
+    }
+
+    // Verify the authenticated user owns this swap request
+    if (swapRequest.from_user_id !== user.id) {
+      // Check if user is admin
+      const { data: adminCheck } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id)
+        .eq('role', 'admin')
+        .maybeSingle();
+      
+      if (!adminCheck) {
+        return new Response(
+          JSON.stringify({ error: 'Forbidden: You can only send notifications for your own swap requests' }),
+          { status: 403, headers: { "Content-Type": "application/json", ...corsHeaders } }
+        );
+      }
     }
 
     // Get the event assignment details
@@ -189,10 +230,6 @@ const handler = async (req: Request): Promise<Response> => {
     // If no availability record exists for a date, we assume they're available
     const eligibleProfiles = allProfiles.filter((profile) => {
       const hasRolePreference = rolePreferenceUserIds.includes(profile.user_id);
-
-      // Check if they have explicitly marked themselves as unavailable
-      // If no record, assume available. If record says available=true, they're available.
-      const hasExplicitAvailability = availableUserIds.includes(profile.user_id);
 
       // For now, let's send to all volunteers with the role preference
       // This is more inclusive and ensures the swap gets coverage
