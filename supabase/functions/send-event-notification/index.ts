@@ -43,21 +43,6 @@ const ROLE_LABELS: Record<string, string> = {
   "collection": "Collection",
 };
 
-interface Assignment {
-  volunteer_id: string;
-  volunteer_name: string;
-  volunteer_email: string;
-  role: string;
-}
-
-interface EventInfo {
-  id: string;
-  name: string;
-  date: string;
-  start_time: string;
-  assignments: Assignment[];
-}
-
 interface NotificationRequest {
   eventIds: string[];
   baseUrl: string;
@@ -90,8 +75,47 @@ const handler = async (req: Request): Promise<Response> => {
 
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+    // Verify admin authorization
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
+    const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } }
+    });
+    
+    const { data: { user }, error: authError } = await supabaseAuth.auth.getUser();
+    if (authError || !user) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
+    // Use service role client
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    
+    // Check admin status
+    const { data: adminCheck } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id)
+      .eq('role', 'admin')
+      .maybeSingle();
+    
+    if (!adminCheck) {
+      return new Response(
+        JSON.stringify({ error: 'Forbidden: Admin access required' }),
+        { status: 403, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
 
     const { eventIds, baseUrl, userIds }: NotificationRequest = await req.json();
 

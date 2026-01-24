@@ -64,7 +64,7 @@ export function useSwapRequests() {
       if (allAssignmentIds.length === 0) return [];
 
       const { data: assignments, error: assignmentsError } = await supabase
-        .from('event_assignments')
+        .from('event_assignments_safe')
         .select('*')
         .in('id', allAssignmentIds);
 
