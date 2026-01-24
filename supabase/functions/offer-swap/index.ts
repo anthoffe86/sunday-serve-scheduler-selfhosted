@@ -118,6 +118,18 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Verify the offered assignment is on a DIFFERENT day than the original
+    // The point of a swap is to trade days, not just roles on the same day
+    const originalDate = (originalAssignment.events as any).date;
+    const offeredDate = (offeredAssignment.events as any).date;
+    
+    if (originalDate === offeredDate) {
+      return new Response(
+        JSON.stringify({ error: "You must offer an assignment from a different day. Swaps are meant to trade days, not just roles." }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     // Verify the accepting user has the role preference for the original assignment
     const { data: accepterRolePref } = await supabaseAdmin
       .from("role_preferences")

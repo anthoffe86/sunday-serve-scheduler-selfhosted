@@ -513,32 +513,40 @@ const Swaps = () => {
                   <div className="flex items-center justify-center py-4">
                     <Loader2 className="h-5 w-5 animate-spin" />
                   </div>
-                ) : userAssignments && userAssignments.length > 0 ? (
-                  <Select value={selectedAssignmentId} onValueChange={setSelectedAssignmentId}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Choose an assignment..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {userAssignments.map((assignment) => (
-                        <SelectItem key={assignment!.id} value={assignment!.id}>
-                          <div className="flex flex-col">
-                            <span className="font-medium">
-                              {ROLE_LABELS[assignment!.role as Role] || assignment!.role} - {assignment!.event_name}
-                            </span>
-                            <span className="text-xs text-muted-foreground">
-                              {format(parseISO(assignment!.event_date), 'EEE, MMM d')} at{' '}
-                              {formatTime(assignment!.event_start_time)}
-                            </span>
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                ) : (
-                  <p className="text-sm text-muted-foreground py-4 text-center">
-                    You don't have any upcoming assignments to offer.
-                  </p>
-                )}
+                ) : (() => {
+                  // Filter out assignments on the same date as the swap request
+                  // The point of a swap is to trade days, not just roles
+                  const eligibleAssignments = userAssignments?.filter(
+                    (a) => a!.event_date !== selectedSwapRequest?.event_date
+                  );
+                  
+                  return eligibleAssignments && eligibleAssignments.length > 0 ? (
+                    <Select value={selectedAssignmentId} onValueChange={setSelectedAssignmentId}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Choose an assignment..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {eligibleAssignments.map((assignment) => (
+                          <SelectItem key={assignment!.id} value={assignment!.id}>
+                            <div className="flex flex-col">
+                              <span className="font-medium">
+                                {ROLE_LABELS[assignment!.role as Role] || assignment!.role} - {assignment!.event_name}
+                              </span>
+                              <span className="text-xs text-muted-foreground">
+                                {format(parseISO(assignment!.event_date), 'EEE, MMM d')} at{' '}
+                                {formatTime(assignment!.event_start_time)}
+                              </span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <p className="text-sm text-muted-foreground py-4 text-center">
+                      You don't have any assignments on a different day to offer.
+                    </p>
+                  );
+                })()}
               </div>
             </div>
           )}
