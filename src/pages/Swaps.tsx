@@ -60,6 +60,11 @@ const Swaps = () => {
   const myRequestsWithOffers = myRequests.filter((s) => s.offered_assignment && s.status === 'pending');
   const myRequestsPending = myRequests.filter((s) => !s.offered_assignment || s.status !== 'pending');
   
+  // Swaps where I made an offer (to_user_id is me, and there's an offered_assignment)
+  const myOfferedSwaps = swapRequests?.filter(
+    (s) => s.to_user_id === user?.id && s.offered_assignment && s.status === 'pending'
+  ) || [];
+  
   const incomingRequests = swapRequests?.filter(
     (s) => s.from_user_id !== user?.id && s.status === 'pending' && !s.to_user_id
   ) || [];
@@ -371,6 +376,80 @@ const Swaps = () => {
           <div className="grid gap-4">
             {incomingRequests.map((swap) => (
               <SwapCard key={swap.id} swap={swap} isMyRequest={false} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* My Offered Swaps - swaps where I've made an offer and waiting for response */}
+      {myOfferedSwaps.length > 0 && (
+        <div className="space-y-4">
+          <h2 className="font-serif text-xl font-semibold flex items-center gap-2">
+            <Gift className="h-5 w-5 text-blue-500" />
+            My Pending Offers
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            You've offered to swap - waiting for the other volunteer to respond
+          </p>
+          <div className="grid gap-4">
+            {myOfferedSwaps.map((swap) => (
+              <Card key={swap.id} className="overflow-hidden">
+                <CardContent className="p-0">
+                  <div className="flex">
+                    {/* Date Block */}
+                    <div className="flex flex-col items-center justify-center px-4 py-4 min-w-[72px] bg-blue-50">
+                      <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        {format(parseISO(swap.event_date), 'EEE')}
+                      </span>
+                      <span className="text-2xl font-bold">{format(parseISO(swap.event_date), 'd')}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {format(parseISO(swap.event_date), 'MMM')}
+                      </span>
+                    </div>
+
+                    {/* Content */}
+                    <div className="flex-1 p-4">
+                      <div className="flex flex-wrap items-center gap-2 mb-2">
+                        <RoleBadge role={swap.role as Role} />
+                        <Badge variant="outline" className="gap-1 border-blue-500 text-blue-600">
+                          <Clock className="h-3 w-3" />
+                          Offer Sent
+                        </Badge>
+                      </div>
+
+                      <h3 className="font-serif text-lg font-semibold mb-1">{swap.event_name}</h3>
+
+                      <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground mb-3">
+                        <span className="flex items-center gap-1.5">
+                          <Clock className="h-4 w-4" />
+                          {formatTime(swap.event_start_time)}
+                        </span>
+                        <span className="flex items-center gap-1.5">
+                          <User className="h-4 w-4" />
+                          Requested by <span className="font-medium text-foreground">{swap.from_user_name}</span>
+                        </span>
+                      </div>
+
+                      {/* Show what I offered */}
+                      {swap.offered_assignment && (
+                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                          <p className="text-sm font-medium text-blue-800 mb-2">You offered:</p>
+                          <div className="bg-white rounded p-2 text-sm">
+                            <div className="flex items-center gap-2 mb-1">
+                              <RoleBadge role={swap.offered_assignment.role as Role} />
+                            </div>
+                            <p className="font-medium">{swap.offered_assignment.event_name}</p>
+                            <p className="text-muted-foreground">
+                              {format(parseISO(swap.offered_assignment.event_date), 'EEE, MMM d, yyyy')} at{' '}
+                              {formatTime(swap.offered_assignment.event_start_time)}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
             ))}
           </div>
         </div>
