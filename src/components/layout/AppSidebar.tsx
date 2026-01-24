@@ -76,18 +76,18 @@ export function AppSidebar({ isOpen, onClose }: AppSidebarProps) {
       {/* Sidebar */}
       <aside
         className={cn(
-          'fixed left-0 top-0 z-50 h-full w-64 transform border-r bg-sidebar transition-transform duration-200 ease-in-out md:relative md:translate-x-0',
+          'fixed left-0 top-0 z-50 flex h-full w-64 flex-col border-r bg-sidebar transition-transform duration-200 ease-in-out md:relative md:translate-x-0',
           isOpen ? 'translate-x-0' : '-translate-x-full'
         )}
       >
-        <div className="flex h-16 items-center justify-between border-b px-4 md:hidden">
+        <div className="flex h-16 shrink-0 items-center justify-between border-b px-4 md:hidden">
           <span className="font-serif text-lg font-semibold">Menu</span>
           <Button variant="ghost" size="icon" onClick={onClose}>
             <X className="h-5 w-5" />
           </Button>
         </div>
 
-        <nav className="flex flex-col gap-1 p-4">
+        <nav className="flex flex-1 flex-col gap-1 overflow-y-auto p-4 pb-8">
           <p className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             Volunteer
           </p>
