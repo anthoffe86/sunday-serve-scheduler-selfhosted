@@ -22,7 +22,7 @@ interface AppSidebarProps {
 }
 
 const volunteerNav = [
-  { to: '/', icon: Home, label: 'Dashboard' },
+  { to: '/dashboard', icon: Home, label: 'Dashboard' },
   { to: '/schedule', icon: CalendarDays, label: 'Schedule' },
   { to: '/invitations', icon: Mail, label: 'Invitations' },
   { to: '/availability', icon: CalendarCheck, label: 'My Availability' },
