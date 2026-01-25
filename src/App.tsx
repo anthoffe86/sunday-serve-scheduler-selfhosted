@@ -7,6 +7,7 @@ import { BrowserRouter, Routes, Route, useLocation, useNavigate } from "react-ro
 import { AuthProvider } from "@/hooks/useAuth";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AppLayout } from "@/components/layout/AppLayout";
+import Landing from "./pages/Landing";
 import Dashboard from "./pages/Dashboard";
 import Schedule from "./pages/Schedule";
 import Availability from "./pages/Availability";
@@ -59,6 +60,7 @@ const App = () => (
           <UrlNormalizer />
           <Routes>
             {/* Public routes - accessible without authentication */}
+            <Route path="/" element={<Landing />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/invite" element={<InviteSignup />} />
             {/* Backwards-compatible alias for older emails */}
@@ -71,7 +73,7 @@ const App = () => (
                 <AppLayout />
               </ProtectedRoute>
             }>
-              <Route path="/" element={<Dashboard />} />
+              <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/schedule" element={<Schedule />} />
               <Route path="/availability" element={<Availability />} />
               <Route path="/swaps" element={<Swaps />} />

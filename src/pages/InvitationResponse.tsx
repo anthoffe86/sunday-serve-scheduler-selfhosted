@@ -174,7 +174,7 @@ const InvitationResponse = () => {
               <Button onClick={() => navigate('/schedule')} className="w-full">
                 View Your Schedule
               </Button>
-              <Button variant="outline" onClick={() => navigate('/')} className="w-full">
+              <Button variant="outline" onClick={() => navigate('/dashboard')} className="w-full">
                 Go to Dashboard
               </Button>
             </div>

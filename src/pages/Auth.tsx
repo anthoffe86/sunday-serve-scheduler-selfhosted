@@ -23,7 +23,7 @@ const Auth = () => {
 
   useEffect(() => {
     if (user && !isLoading) {
-      navigate('/');
+      navigate('/dashboard');
     }
   }, [user, isLoading, navigate]);
 
@@ -52,7 +52,7 @@ const Auth = () => {
       }
     } else {
       toast.success('Welcome back!');
-      navigate('/');
+      navigate('/dashboard');
     }
   };
 
