@@ -58,19 +58,12 @@ export function InviteVolunteerDialog({ open, onOpenChange, onSuccess }: InviteV
         return;
       }
 
-      // Check for existing unused invite
-      const { data: existingInvite } = await supabase
+      // Delete any existing unused invites for this email (allows re-inviting)
+      await supabase
         .from('invite_tokens')
-        .select('id')
+        .delete()
         .eq('email', email.trim().toLowerCase())
-        .is('used_at', null)
-        .maybeSingle();
-
-      if (existingInvite) {
-        toast.error('An invitation has already been sent to this email');
-        setIsSubmitting(false);
-        return;
-      }
+        .is('used_at', null);
 
       // Create invite token
       const { data: invite, error } = await supabase
