@@ -27,11 +27,15 @@ const Invitations = () => {
   const { user, isLoading: authLoading } = useAuth();
   const respondMutation = useRespondToInvitation();
   
+  console.log('[Invitations] Component rendered, user:', user?.id);
+  
    // Fetch pending invitations directly - this includes invitations for draft events
    const { data: pendingInvitations = [], isLoading: invitationsLoading } = useQuery({
      queryKey: ['pending-invitations', user?.id],
      queryFn: async () => {
        if (!user?.id) return [];
+       
+       console.log('[Invitations] Fetching pending invitations for user:', user.id);
        
        // Get all invited assignments for the current user
        const { data: assignments, error: assignmentsError } = await supabase
@@ -44,6 +48,8 @@ const Invitations = () => {
        if (assignmentsError) throw assignmentsError;
        if (!assignments || assignments.length === 0) return [];
        
+       console.log('[Invitations] Found assignments:', assignments);
+       
        // Get the events for these assignments
        const eventIds = [...new Set(assignments.map(a => a.event_id))];
        const { data: events, error: eventsError } = await supabase
@@ -52,6 +58,8 @@ const Invitations = () => {
          .in('id', eventIds);
        
        if (eventsError) throw eventsError;
+       
+       console.log('[Invitations] Found events:', events);
        
        // Create a map for easy lookup
        const eventsMap = new Map(events?.map(e => [e.id, e]) || []);
@@ -66,6 +74,7 @@ const Invitations = () => {
          .filter((item): item is NonNullable<typeof item> => item !== null)
          .sort((a, b) => a.event.date.localeCompare(b.event.date));
        
+       console.log('[Invitations] Returning result:', result);
        return result;
      },
      enabled: !!user?.id,
