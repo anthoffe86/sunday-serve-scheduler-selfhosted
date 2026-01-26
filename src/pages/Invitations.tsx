@@ -1,12 +1,14 @@
-import { useState, useMemo } from 'react';
+ import { useState } from 'react';
 import { Loader2, Mail, CheckCircle, XCircle, Calendar } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
+ import { useQuery } from '@tanstack/react-query';
+ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/hooks/useAuth';
-import { useEvents, useRespondToInvitation } from '@/hooks/useEventScheduler';
+ import { useRespondToInvitation } from '@/hooks/useEventScheduler';
 import { ROLE_LABELS } from '@/types';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -23,9 +25,52 @@ import {
 
 const Invitations = () => {
   const { user, isLoading: authLoading } = useAuth();
-  const { data: events, isLoading: eventsLoading } = useEvents();
   const respondMutation = useRespondToInvitation();
   
+   // Fetch pending invitations directly - this includes invitations for draft events
+   const { data: pendingInvitations = [], isLoading: invitationsLoading } = useQuery({
+     queryKey: ['pending-invitations', user?.id],
+     queryFn: async () => {
+       if (!user?.id) return [];
+       
+       // Get all invited assignments for the current user
+       const { data: assignments, error: assignmentsError } = await supabase
+         .from('event_assignments')
+         .select('id, role, invitation_token, event_id')
+         .eq('volunteer_id', user.id)
+         .eq('status', 'invited')
+         .order('event_id');
+       
+       if (assignmentsError) throw assignmentsError;
+       if (!assignments || assignments.length === 0) return [];
+       
+       // Get the events for these assignments
+       const eventIds = [...new Set(assignments.map(a => a.event_id))];
+       const { data: events, error: eventsError } = await supabase
+         .from('events')
+         .select('id, name, date, start_time')
+         .in('id', eventIds);
+       
+       if (eventsError) throw eventsError;
+       
+       // Create a map for easy lookup
+       const eventsMap = new Map(events?.map(e => [e.id, e]) || []);
+       
+       // Combine assignments with event data
+       const result = assignments
+         .map(assignment => {
+           const event = eventsMap.get(assignment.event_id);
+           if (!event) return null;
+           return { assignment, event };
+         })
+         .filter((item): item is NonNullable<typeof item> => item !== null)
+         .sort((a, b) => a.event.date.localeCompare(b.event.date));
+       
+       return result;
+     },
+     enabled: !!user?.id,
+   });
+   
   const [declineDialog, setDeclineDialog] = useState<{
     open: boolean;
     assignmentId: string;
@@ -35,31 +80,6 @@ const Invitations = () => {
     role: string;
   } | null>(null);
   const [declineReason, setDeclineReason] = useState('');
-
-  // Get pending invitations for the current user
-  const pendingInvitations = useMemo(() => {
-    if (!events || !user) return [];
-    
-    type InvitationItem = {
-      assignment: typeof events[0]['assignments'][0];
-      event: typeof events[0];
-    };
-    
-    const pending: InvitationItem[] = [];
-    
-    for (const event of events) {
-      for (const assignment of event.assignments) {
-        if (assignment.volunteer_id === user.id && assignment.status === 'invited') {
-          pending.push({ assignment, event });
-        }
-      }
-    }
-    
-    // Sort by date
-    pending.sort((a, b) => a.event.date.localeCompare(b.event.date));
-    
-    return pending;
-  }, [events, user]);
 
   const handleAccept = async (assignment: typeof pendingInvitations[0]['assignment']) => {
     if (!assignment.invitation_token) {
@@ -122,7 +142,7 @@ const Invitations = () => {
     return `${displayHour}:${minutes} ${ampm}`;
   };
 
-  if (authLoading || eventsLoading) {
+   if (authLoading || invitationsLoading) {
     return (
       <div className="flex items-center justify-center py-12">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />

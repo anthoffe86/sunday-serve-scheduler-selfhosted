@@ -505,6 +505,7 @@ export function useGenerateEvents() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['events'] });
+      queryClient.invalidateQueries({ queryKey: ['pending-invitations'] });
     },
   });
 }
