@@ -661,6 +661,7 @@ export type Database = {
         Returns: boolean
       }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
+      is_event_published: { Args: { _event_id: string }; Returns: boolean }
       is_same_family: {
         Args: { _user_id1: string; _user_id2: string }
         Returns: boolean
