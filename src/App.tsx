@@ -23,6 +23,8 @@ import AdminEventDetail from "./pages/admin/EventDetail";
 import AdminSwapManagement from "./pages/admin/SwapManagement";
 import AdminSettings from "./pages/admin/AdminSettings";
 import Auth from "./pages/Auth";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
 import InviteSignup from "./pages/InviteSignup";
 import NotFound from "./pages/NotFound";
 const queryClient = new QueryClient();
@@ -62,6 +64,8 @@ const App = () => (
             {/* Public routes - accessible without authentication */}
             <Route path="/" element={<Landing />} />
             <Route path="/auth" element={<Auth />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/invite" element={<InviteSignup />} />
             {/* Backwards-compatible alias for older emails */}
             <Route path="/invitation/respond" element={<InvitationResponse />} />

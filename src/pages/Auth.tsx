@@ -107,6 +107,15 @@ const Auth = () => {
                   required
                 />
               </div>
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => navigate('/forgot-password')}
+                  className="text-sm text-primary hover:underline"
+                >
+                  Forgot password?
+                </button>
+              </div>
               <Button
                 type="submit"
                 className="w-full"
