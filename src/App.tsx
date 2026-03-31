@@ -23,6 +23,8 @@ import AdminEventDetail from "./pages/admin/EventDetail";
 import AdminSwapManagement from "./pages/admin/SwapManagement";
 import AdminSettings from "./pages/admin/AdminSettings";
 import Auth from "./pages/Auth";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
 import InviteSignup from "./pages/InviteSignup";
 import NotFound from "./pages/NotFound";
 const queryClient = new QueryClient();
