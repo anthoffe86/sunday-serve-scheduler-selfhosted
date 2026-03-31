@@ -64,6 +64,8 @@ const App = () => (
             {/* Public routes - accessible without authentication */}
             <Route path="/" element={<Landing />} />
             <Route path="/auth" element={<Auth />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/invite" element={<InviteSignup />} />
             {/* Backwards-compatible alias for older emails */}
             <Route path="/invitation/respond" element={<InvitationResponse />} />
