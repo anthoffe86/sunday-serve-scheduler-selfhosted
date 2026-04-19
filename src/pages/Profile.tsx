@@ -80,7 +80,7 @@ const Profile = () => {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="font-serif text-3xl font-bold">My Preferences</h1>
+        <h1 className="font-serif text-2xl font-bold sm:text-3xl">My Preferences</h1>
         <p className="text-muted-foreground">
           Update your profile and role preferences
         </p>

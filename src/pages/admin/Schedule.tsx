@@ -206,15 +206,15 @@ const AdminSchedule = () => {
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="font-serif text-3xl font-bold">Schedule</h1>
+          <h1 className="font-serif text-2xl font-bold sm:text-3xl">Schedule</h1>
           <p className="text-muted-foreground">View and manage volunteer assignments</p>
         </div>
-        <div className="flex gap-2 self-start">
+        <div className="flex flex-wrap gap-2 self-start">
           <ScheduleExport
             events={currentMonthEvents}
             monthLabel={format(currentMonth, "MMMM yyyy")}
           />
-          <Button asChild variant="outline" className="gap-2">
+          <Button asChild variant="outline" className="flex-1 sm:flex-initial gap-2">
             <Link to="/admin/events">
               <Plus className="h-4 w-4" />
               Manage Events
@@ -355,7 +355,7 @@ const AdminSchedule = () => {
         ) : (
           <>
             {/* Bulk Actions Bar */}
-            <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
+            <div className="flex flex-wrap items-center gap-3 p-3 bg-muted/50 rounded-lg">
               <Button
                 variant="ghost"
                 size="sm"
@@ -444,7 +444,7 @@ const AdminSchedule = () => {
                       {/* Date Block */}
                       <div
                         className={cn(
-                          "flex flex-col items-center justify-center px-4 py-4 min-w-[72px]",
+                          "flex flex-col items-center justify-center px-3 py-4 min-w-[64px] sm:px-4 sm:min-w-[72px]",
                           event.status === "published"
                             ? "bg-primary text-primary-foreground"
                             : event.status === "cancelled"
@@ -459,7 +459,7 @@ const AdminSchedule = () => {
                       </div>
 
                       {/* Content */}
-                      <div className="flex-1 p-4">
+                      <div className="flex-1 min-w-0 p-3 sm:p-4">
                         <h3
                           className={cn(
                             "font-serif text-lg font-semibold mb-1",

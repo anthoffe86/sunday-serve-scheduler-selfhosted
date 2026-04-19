@@ -49,7 +49,7 @@ const Availability = () => {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="font-serif text-3xl font-bold">My Availability</h1>
+        <h1 className="font-serif text-2xl font-bold sm:text-3xl">My Availability</h1>
         <p className="text-muted-foreground">
           Manage when you're available to serve
         </p>

@@ -164,7 +164,7 @@ const Invitations = () => {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="font-serif text-3xl font-bold">Invitations</h1>
+        <h1 className="font-serif text-2xl font-bold sm:text-3xl">Invitations</h1>
         <p className="text-muted-foreground">
           Respond to service invitations
         </p>
@@ -203,11 +203,9 @@ const Invitations = () => {
                         {format(parseISO(event.date), 'EEEE, MMMM d, yyyy')}
                       </span>
                     </div>
-                    <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
                       <span>{event.name}</span>
-                      <span>•</span>
                       <span>{formatTime(event.start_time)}</span>
-                      <span>•</span>
                       <Badge variant="outline">
                         {ROLE_LABELS[assignment.role as keyof typeof ROLE_LABELS] || assignment.role}
                       </Badge>
@@ -218,7 +216,7 @@ const Invitations = () => {
                       size="sm"
                       onClick={() => handleAccept(assignment)}
                       disabled={respondMutation.isPending}
-                      className="bg-green-600 hover:bg-green-700"
+                      className="flex-1 sm:flex-initial bg-green-600 hover:bg-green-700"
                     >
                       <CheckCircle className="h-4 w-4 mr-1" />
                       Accept
@@ -228,6 +226,7 @@ const Invitations = () => {
                       variant="destructive"
                       onClick={() => openDeclineDialog(assignment, event)}
                       disabled={respondMutation.isPending}
+                      className="flex-1 sm:flex-initial"
                     >
                       <XCircle className="h-4 w-4 mr-1" />
                       Decline

@@ -168,7 +168,7 @@ const Swaps = () => {
           {/* Date Block */}
           <div
             className={cn(
-              'flex flex-col items-center justify-center px-4 py-4 min-w-[72px]',
+              'flex flex-col items-center justify-center px-3 py-4 min-w-[64px] sm:px-4 sm:min-w-[72px]',
               isMyRequest ? 'bg-primary/10' : 'bg-secondary'
             )}
           >
@@ -182,7 +182,7 @@ const Swaps = () => {
           </div>
 
           {/* Content */}
-          <div className="flex-1 p-4">
+          <div className="flex-1 min-w-0 p-3 sm:p-4">
             <div className="flex flex-wrap items-center gap-2 mb-2">
               <RoleBadge role={swap.role as Role} />
               {getStatusBadge(swap.status, !!swap.offered_assignment)}
@@ -339,7 +339,7 @@ const Swaps = () => {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="font-serif text-3xl font-bold">Swap Requests</h1>
+        <h1 className="font-serif text-2xl font-bold sm:text-3xl">Swap Requests</h1>
         <p className="text-muted-foreground">
           Request to swap your assigned role with another volunteer
         </p>
@@ -397,7 +397,7 @@ const Swaps = () => {
                 <CardContent className="p-0">
                   <div className="flex">
                     {/* Date Block */}
-                    <div className="flex flex-col items-center justify-center px-4 py-4 min-w-[72px] bg-blue-50">
+                    <div className="flex flex-col items-center justify-center px-3 py-4 min-w-[64px] sm:px-4 sm:min-w-[72px] bg-blue-50">
                       <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                         {format(parseISO(swap.event_date), 'EEE')}
                       </span>
@@ -408,7 +408,7 @@ const Swaps = () => {
                     </div>
 
                     {/* Content */}
-                    <div className="flex-1 p-4">
+                    <div className="flex-1 min-w-0 p-3 sm:p-4">
                       <div className="flex flex-wrap items-center gap-2 mb-2">
                         <RoleBadge role={swap.role as Role} />
                         <Badge variant="outline" className="gap-1 border-blue-500 text-blue-600">

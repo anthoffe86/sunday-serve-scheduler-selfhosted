@@ -453,7 +453,7 @@ const AdminEventDetail = () => {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <div className="flex items-center gap-3 mb-2">
-            <h1 className="font-serif text-3xl font-bold">{template.name}</h1>
+            <h1 className="font-serif text-2xl font-bold sm:text-3xl">{template.name}</h1>
             {!template.active && (
               <Badge variant="secondary">Inactive</Badge>
             )}

@@ -166,7 +166,7 @@ const VolunteerManagement = () => {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="font-serif text-3xl font-bold">Volunteers</h1>
+          <h1 className="font-serif text-2xl font-bold sm:text-3xl">Volunteers</h1>
           <p className="text-muted-foreground">
             Manage volunteer profiles and family groups
           </p>
@@ -195,7 +195,7 @@ const VolunteerManagement = () => {
       </div>
 
       {/* Stats */}
-      <div className="flex gap-4 text-sm">
+      <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm">
         <span className="text-muted-foreground">
           Total: <strong className="text-foreground">{volunteers?.length || 0}</strong>
         </span>
@@ -383,8 +383,8 @@ function VolunteerCard({ volunteer, familyGroups, onToggleActive, onEditFamily, 
   return (
     <Card className={`transition-shadow hover:shadow-md ${!volunteer.active ? 'opacity-60' : ''}`}>
       <CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-4">
-          <div className={`flex h-12 w-12 items-center justify-center rounded-full text-lg font-medium ${
+        <div className="flex items-center gap-4 min-w-0">
+          <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-lg font-medium ${
             volunteer.active ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
           }`}>
             {volunteer.name
@@ -392,8 +392,8 @@ function VolunteerCard({ volunteer, familyGroups, onToggleActive, onEditFamily, 
               .map((n) => n[0])
               .join('')}
           </div>
-          <div>
-            <div className="flex items-center gap-2">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
               <h3 className="font-serif font-semibold">{volunteer.name}</h3>
               {!volunteer.active && (
                 <Badge variant="secondary" className="text-xs">
@@ -407,7 +407,7 @@ function VolunteerCard({ volunteer, familyGroups, onToggleActive, onEditFamily, 
                 </Badge>
               )}
             </div>
-            <p className="text-sm text-muted-foreground">{volunteer.email}</p>
+            <p className="text-sm text-muted-foreground break-all">{volunteer.email}</p>
           </div>
         </div>
 

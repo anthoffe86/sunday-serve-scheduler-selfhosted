@@ -147,7 +147,7 @@ const SwapManagement = () => {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="font-serif text-3xl font-bold">Swap Requests</h1>
+        <h1 className="font-serif text-2xl font-bold sm:text-3xl">Swap Requests</h1>
         <p className="text-muted-foreground">
           Manage swap requests and assign volunteers on their behalf
         </p>
@@ -180,7 +180,7 @@ const SwapManagement = () => {
       </div>
 
       {/* Stats */}
-      <div className="flex gap-4 text-sm">
+      <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm">
         <span className="text-muted-foreground">
           Total: <strong className="text-foreground">{swapRequests?.length || 0}</strong>
         </span>
@@ -315,7 +315,7 @@ function SwapRequestCard({
       <CardContent className="p-0">
         <div className="flex">
           {/* Date Block */}
-          <div className="flex flex-col items-center justify-center px-4 py-4 min-w-[72px] bg-secondary">
+          <div className="flex flex-col items-center justify-center px-3 py-4 min-w-[64px] sm:px-4 sm:min-w-[72px] bg-secondary">
             <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               {format(parseISO(swap.event_date), 'EEE')}
             </span>
@@ -326,7 +326,7 @@ function SwapRequestCard({
           </div>
 
           {/* Content */}
-          <div className="flex-1 p-4">
+          <div className="flex-1 min-w-0 p-3 sm:p-4">
             <div className="flex flex-wrap items-center gap-2 mb-2">
               <RoleBadge role={swap.role as Role} />
               {getStatusBadge(swap.status)}
