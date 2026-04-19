@@ -90,8 +90,8 @@ export function AddUnavailableDatesDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-[425px] max-h-[90vh] flex flex-col p-0 gap-0">
+        <DialogHeader className="px-6 pt-6 pb-2 shrink-0">
           <DialogTitle className="flex items-center gap-2 font-serif">
             <CalendarOff className="h-5 w-5 text-destructive" />
             Add Unavailable Dates
@@ -101,60 +101,62 @@ export function AddUnavailableDatesDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 py-4">
-          <Tabs value={mode} onValueChange={(v) => setMode(v as 'single' | 'range')}>
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="single">Single Date</TabsTrigger>
-              <TabsTrigger value="range">Date Range</TabsTrigger>
-            </TabsList>
+        <div className="flex-1 overflow-y-auto px-6">
+          <div className="space-y-4 py-4">
+            <Tabs value={mode} onValueChange={(v) => setMode(v as 'single' | 'range')}>
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="single">Single Date</TabsTrigger>
+                <TabsTrigger value="range">Date Range</TabsTrigger>
+              </TabsList>
 
-            <TabsContent value="single" className="mt-4">
-              <div className="flex justify-center">
-                <Calendar
-                  mode="single"
-                  selected={selectedDate}
-                  onSelect={setSelectedDate}
-                  disabled={(date) => isBefore(date, today)}
-                  className={cn("rounded-md border pointer-events-auto")}
-                />
-              </div>
-              {selectedDate && (
-                <p className="mt-3 text-center text-sm text-muted-foreground">
-                  Selected: <span className="font-medium text-foreground">{format(selectedDate, 'EEEE, MMMM d, yyyy')}</span>
-                </p>
-              )}
-            </TabsContent>
+              <TabsContent value="single" className="mt-4">
+                <div className="flex justify-center">
+                  <Calendar
+                    mode="single"
+                    selected={selectedDate}
+                    onSelect={setSelectedDate}
+                    disabled={(date) => isBefore(date, today)}
+                    className={cn("rounded-md border pointer-events-auto")}
+                  />
+                </div>
+                {selectedDate && (
+                  <p className="mt-3 text-center text-sm text-muted-foreground">
+                    Selected: <span className="font-medium text-foreground">{format(selectedDate, 'EEEE, MMMM d, yyyy')}</span>
+                  </p>
+                )}
+              </TabsContent>
 
-            <TabsContent value="range" className="mt-4">
-              <div className="flex justify-center">
-                <Calendar
-                  mode="range"
-                  selected={dateRange.from ? { from: dateRange.from, to: dateRange.to } : undefined}
-                  onSelect={(range) => setDateRange({ from: range?.from, to: range?.to })}
-                  disabled={(date) => isBefore(date, today)}
-                  numberOfMonths={1}
-                  className={cn("rounded-md border pointer-events-auto")}
-                />
-              </div>
-              {dateRange.from && dateRange.to && (
-                <p className="mt-3 text-center text-sm text-muted-foreground">
-                  Selected: <span className="font-medium text-foreground">
-                    {format(dateRange.from, 'MMM d')} – {format(dateRange.to, 'MMM d, yyyy')}
-                  </span>
-                </p>
-              )}
-            </TabsContent>
-          </Tabs>
+              <TabsContent value="range" className="mt-4">
+                <div className="flex justify-center">
+                  <Calendar
+                    mode="range"
+                    selected={dateRange.from ? { from: dateRange.from, to: dateRange.to } : undefined}
+                    onSelect={(range) => setDateRange({ from: range?.from, to: range?.to })}
+                    disabled={(date) => isBefore(date, today)}
+                    numberOfMonths={1}
+                    className={cn("rounded-md border pointer-events-auto")}
+                  />
+                </div>
+                {dateRange.from && dateRange.to && (
+                  <p className="mt-3 text-center text-sm text-muted-foreground">
+                    Selected: <span className="font-medium text-foreground">
+                      {format(dateRange.from, 'MMM d')} – {format(dateRange.to, 'MMM d, yyyy')}
+                    </span>
+                  </p>
+                )}
+              </TabsContent>
+            </Tabs>
 
-          <div className="space-y-2">
-            <Label htmlFor="notes">Reason (optional)</Label>
-            <Textarea
-              id="notes"
-              placeholder="e.g., Holiday, work trip, exams..."
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              rows={2}
-            />
+            <div className="space-y-2">
+              <Label htmlFor="notes">Reason (optional)</Label>
+              <Textarea
+                id="notes"
+                placeholder="e.g., Holiday, work trip, exams..."
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                rows={2}
+              />
+            </div>
           </div>
         </div>
 
