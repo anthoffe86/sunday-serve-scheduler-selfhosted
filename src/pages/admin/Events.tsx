@@ -118,7 +118,7 @@ const AdminEvents = () => {
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="font-serif text-3xl font-bold">Events</h1>
+          <h1 className="font-serif text-2xl font-bold sm:text-3xl">Events</h1>
           <p className="text-muted-foreground">
             Create and manage recurring events with volunteer assignments
           </p>

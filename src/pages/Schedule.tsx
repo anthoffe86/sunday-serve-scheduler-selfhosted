@@ -153,7 +153,7 @@ const Schedule = () => {
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="font-serif text-3xl font-bold">Schedule</h1>
+          <h1 className="font-serif text-2xl font-bold sm:text-3xl">Schedule</h1>
           <p className="text-muted-foreground">View upcoming events and your assignments</p>
         </div>
       </div>
@@ -322,7 +322,7 @@ const Schedule = () => {
                     {/* Date Block */}
                     <div
                       className={cn(
-                        "flex flex-col items-center justify-center px-4 py-4 min-w-[72px]",
+                        "flex flex-col items-center justify-center px-3 py-4 min-w-[64px] sm:px-4 sm:min-w-[72px]",
                         assigned && !pending ? "bg-primary text-primary-foreground" : "",
                         assigned && pending ? "bg-amber-500 text-white" : "",
                         !assigned && "bg-secondary text-secondary-foreground",
@@ -335,7 +335,7 @@ const Schedule = () => {
                     </div>
 
                     {/* Content */}
-                    <div className="flex-1 p-4">
+                    <div className="flex-1 min-w-0 p-3 sm:p-4">
                       {/* Badges */}
                       <div className="flex flex-wrap gap-2 mb-2">
                         {assigned && pending && (
