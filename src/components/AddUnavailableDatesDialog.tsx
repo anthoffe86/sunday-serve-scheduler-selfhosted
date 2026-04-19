@@ -160,7 +160,7 @@ export function AddUnavailableDatesDialog({
           </div>
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="px-6 pb-6 pt-2 shrink-0 gap-2 sm:gap-0">
           <Button variant="outline" onClick={() => handleOpenChange(false)}>
             Cancel
           </Button>
