@@ -261,7 +261,7 @@ const handler = async (req: Request): Promise<Response> => {
       `).join('');
 
       emailBatch.push({
-        from: "St Matthews Church <noreply@updates.lumotutor.co.uk>",
+        from: "St Matthews Church <noreply@updates.servetogether.co.uk>",
         to: [data.email],
         subject: `Your St Matthews Church - ${data.events.length} Assignment${data.events.length > 1 ? 's' : ''} Confirmed`,
         html: `

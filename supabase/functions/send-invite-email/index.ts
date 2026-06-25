@@ -79,7 +79,7 @@ const handler = async (req: Request): Promise<Response> => {
     console.log(`Sending invite email to ${email} for ${name}`);
 
     const emailResponse = await resend.emails.send({
-      from: "St Matthews Church <noreply@updates.lumotutor.co.uk>",
+      from: "St Matthews Church <noreply@updates.servetogether.co.uk>",
       to: [email],
       subject: "You've been invited to join the St Matthew's family as a volunteer",
       html: `

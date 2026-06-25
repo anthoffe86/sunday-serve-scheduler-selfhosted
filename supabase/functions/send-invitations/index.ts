@@ -308,7 +308,7 @@ const handler = async (req: Request): Promise<Response> => {
       const viewAllUrl = `${appBase}/invitations`;
 
       emailBatch.push({
-        from: "St Matthews Church <noreply@updates.lumotutor.co.uk>",
+        from: "St Matthews Church <noreply@updates.servetogether.co.uk>",
         to: [data.email],
         subject: `You're Invited to Serve - ${data.invitations.length} Assignment${data.invitations.length > 1 ? 's' : ''}`,
         html: `

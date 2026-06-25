@@ -198,7 +198,7 @@ const handler = async (req: Request): Promise<Response> => {
 
     // Send email to original requester
     const emailResponse = await resend.emails.send({
-      from: "St Matthews Church <noreply@updates.lumotutor.co.uk>",
+      from: "St Matthews Church <noreply@updates.servetogether.co.uk>",
       to: [originalVolunteer.email],
       subject: `Swap Offer from ${offeringVolunteer.name}`,
       html: `

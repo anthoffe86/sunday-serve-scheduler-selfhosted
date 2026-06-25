@@ -278,7 +278,7 @@ const handler = async (req: Request): Promise<Response> => {
 
     // Prepare batch of emails
     const emailBatch = eligibleProfiles.map((profile) => ({
-      from: "St Matthews Church <noreply@updates.lumotutor.co.uk>",
+      from: "St Matthews Church <noreply@updates.servetogether.co.uk>",
       to: [profile.email],
       subject: `Swap Request: ${roleLabel} on ${formattedDate}`,
       html: `
