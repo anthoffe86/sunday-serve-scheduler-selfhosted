@@ -60,3 +60,36 @@ export async function getOrgShortName(supabase: SupabaseClient): Promise<string>
   }
   return "S";
 }
+
+/**
+ * Build a valid Resend "from" string using the live organisation name.
+ *
+ * The sender address can be configured via:
+ * - RESEND_FROM_ADDRESS (preferred, address only)
+ * - RESEND_FROM_EMAIL (legacy, accepts either address or "Name <address>")
+ */
+export function buildOrgFromEmail(orgName: string): string {
+  const rawFrom =
+    Deno.env.get("RESEND_FROM_ADDRESS") ??
+    Deno.env.get("RESEND_FROM_EMAIL") ??
+    "noreply@updates.servetogether.co.uk";
+
+  const fromAddress = extractEmailAddress(rawFrom);
+  const safeOrgName = sanitizeDisplayName(orgName) || "ServeTogether";
+
+  return `${safeOrgName} <${fromAddress}>`;
+}
+
+function extractEmailAddress(input: string): string {
+  const trimmed = input.trim();
+  const angleMatch = trimmed.match(/<\s*([^>\s]+@[^>\s]+)\s*>/);
+  if (angleMatch?.[1]) return angleMatch[1].trim();
+
+  if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) return trimmed;
+
+  return "noreply@updates.servetogether.co.uk";
+}
+
+function sanitizeDisplayName(name: string): string {
+  return name.replace(/[<>"\r\n]/g, "").trim();
+}

@@ -1,10 +1,9 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { Resend } from "https://esm.sh/resend@2.0.0";
-import { getOrgName } from "../_shared/org-settings.ts";
+import { buildOrgFromEmail, getOrgName } from "../_shared/org-settings.ts";
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
-const RESEND_FROM_EMAIL = Deno.env.get("RESEND_FROM_EMAIL") ?? "St Matthews Church <noreply@updates.servetogether.co.uk>";
 const resend = RESEND_API_KEY ? new Resend(RESEND_API_KEY) : null;
 
 const corsHeaders = {
@@ -62,6 +61,7 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     const orgName = await getOrgName(supabase);
+  const resendFrom = buildOrgFromEmail(orgName);
 
     // Check if email notifications are enabled by admin
     const { data: setting, error: settingError } = await supabase
@@ -92,7 +92,7 @@ const handler = async (req: Request): Promise<Response> => {
     console.log(`Sending invite email to ${email} for ${name}`);
 
     const emailResponse = await resend.emails.send({
-      from: RESEND_FROM_EMAIL,
+      from: resendFrom,
       to: [email],
       subject: `You've been invited to join ${orgName} as a volunteer`,
       html: `

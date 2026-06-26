@@ -1,10 +1,9 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { Resend } from "https://esm.sh/resend@2.0.0";
-import { getOrgName } from "../_shared/org-settings.ts";
+import { buildOrgFromEmail, getOrgName } from "../_shared/org-settings.ts";
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
-const RESEND_FROM_EMAIL = Deno.env.get("RESEND_FROM_EMAIL") ?? "St Matthews Church <noreply@updates.servetogether.co.uk>";
 const resend = RESEND_API_KEY ? new Resend(RESEND_API_KEY) : null;
 
 const corsHeaders = {
@@ -125,6 +124,7 @@ const handler = async (req: Request): Promise<Response> => {
     // Use service role to check admin status
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
     const orgName = await getOrgName(supabase);
+    const resendFrom = buildOrgFromEmail(orgName);
     
     const { data: adminCheck } = await supabase
       .from('user_roles')
@@ -320,7 +320,7 @@ const handler = async (req: Request): Promise<Response> => {
       const viewAllUrl = `${appBase}/invitations`;
 
       emailBatch.push({
-        from: RESEND_FROM_EMAIL,
+        from: resendFrom,
         to: [data.email],
         subject: `You're Invited to Serve at ${orgName} - ${data.invitations.length} Assignment${data.invitations.length > 1 ? 's' : ''}`,
         html: `
