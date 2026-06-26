@@ -195,7 +195,7 @@ const Landing = () => {
     <div className="min-h-screen bg-background">
       <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container mx-auto flex h-16 items-center justify-between px-4">
-          <img src={serveTogetherLogo} alt="ServeTogether" className="h-8" />
+          <img src={serveTogetherLogo} alt="ServeTogether" className="h-10" />
           <div className="flex items-center gap-3">
             <Button variant="ghost" asChild>
               <Link to="/auth">Sign In</Link>
@@ -212,7 +212,7 @@ const Landing = () => {
         <div className="container mx-auto px-4 text-center">
           <div className="mx-auto max-w-3xl">
             <div className="mb-8 flex justify-center">
-              <img src={serveTogetherLogo} alt="ServeTogether" className="h-14" />
+              <img src={serveTogetherLogo} alt="ServeTogether" className="h-16 sm:h-20 md:h-24" />
             </div>
             <h2 className="font-serif text-4xl font-bold tracking-tight md:text-5xl lg:text-6xl">
               Volunteer Scheduling
@@ -335,7 +335,7 @@ const Landing = () => {
               <Button
                 size="lg"
                 variant="outline"
-                className="border-primary-foreground/40 text-primary-foreground hover:bg-primary-foreground/10"
+                className="border-white bg-white text-primary hover:bg-white/90 hover:text-primary"
                 onClick={() => setRequestAccessOpen(true)}
               >
                 Request Access

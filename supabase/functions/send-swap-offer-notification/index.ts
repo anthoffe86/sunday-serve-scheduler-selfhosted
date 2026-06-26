@@ -295,7 +295,7 @@ const handler = async (req: Request): Promise<Response> => {
             </p>
             ${logoUrl ? `
             <p style="text-align: center; margin: 8px 0 6px;">
-              <img src="${escapeUrl(logoUrl)}" alt="ServeTogether" style="height: 16px; width: auto;" />
+              <img src="${escapeUrl(logoUrl)}" alt="ServeTogether" style="height: 24px; width: auto;" />
             </p>` : ''}
             <p style="font-size: 11px; color: #9ca3af; text-align: center; margin-top: 8px;">
               Powered by <a href="https://servetogether.co.uk" style="color: #9ca3af; text-decoration: none;">ServeTogether</a>
