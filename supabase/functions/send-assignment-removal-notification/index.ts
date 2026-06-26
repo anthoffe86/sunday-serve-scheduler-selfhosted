@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { Resend } from "https://esm.sh/resend@2.0.0";
+import { getOrgName } from "../_shared/org-settings.ts";
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
 const resend = new Resend(RESEND_API_KEY);
@@ -39,6 +40,7 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const logoUrl = Deno.env.get("SERVETOGETHER_LOGO_URL") || "";
 
     // Verify authorization - allow service role (internal calls) or admin users
     const authHeader = req.headers.get('Authorization');
@@ -51,6 +53,7 @@ serve(async (req) => {
 
     // Use service role client for data access
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    const orgName = await getOrgName(supabase);
 
     // Check if this is a service role call (from other edge functions like accept-swap-request)
     const token = authHeader.replace('Bearer ', '');
@@ -171,9 +174,9 @@ serve(async (req) => {
     };
 
     const { data: emailData, error: emailError } = await resend.emails.send({
-      from: "St Matthews Church <noreply@updates.servetogether.co.uk>",
+      from: `${orgName} <noreply@updates.servetogether.co.uk>`,
       to: [profile.email],
-      subject: `Service Update: Removed from ${eventName}`,
+      subject: `${orgName} Service Update: Removed from ${eventName}`,
       html: `
             <!DOCTYPE html>
             <html>
@@ -231,6 +234,13 @@ serve(async (req) => {
                 
                 <p style="font-size: 12px; color: #9ca3af; text-align: center;">
                   Thank you for your continued support and understanding.
+                </p>
+                ${logoUrl ? `
+                <p style="text-align: center; margin: 8px 0 6px;">
+                  <img src="${escapeUrl(logoUrl)}" alt="ServeTogether" style="height: 16px; width: auto;" />
+                </p>` : ''}
+                <p style="font-size: 11px; color: #9ca3af; text-align: center; margin-top: 8px;">
+                  Powered by <a href="https://servetogether.co.uk" style="color: #9ca3af; text-decoration: none;">ServeTogether</a>
                 </p>
               </div>
             </body>

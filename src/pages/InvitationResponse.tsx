@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
+import { usePublicOrgSettings } from '@/hooks/usePublicOrgSettings';
 
 const InvitationResponse = () => {
   const [searchParams] = useSearchParams();
@@ -15,6 +16,7 @@ const InvitationResponse = () => {
   const [message, setMessage] = useState('');
   const [declineReason, setDeclineReason] = useState('');
   const [showDeclineForm, setShowDeclineForm] = useState(false);
+  const { data: orgSettings } = usePublicOrgSettings();
   
   const token = searchParams.get('token');
   const tokens = searchParams.get('tokens');
@@ -82,7 +84,7 @@ const InvitationResponse = () => {
                 <Mail className="h-6 w-6 text-primary" />
               </div>
               <CardTitle>Respond to Invitation</CardTitle>
-              <CardDescription>Would you like to accept or decline this invitation?</CardDescription>
+              <CardDescription>Would you like to accept or decline this invitation from {orgSettings.organisationName}?</CardDescription>
             </>
           )}
           

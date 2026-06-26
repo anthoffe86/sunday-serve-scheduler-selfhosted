@@ -1,7 +1,10 @@
-import { Shield, Loader2, Mail } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Shield, Loader2, Mail, Building2 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { useSystemSettings, useUpdateSystemSetting } from "@/hooks/useSystemSettings";
 import { Navigate } from "react-router-dom";
@@ -10,6 +13,33 @@ const AdminSettings = () => {
     const { isAdmin, isLoading: authLoading } = useAuth();
     const { data: settings, isLoading: settingsLoading } = useSystemSettings();
     const updateSetting = useUpdateSystemSetting();
+    const [orgName, setOrgName] = useState('');
+    const [orgShortName, setOrgShortName] = useState('');
+    const [orgNameInitialised, setOrgNameInitialised] = useState(false);
+
+    // Seed local state once settings are loaded
+    useEffect(() => {
+        if (settings && !orgNameInitialised) {
+            const getName = (key: string, fallback: string) => {
+                const s = settings.find(s => s.key === key);
+                if (!s) return fallback;
+                try {
+                    let val: unknown = s.value;
+                    if (typeof val === 'string') {
+                        try {
+                            val = JSON.parse(val);
+                        } catch {
+                            // Keep plain strings as-is
+                        }
+                    }
+                    return typeof val === 'string' ? val : fallback;
+                } catch { return fallback; }
+            };
+            setOrgName(getName('organisation_name', "St Matthew's Church"));
+            setOrgShortName(getName('organisation_short_name', 'S'));
+            setOrgNameInitialised(true);
+        }
+    }, [settings, orgNameInitialised]);
 
     if (authLoading || settingsLoading) {
         return (
@@ -71,6 +101,61 @@ const AdminSettings = () => {
                 <h1 className="font-serif text-2xl sm:text-3xl font-bold">Admin Settings</h1>
                 <p className="text-sm sm:text-base text-muted-foreground">Configure system-wide settings and email notifications</p>
             </div>
+
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2 font-serif">
+                            <Building2 className="h-5 w-5 text-primary" />
+                            Organisation
+                        </CardTitle>
+                        <CardDescription>
+                            The organisation name is shown in the app header, email subjects, and email bodies.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-5">
+                        <div className="space-y-2">
+                            <Label htmlFor="org-name">Organisation name</Label>
+                            <div className="flex gap-2">
+                                <Input
+                                    id="org-name"
+                                    value={orgName}
+                                    onChange={(e) => setOrgName(e.target.value)}
+                                    placeholder="St Matthew's Church"
+                                    className="max-w-sm"
+                                />
+                                <Button
+                                    variant="outline"
+                                    onClick={() => updateSetting.mutate({ key: 'organisation_name', value: orgName })}
+                                    disabled={updateSetting.isPending || !orgName.trim()}
+                                >
+                                    Save
+                                </Button>
+                            </div>
+                            <p className="text-xs text-muted-foreground">Full name used in emails and the logged-in header.</p>
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="org-short">Short name / initials</Label>
+                            <div className="flex gap-2">
+                                <Input
+                                    id="org-short"
+                                    value={orgShortName}
+                                    onChange={(e) => setOrgShortName(e.target.value.slice(0, 3))}
+                                    placeholder="S"
+                                    maxLength={3}
+                                    className="w-24"
+                                />
+                                <Button
+                                    variant="outline"
+                                    onClick={() => updateSetting.mutate({ key: 'organisation_short_name', value: orgShortName })}
+                                    disabled={updateSetting.isPending || !orgShortName.trim()}
+                                >
+                                    Save
+                                </Button>
+                            </div>
+                            <p className="text-xs text-muted-foreground">Up to 3 characters - shown in the avatar mark in the header.</p>
+                        </div>
+                    </CardContent>
+                </Card>
 
             <Card>
                 <CardHeader>

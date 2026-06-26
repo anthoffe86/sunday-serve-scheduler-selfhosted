@@ -42,6 +42,36 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "assignments_service_id_fkey"
+        access_requests: {
+          Row: {
+            created_at: string
+            email: string
+            id: string
+            name: string
+            notes: string | null
+            organisation_name: string
+            status: string
+          }
+          Insert: {
+            created_at?: string
+            email: string
+            id?: string
+            name: string
+            notes?: string | null
+            organisation_name: string
+            status?: string
+          }
+          Update: {
+            created_at?: string
+            email?: string
+            id?: string
+            name?: string
+            notes?: string | null
+            organisation_name?: string
+            status?: string
+          }
+          Relationships: []
+        }
             columns: ["service_id"]
             isOneToOne: false
             referencedRelation: "sunday_services"

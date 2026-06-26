@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
+import { getOrgName } from '../_shared/org-settings.ts';
 
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
@@ -38,14 +39,14 @@ function escapeText(text: string): string {
         .replace(/\n/g, '\\n');
 }
 
-function generateICS(events: Event[], userId: string): string {
+function generateICS(events: Event[], userId: string, orgName: string): string {
     const lines: string[] = [
         'BEGIN:VCALENDAR',
         'VERSION:2.0',
-        'PRODID:-//St Matthews Church//Service Rota//EN',
+        `PRODID:-//${orgName}//Service Rota//EN`,
         'CALSCALE:GREGORIAN',
         'METHOD:PUBLISH',
-        'X-WR-CALNAME:St Matthews Service Rota',
+        `X-WR-CALNAME:${orgName} Service Rota`,
         'X-WR-TIMEZONE:Europe/London',
         'X-PUBLISHED-TTL:PT1H', // Refresh every hour
     ];
@@ -77,13 +78,13 @@ function generateICS(events: Event[], userId: string): string {
 
         lines.push(
             'BEGIN:VEVENT',
-            `UID:${event.id}@stmatthews.church`,
+            `UID:${event.id}@servetogether.co.uk`,
             `DTSTAMP:${dtstamp}`,
             `DTSTART:${dtstart}`,
             `DTEND:${dtend}`,
             `SUMMARY:${escapeText(event.name)}`,
             `DESCRIPTION:${escapeText(description)}`,
-            `LOCATION:St Matthews Church`,
+            `LOCATION:${orgName}`,
             `STATUS:CONFIRMED`,
             'END:VEVENT'
         );
@@ -176,6 +177,11 @@ Deno.serve(async (req) => {
         }
 
         const supabaseClient = createClient(supabaseUrl, supabaseAnonKey);
+        const supabaseAdmin = createClient(
+            supabaseUrl,
+            Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+        );
+        const orgName = await getOrgName(supabaseAdmin);
 
         // Get events for the next 6 months where user is assigned
         const today = new Date();
@@ -220,13 +226,13 @@ Deno.serve(async (req) => {
             event.assignments.some((a: { volunteer_id: string }) => a.volunteer_id === userId)
         );
 
-        const icsContent = generateICS(userEvents as Event[], userId);
+        const icsContent = generateICS(userEvents as Event[], userId, orgName);
 
         return new Response(icsContent, {
             headers: {
                 ...corsHeaders,
                 'Content-Type': 'text/calendar; charset=utf-8',
-                'Content-Disposition': 'inline; filename="st-matthews-rota.ics"',
+                'Content-Disposition': 'inline; filename="serve-together-rota.ics"',
                 'Cache-Control': 'no-cache, must-revalidate',
             },
         });

@@ -22,6 +22,7 @@ import AdminEvents from "./pages/admin/Events";
 import AdminEventDetail from "./pages/admin/EventDetail";
 import AdminSwapManagement from "./pages/admin/SwapManagement";
 import AdminSettings from "./pages/admin/AdminSettings";
+import AccessRequests from "./pages/admin/AccessRequests";
 import Auth from "./pages/Auth";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
@@ -89,6 +90,7 @@ const App = () => (
               <Route path="/admin/events" element={<AdminEvents />} />
               <Route path="/admin/events/:eventId" element={<AdminEventDetail />} />
               <Route path="/admin/swaps" element={<AdminSwapManagement />} />
+              <Route path="/admin/access-requests" element={<AccessRequests />} />
               <Route path="/admin/settings" element={<AdminSettings />} />
             </Route>
             <Route path="*" element={<NotFound />} />

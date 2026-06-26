@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
+import serveTogetherLogo from '@/assets/servetogether-logo.png';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -69,10 +70,9 @@ const Auth = () => {
       <div className="w-full max-w-md animate-fade-in">
         {/* Logo/Header */}
         <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-            <span className="font-serif text-2xl font-bold">S</span>
+          <div className="mx-auto mb-6">
+            <img src={serveTogetherLogo} alt="ServeTogether" className="h-10 mx-auto" />
           </div>
-          <h1 className="font-serif text-2xl font-bold">St. Matthew's Church</h1>
           <p className="text-muted-foreground">Volunteer Scheduling</p>
         </div>
 
@@ -137,6 +137,10 @@ const Auth = () => {
             </p>
           </CardContent>
         </Card>
+
+        <p className="mt-4 text-center text-xs text-muted-foreground">
+          Powered by ServeTogether
+        </p>
       </div>
     </div>
   );

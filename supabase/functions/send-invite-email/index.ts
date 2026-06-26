@@ -1,8 +1,11 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { Resend } from "https://esm.sh/resend@2.0.0";
+import { getOrgName } from "../_shared/org-settings.ts";
 
-const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
+const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
+const RESEND_FROM_EMAIL = Deno.env.get("RESEND_FROM_EMAIL") ?? "St Matthews Church <noreply@updates.servetogether.co.uk>";
+const resend = RESEND_API_KEY ? new Resend(RESEND_API_KEY) : null;
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -48,7 +51,17 @@ const handler = async (req: Request): Promise<Response> => {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const logoUrl = Deno.env.get("SERVETOGETHER_LOGO_URL") || "";
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    if (!RESEND_API_KEY || !resend) {
+      return new Response(
+        JSON.stringify({ error: "RESEND_API_KEY secret is not set" }),
+        { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
+    const orgName = await getOrgName(supabase);
 
     // Check if email notifications are enabled by admin
     const { data: setting, error: settingError } = await supabase
@@ -79,9 +92,9 @@ const handler = async (req: Request): Promise<Response> => {
     console.log(`Sending invite email to ${email} for ${name}`);
 
     const emailResponse = await resend.emails.send({
-      from: "St Matthews Church <noreply@updates.servetogether.co.uk>",
+      from: RESEND_FROM_EMAIL,
       to: [email],
-      subject: "You've been invited to join the St Matthew's family as a volunteer",
+      subject: `You've been invited to join ${orgName} as a volunteer`,
       html: `
         <!DOCTYPE html>
         <html>
@@ -91,14 +104,14 @@ const handler = async (req: Request): Promise<Response> => {
         </head>
         <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
           <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; border-radius: 10px 10px 0 0; text-align: center;">
-            <h1 style="color: white; margin: 0; font-size: 24px;">Welcome to St Matthews Church</h1>
+            <h1 style="color: white; margin: 0; font-size: 24px;">Welcome to ${orgName}</h1>
           </div>
           
           <div style="background: #f9fafb; padding: 30px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 10px 10px;">
             <p style="font-size: 16px; margin-bottom: 20px;">Hello <strong>${escapeHtml(name)}</strong>,</p>
             
             <p style="font-size: 16px; margin-bottom: 20px;">
-              You've been invited to join St Matthews as a volunteer. We use this platform to help manage the St Matthews Service Rota.
+              You've been invited to join ${orgName} as a volunteer. We use this platform to help manage the volunteer rota.
             </p>
             
             <p style="font-size: 16px; margin-bottom: 25px;">
@@ -124,6 +137,14 @@ const handler = async (req: Request): Promise<Response> => {
             <p style="font-size: 12px; color: #9ca3af; text-align: center;">
               This invitation link will expire in 7 days.<br>
               If you didn't expect this invitation, you can safely ignore this email.
+            </p>
+            <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0 10px;">
+            ${logoUrl ? `
+            <p style="text-align: center; margin: 0 0 8px;">
+              <img src="${escapeUrl(logoUrl)}" alt="ServeTogether" style="height: 16px; width: auto;" />
+            </p>` : ''}
+            <p style="font-size: 11px; color: #9ca3af; text-align: center;">
+              Powered by <a href="https://servetogether.co.uk" style="color: #9ca3af; text-decoration: none;">ServeTogether</a>
             </p>
           </div>
         </body>

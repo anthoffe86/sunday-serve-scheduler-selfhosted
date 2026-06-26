@@ -9,6 +9,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { EventWithDetails } from "@/hooks/useEventScheduler";
+import { usePublicOrgSettings } from "@/hooks/usePublicOrgSettings";
 import { toast } from "sonner";
 
 interface ScheduleExportProps {
@@ -20,6 +21,8 @@ const SIDESMAN_ROLES = ['sidesman-standard', 'sidesman-sound', 'sidesman-welcome
 
 export function ScheduleExport({ events, monthLabel }: ScheduleExportProps) {
   const printRef = useRef<HTMLDivElement>(null);
+  const { data: orgSettings } = usePublicOrgSettings();
+  const orgName = orgSettings.organisationName;
 
   const getSidesmenDisplay = (event: EventWithDetails) => {
     const sidesmen: string[] = [];
@@ -129,7 +132,7 @@ export function ScheduleExport({ events, monthLabel }: ScheduleExportProps) {
         </style>
       </head>
       <body>
-        <h1>Rota for St Matthew's Church - ${monthLabel}</h1>
+        <h1>Rota for ${orgName} - ${monthLabel}</h1>
         <table>
           <thead>
             <tr>
@@ -201,7 +204,7 @@ export function ScheduleExport({ events, monthLabel }: ScheduleExportProps) {
   Collection Count: ${collection.length > 0 ? collection.join(', ') : 'TBC'}`;
     }).join('\n\n');
 
-    const fullText = `Rota for St Matthew's Church - ${monthLabel}\n\n${textContent}`;
+    const fullText = `Rota for ${orgName} - ${monthLabel}\n\n${textContent}`;
 
     navigator.clipboard.writeText(fullText).then(() => {
       toast.success('Copied to clipboard - ready to paste into email');

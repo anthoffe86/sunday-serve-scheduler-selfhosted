@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { Resend } from "https://esm.sh/resend@2.0.0";
+import { getOrgName } from "../_shared/org-settings.ts";
 
 const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
 
@@ -49,6 +50,7 @@ const handler = async (req: Request): Promise<Response> => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const logoUrl = Deno.env.get("SERVETOGETHER_LOGO_URL") || "";
 
     // Verify user authentication (any authenticated user can trigger swap notifications for their own swaps)
     const authHeader = req.headers.get('Authorization');
@@ -72,6 +74,7 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
+  const orgName = await getOrgName(supabase);
 
     // Check if email notifications are enabled by admin
     const { data: setting, error: settingError } = await supabase
@@ -278,9 +281,9 @@ const handler = async (req: Request): Promise<Response> => {
 
     // Prepare batch of emails
     const emailBatch = eligibleProfiles.map((profile) => ({
-      from: "St Matthews Church <noreply@updates.servetogether.co.uk>",
+      from: `${orgName} <noreply@updates.servetogether.co.uk>`,
       to: [profile.email],
-      subject: `Swap Request: ${roleLabel} on ${formattedDate}`,
+      subject: `${orgName} Swap Request: ${roleLabel} on ${formattedDate}`,
       html: `
         <!DOCTYPE html>
         <html>
@@ -342,6 +345,13 @@ const handler = async (req: Request): Promise<Response> => {
             
             <p style="font-size: 12px; color: #9ca3af; text-align: center;">
               Thank you for your service!
+            </p>
+            ${logoUrl ? `
+            <p style="text-align: center; margin: 8px 0 6px;">
+              <img src="${escapeUrl(logoUrl)}" alt="ServeTogether" style="height: 16px; width: auto;" />
+            </p>` : ''}
+            <p style="font-size: 11px; color: #9ca3af; text-align: center; margin-top: 8px;">
+              Powered by <a href="https://servetogether.co.uk" style="color: #9ca3af; text-decoration: none;">ServeTogether</a>
             </p>
           </div>
         </body>

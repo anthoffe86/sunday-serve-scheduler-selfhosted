@@ -6,7 +6,8 @@ import { parseISO } from 'date-fns';
  */
 export function generateSingleEventICS(
     event: EventWithDetails,
-    userRole?: string
+    userRole?: string,
+    organisationName = "St Matthew's Church"
 ): string {
     const eventDate = parseISO(event.date);
     const [hours, minutes] = event.start_time.split(':');
@@ -51,17 +52,17 @@ export function generateSingleEventICS(
     const lines = [
         'BEGIN:VCALENDAR',
         'VERSION:2.0',
-        'PRODID:-//St Matthews Church//Service Rota//EN',
+        `PRODID:-//${organisationName}//Service Rota//EN`,
         'CALSCALE:GREGORIAN',
         'METHOD:PUBLISH',
         'BEGIN:VEVENT',
-        `UID:${event.id}@stmatthews.church`,
+        `UID:${event.id}@servetogether.co.uk`,
         `DTSTAMP:${dtstamp}`,
         `DTSTART:${dtstart}`,
         `DTEND:${dtend}`,
         `SUMMARY:${escapeText(event.name)}`,
         `DESCRIPTION:${escapeText(description)}`,
-        `LOCATION:St Matthews Church`,
+        `LOCATION:${escapeText(organisationName)}`,
         `STATUS:CONFIRMED`,
         'END:VEVENT',
         'END:VCALENDAR'

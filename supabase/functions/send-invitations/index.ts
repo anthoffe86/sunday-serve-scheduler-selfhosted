@@ -1,8 +1,11 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { Resend } from "https://esm.sh/resend@2.0.0";
+import { getOrgName } from "../_shared/org-settings.ts";
 
-const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
+const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
+const RESEND_FROM_EMAIL = Deno.env.get("RESEND_FROM_EMAIL") ?? "St Matthews Church <noreply@updates.servetogether.co.uk>";
+const resend = RESEND_API_KEY ? new Resend(RESEND_API_KEY) : null;
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -89,6 +92,14 @@ const handler = async (req: Request): Promise<Response> => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const logoUrl = Deno.env.get("SERVETOGETHER_LOGO_URL") || "";
+
+    if (!RESEND_API_KEY || !resend) {
+      return new Response(
+        JSON.stringify({ error: "RESEND_API_KEY secret is not set" }),
+        { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
 
     // Verify admin authorization
     const authHeader = req.headers.get('Authorization');
@@ -113,6 +124,7 @@ const handler = async (req: Request): Promise<Response> => {
 
     // Use service role to check admin status
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    const orgName = await getOrgName(supabase);
     
     const { data: adminCheck } = await supabase
       .from('user_roles')
@@ -308,9 +320,9 @@ const handler = async (req: Request): Promise<Response> => {
       const viewAllUrl = `${appBase}/invitations`;
 
       emailBatch.push({
-        from: "St Matthews Church <noreply@updates.servetogether.co.uk>",
+        from: RESEND_FROM_EMAIL,
         to: [data.email],
-        subject: `You're Invited to Serve - ${data.invitations.length} Assignment${data.invitations.length > 1 ? 's' : ''}`,
+        subject: `You're Invited to Serve at ${orgName} - ${data.invitations.length} Assignment${data.invitations.length > 1 ? 's' : ''}`,
         html: `
           <!DOCTYPE html>
           <html>
@@ -327,7 +339,7 @@ const handler = async (req: Request): Promise<Response> => {
               <p style="font-size: 16px; margin-bottom: 20px;">Hello <strong>${escapeHtml(data.name)}</strong>,</p>
               
               <p style="font-size: 16px; margin-bottom: 20px;">
-                You've been invited to serve at the following events. Please respond to confirm your availability:
+                You've been invited to serve at ${escapeHtml(orgName)}. Please respond to confirm your availability for the following events:
               </p>
               
               <table style="width: 100%; border-collapse: collapse; margin: 25px 0; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
@@ -368,6 +380,13 @@ const handler = async (req: Request): Promise<Response> => {
               
               <p style="font-size: 12px; color: #9ca3af; text-align: center;">
                 Thank you for your service!
+              </p>
+              ${logoUrl ? `
+              <p style="text-align: center; margin: 8px 0 6px;">
+                <img src="${escapeUrl(logoUrl)}" alt="ServeTogether" style="height: 16px; width: auto;" />
+              </p>` : ''}
+              <p style="font-size: 11px; color: #9ca3af; text-align: center; margin-top: 8px;">
+                Powered by <a href="https://servetogether.co.uk" style="color: #9ca3af; text-decoration: none;">ServeTogether</a>
               </p>
             </div>
           </body>

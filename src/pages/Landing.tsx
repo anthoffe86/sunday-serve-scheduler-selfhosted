@@ -1,16 +1,26 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { 
-  Calendar, 
-  Users, 
-  RefreshCw, 
-  Bell, 
-  Shield, 
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { toast } from 'sonner';
+import {
+  Calendar,
+  Users,
+  RefreshCw,
+  Bell,
+  Shield,
   Clock,
   CheckCircle2,
-  ArrowRight
+  ArrowRight,
+  Loader2,
 } from 'lucide-react';
+import serveTogetherLogo from '@/assets/servetogether-logo.png';
+import { supabase } from '@/integrations/supabase/client';
+import { z } from 'zod';
 
 const features = [
   {
@@ -53,41 +63,164 @@ const benefits = [
   'Fair distribution of roles across all volunteers',
 ];
 
+const requestSchema = z.object({
+  name: z.string().min(2, 'Name must be at least 2 characters'),
+  organisationName: z.string().min(2, 'Organisation name must be at least 2 characters'),
+  email: z.string().email('Please enter a valid email address'),
+  notes: z.string().optional(),
+});
+
+function RequestAccessModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const [name, setName] = useState('');
+  const [organisationName, setOrganisationName] = useState('');
+  const [email, setEmail] = useState('');
+  const [notes, setNotes] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    try {
+      requestSchema.parse({ name, organisationName, email, notes });
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        toast.error(err.errors[0].message);
+        return;
+      }
+    }
+
+    setIsSubmitting(true);
+    try {
+      const { error } = await supabase.from('access_requests').insert({
+        name,
+        organisation_name: organisationName,
+        email,
+        notes: notes || null,
+        status: 'pending',
+      });
+
+      if (error) throw error;
+
+      supabase.functions
+        .invoke('notify-access-request', { body: { name, organisationName, email, notes } })
+        .catch(() => {
+          // best effort only
+        });
+
+      toast.success("Request submitted! We'll be in touch soon.");
+      onClose();
+      setName('');
+      setOrganisationName('');
+      setEmail('');
+      setNotes('');
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to submit request. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="font-serif text-xl">Request Access</DialogTitle>
+          <DialogDescription>
+            Tell us about your organisation and we will be in touch to get you set up.
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-4 mt-2">
+          <div className="space-y-2">
+            <Label htmlFor="req-name">Your name</Label>
+            <Input
+              id="req-name"
+              placeholder="Jane Smith"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              required
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="req-org">Organisation name</Label>
+            <Input
+              id="req-org"
+              placeholder="St Matthew's Church"
+              value={organisationName}
+              onChange={(e) => setOrganisationName(e.target.value)}
+              required
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="req-email">Email address</Label>
+            <Input
+              id="req-email"
+              type="email"
+              placeholder="jane@example.org"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="req-notes">
+              Notes <span className="text-muted-foreground font-normal">(optional)</span>
+            </Label>
+            <Textarea
+              id="req-notes"
+              placeholder="Tell us about your team size and scheduling needs..."
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              rows={3}
+            />
+          </div>
+          <div className="flex gap-3 pt-2">
+            <Button type="button" variant="outline" className="flex-1" onClick={onClose} disabled={isSubmitting}>
+              Cancel
+            </Button>
+            <Button type="submit" className="flex-1" disabled={isSubmitting}>
+              {isSubmitting && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+              Send Request
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 const Landing = () => {
+  const [requestAccessOpen, setRequestAccessOpen] = useState(false);
+
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
       <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container mx-auto flex h-16 items-center justify-between px-4">
+          <img src={serveTogetherLogo} alt="ServeTogether" className="h-8" />
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-              <span className="font-serif text-xl font-bold">S</span>
-            </div>
-            <div>
-              <h1 className="font-serif text-lg font-semibold leading-tight">St. Matthew's</h1>
-              <p className="text-xs text-muted-foreground">Volunteer Rota</p>
-            </div>
-          </div>
-          <Button asChild>
-            <Link to="/auth">
-              Sign In
+            <Button variant="ghost" asChild>
+              <Link to="/auth">Sign In</Link>
+            </Button>
+            <Button onClick={() => setRequestAccessOpen(true)}>
+              Request Access
               <ArrowRight className="ml-2 h-4 w-4" />
-            </Link>
-          </Button>
+            </Button>
+          </div>
         </div>
       </header>
 
-      {/* Hero Section */}
       <section className="relative overflow-hidden border-b bg-gradient-to-b from-primary/5 to-background py-20 md:py-32">
         <div className="container mx-auto px-4 text-center">
           <div className="mx-auto max-w-3xl">
+            <div className="mb-8 flex justify-center">
+              <img src={serveTogetherLogo} alt="ServeTogether" className="h-14" />
+            </div>
             <h2 className="font-serif text-4xl font-bold tracking-tight md:text-5xl lg:text-6xl">
               Volunteer Scheduling
               <span className="block text-primary">Made Simple</span>
             </h2>
             <p className="mt-6 text-lg text-muted-foreground md:text-xl">
-              Streamline your church volunteer rota with smart scheduling, easy swaps, 
-              and automatic notifications. Less admin work, more ministry.
+              Streamline your volunteer rota with smart scheduling, easy swaps,
+              and automatic notifications - built for churches and volunteer organisations.
             </p>
             <div className="mt-10 flex flex-col gap-4 sm:flex-row sm:justify-center">
               <Button asChild size="lg" className="text-base">
@@ -96,26 +229,23 @@ const Landing = () => {
                   <ArrowRight className="ml-2 h-5 w-5" />
                 </Link>
               </Button>
+              <Button size="lg" variant="outline" className="text-base" onClick={() => setRequestAccessOpen(true)}>
+                Request Access
+              </Button>
             </div>
           </div>
         </div>
-        
-        {/* Decorative elements */}
+
         <div className="absolute -top-24 left-1/2 h-96 w-96 -translate-x-1/2 rounded-full bg-primary/10 blur-3xl" />
       </section>
 
-      {/* Features Grid */}
       <section className="py-20">
         <div className="container mx-auto px-4">
           <div className="mx-auto max-w-2xl text-center">
-            <h3 className="font-serif text-3xl font-bold md:text-4xl">
-              Everything You Need
-            </h3>
-            <p className="mt-4 text-muted-foreground">
-              A complete solution for managing church volunteer schedules
-            </p>
+            <h3 className="font-serif text-3xl font-bold md:text-4xl">Everything You Need</h3>
+            <p className="mt-4 text-muted-foreground">A complete solution for managing volunteer schedules</p>
           </div>
-          
+
           <div className="mt-16 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {features.map((feature) => (
               <Card key={feature.title} className="border-2 transition-colors hover:border-primary/50">
@@ -132,17 +262,14 @@ const Landing = () => {
         </div>
       </section>
 
-      {/* Benefits Section */}
       <section className="border-y bg-muted/50 py-20">
         <div className="container mx-auto px-4">
           <div className="grid gap-12 lg:grid-cols-2 lg:items-center">
             <div>
-              <h3 className="font-serif text-3xl font-bold md:text-4xl">
-                Why Choose Our System?
-              </h3>
+              <h3 className="font-serif text-3xl font-bold md:text-4xl">Why ServeTogether?</h3>
               <p className="mt-4 text-muted-foreground">
-                Built specifically for church volunteer coordination, our system 
-                handles the complexity so you can focus on what matters.
+                Built for volunteer coordination, ServeTogether handles the scheduling complexity
+                so your team can focus on what matters.
               </p>
               <ul className="mt-8 space-y-4">
                 {benefits.map((benefit) => (
@@ -153,7 +280,7 @@ const Landing = () => {
                 ))}
               </ul>
             </div>
-            
+
             <div className="rounded-2xl border-2 bg-background p-8 shadow-lg">
               <div className="space-y-6">
                 <div className="flex items-center gap-4">
@@ -165,7 +292,7 @@ const Landing = () => {
                     <p className="text-sm text-muted-foreground">View your schedule, mark availability, request swaps</p>
                   </div>
                 </div>
-                
+
                 <div className="flex items-center gap-4">
                   <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
                     <Shield className="h-6 w-6" />
@@ -175,7 +302,7 @@ const Landing = () => {
                     <p className="text-sm text-muted-foreground">Manage events, auto-schedule, send invitations</p>
                   </div>
                 </div>
-                
+
                 <div className="flex items-center gap-4">
                   <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
                     <Bell className="h-6 w-6" />
@@ -191,32 +318,40 @@ const Landing = () => {
         </div>
       </section>
 
-      {/* CTA Section */}
       <section className="py-20">
         <div className="container mx-auto px-4">
           <div className="mx-auto max-w-2xl rounded-2xl bg-primary p-8 text-center text-primary-foreground md:p-12">
-            <h3 className="font-serif text-2xl font-bold md:text-3xl">
-              Ready to Get Started?
-            </h3>
+            <h3 className="font-serif text-2xl font-bold md:text-3xl">Ready to Get Started?</h3>
             <p className="mt-4 text-primary-foreground/80">
-              Sign in to access your volunteer schedule or contact your administrator for an invitation.
+              Already have an account? Sign in below. New organisation? Request access and we will get you set up.
             </p>
-            <Button asChild size="lg" variant="secondary" className="mt-8">
-              <Link to="/auth">
-                Sign In Now
-                <ArrowRight className="ml-2 h-5 w-5" />
-              </Link>
-            </Button>
+            <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
+              <Button asChild size="lg" variant="secondary">
+                <Link to="/auth">
+                  Sign In
+                  <ArrowRight className="ml-2 h-5 w-5" />
+                </Link>
+              </Button>
+              <Button
+                size="lg"
+                variant="outline"
+                className="border-primary-foreground/40 text-primary-foreground hover:bg-primary-foreground/10"
+                onClick={() => setRequestAccessOpen(true)}
+              >
+                Request Access
+              </Button>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* Footer */}
       <footer className="border-t py-8">
         <div className="container mx-auto px-4 text-center text-sm text-muted-foreground">
-          <p>&copy; {new Date().getFullYear()} St. Matthew's Church. All rights reserved.</p>
+          <p>&copy; {new Date().getFullYear()} ServeTogether. All rights reserved.</p>
         </div>
       </footer>
+
+      <RequestAccessModal open={requestAccessOpen} onClose={() => setRequestAccessOpen(false)} />
     </div>
   );
 };

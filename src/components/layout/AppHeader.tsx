@@ -5,6 +5,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { useAuth } from '@/hooks/useAuth';
 import { useProfile } from '@/hooks/useVolunteerData';
+import { usePublicOrgSettings } from '@/hooks/usePublicOrgSettings';
 interface AppHeaderProps {
   onMenuClick: () => void;
 }
@@ -19,7 +20,10 @@ export function AppHeader({
   const {
     data: profile
   } = useProfile();
+  const { data: orgSettings } = usePublicOrgSettings();
   const navigate = useNavigate();
+  const orgName = orgSettings.organisationName;
+  const orgShortName = orgSettings.organisationShortName;
   const displayName = profile?.name || user?.email?.split('@')[0] || 'User';
   const initials = displayName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
   const handleSignOut = async () => {
@@ -34,10 +38,10 @@ export function AppHeader({
 
         <div className="flex items-center gap-3">
           <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-            <span className="font-serif text-lg font-bold">S</span>
+            <span className="font-serif text-lg font-bold">{orgShortName}</span>
           </div>
           <div className="hidden md:block">
-            <h1 className="font-serif text-lg font-semibold">St. Matthew's</h1>
+            <h1 className="font-serif text-lg font-semibold">{orgName}</h1>
             <p className="text-xs text-muted-foreground">Volunteer Scheduling</p>
           </div>
         </div>

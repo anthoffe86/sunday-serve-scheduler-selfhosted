@@ -64,6 +64,19 @@ This project is built with:
 
 Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
 
+## Supabase email setup
+
+The Supabase edge functions that send invitations and volunteer emails require a Resend API key in production.
+
+Set these secrets in your Supabase project before deploying the functions:
+
+```sh
+supabase secrets set RESEND_API_KEY=your_resend_api_key
+supabase secrets set RESEND_FROM_EMAIL="Your Org <noreply@your-verified-domain.com>"
+```
+
+If `RESEND_FROM_EMAIL` is not set, the functions fall back to `St Matthews Church <noreply@updates.servetogether.co.uk>`.
+
 ## Can I connect a custom domain to my Lovable project?
 
 Yes, you can!

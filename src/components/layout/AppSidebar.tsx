@@ -10,7 +10,8 @@ import {
   CalendarPlus,
   X,
   Shield,
-  Mail
+  Mail,
+  ClipboardList
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -36,6 +37,7 @@ const adminNav = [
   { to: '/admin/schedule', icon: CalendarDays, label: 'Schedule' },
   { to: '/admin/volunteers', icon: Users, label: 'Volunteers' },
   { to: '/admin/swaps', icon: ArrowLeftRight, label: 'Swap Requests' },
+  { to: '/admin/access-requests', icon: ClipboardList, label: 'Access Requests' },
   { to: '/admin/settings', icon: Settings, label: 'Settings' },
 ];
 

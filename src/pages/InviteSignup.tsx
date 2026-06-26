@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Loader2, CheckCircle, XCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { usePublicOrgSettings } from '@/hooks/usePublicOrgSettings';
 
 interface InviteTokenData {
   id: string;
@@ -26,6 +27,7 @@ const InviteSignup = () => {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { data: orgSettings } = usePublicOrgSettings();
 
   useEffect(() => {
     const validateToken = async () => {
@@ -158,7 +160,7 @@ const InviteSignup = () => {
           </div>
           <CardTitle className="font-serif text-2xl">Welcome, {inviteData?.name}!</CardTitle>
           <CardDescription>
-            You've been invited to join as a volunteer. Create your password to complete your account.
+            You've been invited to join {orgSettings.organisationName} as a volunteer. Create your password to complete your account.
           </CardDescription>
         </CardHeader>
         <CardContent>
