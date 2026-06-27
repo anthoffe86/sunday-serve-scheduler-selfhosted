@@ -64,6 +64,22 @@ This project is built with:
 
 Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
 
+### Deploying on Netlify
+
+This project is a Vite + React single-page app using client-side routes (for example `/schedule` and `/admin/*`).
+To avoid `Page Not Found` on direct URL access and browser refresh, Netlify must rewrite unknown routes to `index.html`.
+
+This repo includes both:
+
+- `netlify.toml` with build/publish settings and a catch-all SPA redirect.
+- `public/_redirects` with `/* /index.html 200` (copied into `dist/` during build).
+
+Netlify settings to verify:
+
+- Base directory: empty (repo root)
+- Build command: `npm run build`
+- Publish directory: `dist`
+
 ## Supabase email setup
 
 The Supabase edge functions that send invitations and volunteer emails require a Resend API key in production.
