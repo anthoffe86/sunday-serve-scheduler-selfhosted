@@ -1,0 +1,104 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 520">
+  <defs>
+    <linearGradient id="swapFade" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#FAF9F5" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#FAF9F5" stop-opacity="1"/>
+    </linearGradient>
+    <clipPath id="swapClip">
+      <rect width="900" height="520" rx="14"/>
+    </clipPath>
+  </defs>
+  <g clip-path="url(#swapClip)">
+    <!-- Background -->
+    <rect width="900" height="520" fill="#FAF9F5"/>
+
+    <!-- Browser chrome -->
+    <rect width="900" height="38" fill="#E5E0D5"/>
+    <circle cx="18" cy="19" r="5.5" fill="#FF5F57"/>
+    <circle cx="32" cy="19" r="5.5" fill="#FEBC2E"/>
+    <circle cx="46" cy="19" r="5.5" fill="#28C840"/>
+    <rect x="64" y="11" width="772" height="16" rx="8" fill="#F5F3EE" opacity="0.8"/>
+    <text x="450" y="23" text-anchor="middle" font-size="9.5" fill="#9A9180" font-family="system-ui,sans-serif">app.servetogether.com/swaps</text>
+
+    <!-- App nav -->
+    <rect y="38" width="900" height="44" fill="#FAF9F5"/>
+    <line x1="0" y1="82" x2="900" y2="82" stroke="#E4DFD0" stroke-width="1"/>
+    <text x="20" y="65" font-size="15" font-weight="700" fill="#43705A" font-family="Georgia,serif">ServeTogether</text>
+    <text x="628" y="65" font-size="12" fill="#9A9180" font-family="system-ui,sans-serif">Dashboard</text>
+    <text x="706" y="65" font-size="12" fill="#9A9180" font-family="system-ui,sans-serif">Schedule</text>
+    <rect x="762" y="52" width="50" height="22" rx="5" fill="#ECF3EF"/>
+    <text x="787" y="67" text-anchor="middle" font-size="12" font-weight="600" fill="#43705A" font-family="system-ui,sans-serif">Swaps</text>
+    <text x="826" y="65" font-size="12" fill="#9A9180" font-family="system-ui,sans-serif">Profile</text>
+
+    <!-- Page header and tabs -->
+    <text x="20" y="112" font-size="20" font-weight="700" fill="#3D2F22" font-family="Georgia,serif">Swap Requests</text>
+    <!-- Tab underlines -->
+    <text x="20" y="132" font-size="11" font-weight="600" fill="#43705A" font-family="system-ui,sans-serif">My Requests</text>
+    <line x1="20" y1="136" x2="90" y2="136" stroke="#43705A" stroke-width="2"/>
+    <text x="106" y="132" font-size="11" fill="#9A9180" font-family="system-ui,sans-serif">Incoming Offers</text>
+    <text x="218" y="132" font-size="11" fill="#9A9180" font-family="system-ui,sans-serif">All Swaps</text>
+
+    <!-- CARD 1: Offer Pending (y=150, height=152) -->
+    <rect x="16" y="150" width="868" height="152" rx="10" fill="#FDFCF8" stroke="#E4DFD0" stroke-width="1.5"/>
+    <!-- Primary date block -->
+    <rect x="30" y="168" width="44" height="44" rx="7" fill="#43705A"/>
+    <text x="52" y="179" text-anchor="middle" font-size="7.5" fill="#B8D8C8" font-family="system-ui,sans-serif">SUN</text>
+    <text x="52" y="194" text-anchor="middle" font-size="14" font-weight="700" fill="white" font-family="system-ui,sans-serif">6</text>
+    <text x="52" y="203" text-anchor="middle" font-size="7.5" fill="#B8D8C8" font-family="system-ui,sans-serif">JUL</text>
+    <!-- Role badge -->
+    <rect x="84" y="165" width="56" height="18" rx="4" fill="#EDE4F8"/>
+    <text x="112" y="177" text-anchor="middle" font-size="10" fill="#7B3FAF" font-family="system-ui,sans-serif">Reader</text>
+    <!-- Status badge: Offer Pending -->
+    <rect x="782" y="165" width="88" height="18" rx="5" fill="#FBF2DC"/>
+    <text x="826" y="177" text-anchor="middle" font-size="10" font-weight="600" fill="#9B7208" font-family="system-ui,sans-serif">Offer Pending</text>
+    <!-- Event name and time -->
+    <text x="84" y="198" font-size="13" font-weight="600" fill="#3D2F22" font-family="system-ui,sans-serif">Morning Service</text>
+    <text x="84" y="214" font-size="11" fill="#9A9180" font-family="system-ui,sans-serif">Sunday 6 July · 9:30 am · I'm away this weekend</text>
+
+    <!-- Offer box (amber tinted inner card) -->
+    <rect x="26" y="228" width="856" height="68" rx="8" fill="#FFFAEC" stroke="#E6C46A" stroke-width="0.75" stroke-opacity="0.7"/>
+    <text x="42" y="246" font-size="10" fill="#9B7208" font-family="system-ui,sans-serif">James R. has offered to swap with you:</text>
+    <text x="42" y="264" font-size="12" font-weight="600" fill="#3D2F22" font-family="system-ui,sans-serif">Evening Service · Sunday 20 July · 6:00 pm</text>
+    <rect x="42" y="272" width="56" height="18" rx="4" fill="#EDE4F8"/>
+    <text x="70" y="284" text-anchor="middle" font-size="10" fill="#7B3FAF" font-family="system-ui,sans-serif">Reader</text>
+    <!-- Accept button -->
+    <rect x="724" y="234" width="72" height="28" rx="6" fill="#43705A"/>
+    <text x="760" y="252" text-anchor="middle" font-size="11" fill="white" font-family="system-ui,sans-serif">Accept</text>
+    <!-- Decline link -->
+    <text x="806" y="252" font-size="11" fill="#9A9180" font-family="system-ui,sans-serif">Decline</text>
+
+    <!-- CARD 2: Approved (y=316, height=82) -->
+    <rect x="16" y="316" width="868" height="82" rx="10" fill="#FDFCF8" stroke="#E4DFD0" stroke-width="1"/>
+    <!-- Green left accent -->
+    <rect x="16" y="316" width="4" height="82" rx="2" fill="#43705A" opacity="0.5"/>
+    <rect x="30" y="335" width="40" height="40" rx="7" fill="#EDE9DC"/>
+    <text x="50" y="345" text-anchor="middle" font-size="7.5" fill="#9A9180" font-family="system-ui,sans-serif">SUN</text>
+    <text x="50" y="360" text-anchor="middle" font-size="14" font-weight="700" fill="#7A7068" font-family="system-ui,sans-serif">13</text>
+    <text x="50" y="369" text-anchor="middle" font-size="7.5" fill="#9A9180" font-family="system-ui,sans-serif">JUL</text>
+    <!-- Role badge -->
+    <rect x="84" y="323" width="62" height="18" rx="4" fill="#DAEEF7"/>
+    <text x="115" y="335" text-anchor="middle" font-size="10" fill="#1A7AA8" font-family="system-ui,sans-serif">Welcome</text>
+    <!-- Status badge: Approved -->
+    <rect x="796" y="323" width="70" height="18" rx="5" fill="#D0E8D8"/>
+    <text x="831" y="335" text-anchor="middle" font-size="10" font-weight="600" fill="#2D5C40" font-family="system-ui,sans-serif">Approved</text>
+    <text x="84" y="356" font-size="13" font-weight="600" fill="#3D2F22" font-family="system-ui,sans-serif">Morning Service</text>
+    <text x="84" y="372" font-size="11" fill="#9A9180" font-family="system-ui,sans-serif">Sunday 13 July · Swapped with Anna B.</text>
+
+    <!-- CARD 3: Pending (partial, y=412, height=70) -->
+    <rect x="16" y="412" width="868" height="70" rx="10" fill="#FDFCF8" stroke="#E4DFD0" stroke-width="1"/>
+    <rect x="30" y="426" width="40" height="40" rx="7" fill="#EDE9DC"/>
+    <text x="50" y="436" text-anchor="middle" font-size="7.5" fill="#9A9180" font-family="system-ui,sans-serif">SUN</text>
+    <text x="50" y="451" text-anchor="middle" font-size="14" font-weight="700" fill="#7A7068" font-family="system-ui,sans-serif">27</text>
+    <text x="50" y="460" text-anchor="middle" font-size="7.5" fill="#9A9180" font-family="system-ui,sans-serif">JUL</text>
+    <text x="84" y="444" font-size="13" font-weight="600" fill="#3D2F22" font-family="system-ui,sans-serif">Morning Service</text>
+    <text x="84" y="460" font-size="11" fill="#9A9180" font-family="system-ui,sans-serif">Sunday 27 July · Awaiting offers</text>
+    <rect x="796" y="421" width="68" height="18" rx="5" fill="#FBF2DC"/>
+    <text x="830" y="433" text-anchor="middle" font-size="10" font-weight="600" fill="#9B7208" font-family="system-ui,sans-serif">Pending</text>
+
+    <!-- Bottom fade -->
+    <rect y="390" width="900" height="130" fill="url(#swapFade)"/>
+
+    <!-- Outer border -->
+    <rect width="900" height="520" rx="14" fill="none" stroke="#D8D3C8" stroke-width="1.5"/>
+  </g>
+</svg>
