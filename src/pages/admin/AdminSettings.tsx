@@ -114,7 +114,7 @@ const AdminSettings = () => {
                             Organisation
                         </CardTitle>
                         <CardDescription>
-                            The organisation name is shown in the app header, email subjects, and email bodies1.
+                            The organisation name is shown in the app header, email subjects, and email bodies.
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-5">
