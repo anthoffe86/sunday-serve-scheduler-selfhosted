@@ -1,0 +1,156 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 520">
+  <defs>
+    <linearGradient id="schFade" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#FAF9F5" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#FAF9F5" stop-opacity="1"/>
+    </linearGradient>
+    <clipPath id="schClip">
+      <rect width="900" height="520" rx="14"/>
+    </clipPath>
+  </defs>
+  <g clip-path="url(#schClip)">
+    <!-- Background -->
+    <rect width="900" height="520" fill="#FAF9F5"/>
+
+    <!-- Browser chrome -->
+    <rect width="900" height="38" fill="#E5E0D5"/>
+    <circle cx="18" cy="19" r="5.5" fill="#FF5F57"/>
+    <circle cx="32" cy="19" r="5.5" fill="#FEBC2E"/>
+    <circle cx="46" cy="19" r="5.5" fill="#28C840"/>
+    <rect x="64" y="11" width="772" height="16" rx="8" fill="#F5F3EE" opacity="0.8"/>
+    <text x="450" y="23" text-anchor="middle" font-size="9.5" fill="#9A9180" font-family="system-ui,sans-serif">app.servetogether.com/schedule</text>
+
+    <!-- App nav -->
+    <rect y="38" width="900" height="44" fill="#FAF9F5"/>
+    <line x1="0" y1="82" x2="900" y2="82" stroke="#E4DFD0" stroke-width="1"/>
+    <text x="20" y="65" font-size="15" font-weight="700" fill="#43705A" font-family="Georgia,serif">ServeTogether</text>
+    <text x="628" y="65" font-size="12" fill="#9A9180" font-family="system-ui,sans-serif">Dashboard</text>
+    <rect x="704" y="52" width="66" height="22" rx="5" fill="#ECF3EF"/>
+    <text x="737" y="67" text-anchor="middle" font-size="12" font-weight="600" fill="#43705A" font-family="system-ui,sans-serif">Schedule</text>
+    <text x="788" y="65" font-size="12" fill="#9A9180" font-family="system-ui,sans-serif">Swaps</text>
+    <text x="843" y="65" font-size="12" fill="#9A9180" font-family="system-ui,sans-serif">Profile</text>
+
+    <!-- Page heading -->
+    <text x="20" y="114" font-size="20" font-weight="700" fill="#3D2F22" font-family="Georgia,serif">Service Schedule</text>
+    <text x="20" y="130" font-size="11" fill="#9A9180" font-family="system-ui,sans-serif">July 2026 · St Matthew's Church</text>
+    <rect x="778" y="91" width="62" height="28" rx="6" fill="#F0ECE0" stroke="#E4DFD0" stroke-width="1"/>
+    <text x="809" y="109" text-anchor="middle" font-size="11" fill="#4A3E2F" font-family="system-ui,sans-serif">Export</text>
+    <rect x="846" y="91" width="42" height="28" rx="6" fill="#43705A"/>
+    <text x="867" y="109" text-anchor="middle" font-size="11" fill="#F9F7F3" font-family="system-ui,sans-serif">+ New</text>
+
+    <!-- Table header row -->
+    <rect y="136" width="900" height="34" fill="#EDE9DC"/>
+    <text x="16" y="157" font-size="10.5" font-weight="600" fill="#7A7068" font-family="system-ui,sans-serif">Date / Event</text>
+    <text x="156" y="157" font-size="10" font-weight="600" fill="#7A7068" font-family="system-ui,sans-serif">Sound</text>
+    <text x="306" y="157" font-size="10" font-weight="600" fill="#7A7068" font-family="system-ui,sans-serif">Welcome</text>
+    <text x="456" y="157" font-size="10" font-weight="600" fill="#7A7068" font-family="system-ui,sans-serif">Reader</text>
+    <text x="606" y="157" font-size="10" font-weight="600" fill="#7A7068" font-family="system-ui,sans-serif">Intercessions</text>
+    <text x="756" y="157" font-size="10" font-weight="600" fill="#7A7068" font-family="system-ui,sans-serif">Collection</text>
+
+    <!-- Column dividers -->
+    <line x1="148" y1="136" x2="148" y2="412" stroke="#E4DFD0" stroke-width="0.75"/>
+    <line x1="298" y1="136" x2="298" y2="412" stroke="#E4DFD0" stroke-width="0.75"/>
+    <line x1="448" y1="136" x2="448" y2="412" stroke="#E4DFD0" stroke-width="0.75"/>
+    <line x1="598" y1="136" x2="598" y2="412" stroke="#E4DFD0" stroke-width="0.75"/>
+    <line x1="748" y1="136" x2="748" y2="412" stroke="#E4DFD0" stroke-width="0.75"/>
+
+    <!-- ROW 1: Sun 6 Jul — highlighted (next service) -->
+    <rect y="170" width="900" height="48" fill="#F3FAF6"/>
+    <line x1="0" y1="218" x2="900" y2="218" stroke="#E4DFD0" stroke-width="0.75"/>
+    <rect x="8" y="175" width="40" height="38" rx="7" fill="#43705A"/>
+    <text x="28" y="186" text-anchor="middle" font-size="7.5" fill="#B8D8C8" font-family="system-ui,sans-serif">SUN</text>
+    <text x="28" y="201" text-anchor="middle" font-size="14" font-weight="700" fill="white" font-family="system-ui,sans-serif">6</text>
+    <text x="28" y="210" text-anchor="middle" font-size="7.5" fill="#B8D8C8" font-family="system-ui,sans-serif">JUL</text>
+    <text x="56" y="191" font-size="11.5" font-weight="600" fill="#3D2F22" font-family="system-ui,sans-serif">Morning Service</text>
+    <text x="56" y="207" font-size="10" fill="#9A9180" font-family="system-ui,sans-serif">9:30 am · Next Service</text>
+    <rect x="158" y="184" width="68" height="20" rx="4" fill="#DAEEF7"/>
+    <text x="192" y="198" text-anchor="middle" font-size="10" fill="#1A7AA8" font-family="system-ui,sans-serif">Emma T.</text>
+    <rect x="308" y="184" width="80" height="20" rx="4" fill="#D0E8D8"/>
+    <text x="348" y="198" text-anchor="middle" font-size="10" font-weight="600" fill="#2D5C40" font-family="system-ui,sans-serif">You (Sarah M.)</text>
+    <rect x="458" y="184" width="64" height="20" rx="4" fill="#EDE4F8"/>
+    <text x="490" y="198" text-anchor="middle" font-size="10" fill="#7B3FAF" font-family="system-ui,sans-serif">Peter L.</text>
+    <text x="673" y="197" text-anchor="middle" font-size="16" fill="#C8C2B8" font-family="system-ui,sans-serif">—</text>
+    <rect x="758" y="184" width="60" height="20" rx="4" fill="#FBF2DC"/>
+    <text x="788" y="198" text-anchor="middle" font-size="10" fill="#9B7208" font-family="system-ui,sans-serif">Lucy F.</text>
+
+    <!-- ROW 2: Sun 13 Jul -->
+    <rect y="218" width="900" height="48" fill="#FAF9F5"/>
+    <line x1="0" y1="266" x2="900" y2="266" stroke="#E4DFD0" stroke-width="0.75"/>
+    <rect x="8" y="223" width="40" height="38" rx="7" fill="#EDE9DC"/>
+    <text x="28" y="234" text-anchor="middle" font-size="7.5" fill="#9A9180" font-family="system-ui,sans-serif">SUN</text>
+    <text x="28" y="249" text-anchor="middle" font-size="14" font-weight="700" fill="#7A7068" font-family="system-ui,sans-serif">13</text>
+    <text x="28" y="258" text-anchor="middle" font-size="7.5" fill="#9A9180" font-family="system-ui,sans-serif">JUL</text>
+    <text x="56" y="239" font-size="11.5" font-weight="600" fill="#3D2F22" font-family="system-ui,sans-serif">Morning Service</text>
+    <text x="56" y="255" font-size="10" fill="#9A9180" font-family="system-ui,sans-serif">9:30 am</text>
+    <rect x="158" y="232" width="68" height="20" rx="4" fill="#DAEEF7"/>
+    <text x="192" y="246" text-anchor="middle" font-size="10" fill="#1A7AA8" font-family="system-ui,sans-serif">David K.</text>
+    <text x="373" y="246" text-anchor="middle" font-size="16" fill="#C8C2B8" font-family="system-ui,sans-serif">—</text>
+    <rect x="458" y="232" width="56" height="20" rx="4" fill="#EDE4F8"/>
+    <text x="486" y="246" text-anchor="middle" font-size="10" fill="#7B3FAF" font-family="system-ui,sans-serif">Tom H.</text>
+    <rect x="608" y="232" width="70" height="20" rx="4" fill="#F6E2EE"/>
+    <text x="643" y="246" text-anchor="middle" font-size="10" fill="#B03070" font-family="system-ui,sans-serif">Rachel G.</text>
+    <rect x="758" y="232" width="56" height="20" rx="4" fill="#FBF2DC"/>
+    <text x="786" y="246" text-anchor="middle" font-size="10" fill="#9B7208" font-family="system-ui,sans-serif">John D.</text>
+
+    <!-- ROW 3: Sun 20 Jul — Draft -->
+    <rect y="266" width="900" height="48" fill="#FAF9F5"/>
+    <line x1="0" y1="314" x2="900" y2="314" stroke="#E4DFD0" stroke-width="0.75"/>
+    <rect x="8" y="271" width="40" height="38" rx="7" fill="#EDE9DC"/>
+    <text x="28" y="282" text-anchor="middle" font-size="7.5" fill="#9A9180" font-family="system-ui,sans-serif">SUN</text>
+    <text x="28" y="297" text-anchor="middle" font-size="14" font-weight="700" fill="#7A7068" font-family="system-ui,sans-serif">20</text>
+    <text x="28" y="306" text-anchor="middle" font-size="7.5" fill="#9A9180" font-family="system-ui,sans-serif">JUL</text>
+    <text x="56" y="283" font-size="11.5" font-weight="600" fill="#3D2F22" font-family="system-ui,sans-serif">Morning Service</text>
+    <rect x="56" y="286" width="32" height="14" rx="3" fill="#EDE9DC"/>
+    <text x="72" y="296" text-anchor="middle" font-size="8" fill="#7A7068" font-family="system-ui,sans-serif">Draft</text>
+    <text x="223" y="296" text-anchor="middle" font-size="16" fill="#C8C2B8" font-family="system-ui,sans-serif">—</text>
+    <rect x="308" y="280" width="66" height="20" rx="4" fill="#DAEEF7"/>
+    <text x="341" y="294" text-anchor="middle" font-size="10" fill="#1A7AA8" font-family="system-ui,sans-serif">Chris P.</text>
+    <text x="523" y="296" text-anchor="middle" font-size="16" fill="#C8C2B8" font-family="system-ui,sans-serif">—</text>
+    <text x="673" y="296" text-anchor="middle" font-size="16" fill="#C8C2B8" font-family="system-ui,sans-serif">—</text>
+    <rect x="758" y="280" width="58" height="20" rx="4" fill="#FBF2DC"/>
+    <text x="787" y="294" text-anchor="middle" font-size="10" fill="#9B7208" font-family="system-ui,sans-serif">Anna B.</text>
+
+    <!-- ROW 4: Sun 27 Jul -->
+    <rect y="314" width="900" height="48" fill="#FAF9F5"/>
+    <line x1="0" y1="362" x2="900" y2="362" stroke="#E4DFD0" stroke-width="0.75"/>
+    <rect x="8" y="319" width="40" height="38" rx="7" fill="#EDE9DC"/>
+    <text x="28" y="330" text-anchor="middle" font-size="7.5" fill="#9A9180" font-family="system-ui,sans-serif">SUN</text>
+    <text x="28" y="345" text-anchor="middle" font-size="14" font-weight="700" fill="#7A7068" font-family="system-ui,sans-serif">27</text>
+    <text x="28" y="354" text-anchor="middle" font-size="7.5" fill="#9A9180" font-family="system-ui,sans-serif">JUL</text>
+    <text x="56" y="335" font-size="11.5" font-weight="600" fill="#3D2F22" font-family="system-ui,sans-serif">Morning Service</text>
+    <text x="56" y="351" font-size="10" fill="#9A9180" font-family="system-ui,sans-serif">9:30 am</text>
+    <rect x="158" y="328" width="62" height="20" rx="4" fill="#DAEEF7"/>
+    <text x="189" y="342" text-anchor="middle" font-size="10" fill="#1A7AA8" font-family="system-ui,sans-serif">Fiona S.</text>
+    <rect x="308" y="328" width="64" height="20" rx="4" fill="#DAEEF7"/>
+    <text x="340" y="342" text-anchor="middle" font-size="10" fill="#1A7AA8" font-family="system-ui,sans-serif">Emma T.</text>
+    <text x="523" y="341" text-anchor="middle" font-size="16" fill="#C8C2B8" font-family="system-ui,sans-serif">—</text>
+    <rect x="608" y="328" width="56" height="20" rx="4" fill="#F6E2EE"/>
+    <text x="636" y="342" text-anchor="middle" font-size="10" fill="#B03070" font-family="system-ui,sans-serif">Tom H.</text>
+    <rect x="758" y="328" width="66" height="20" rx="4" fill="#FBF2DC"/>
+    <text x="791" y="342" text-anchor="middle" font-size="10" fill="#9B7208" font-family="system-ui,sans-serif">James R.</text>
+
+    <!-- ROW 5: Sun 3 Aug (partial / faded) -->
+    <rect y="362" width="900" height="48" fill="#FAF9F5"/>
+    <rect x="8" y="367" width="40" height="38" rx="7" fill="#EDE9DC"/>
+    <text x="28" y="378" text-anchor="middle" font-size="7.5" fill="#9A9180" font-family="system-ui,sans-serif">SUN</text>
+    <text x="28" y="393" text-anchor="middle" font-size="14" font-weight="700" fill="#7A7068" font-family="system-ui,sans-serif">3</text>
+    <text x="28" y="402" text-anchor="middle" font-size="7.5" fill="#9A9180" font-family="system-ui,sans-serif">AUG</text>
+    <text x="56" y="383" font-size="11.5" font-weight="600" fill="#3D2F22" font-family="system-ui,sans-serif">Morning Service</text>
+    <text x="56" y="399" font-size="10" fill="#9A9180" font-family="system-ui,sans-serif">9:30 am</text>
+    <rect x="158" y="376" width="80" height="20" rx="4" fill="#D0E8D8"/>
+    <text x="198" y="390" text-anchor="middle" font-size="10" font-weight="600" fill="#2D5C40" font-family="system-ui,sans-serif">You (Sarah M.)</text>
+    <rect x="308" y="376" width="64" height="20" rx="4" fill="#DAEEF7"/>
+    <text x="340" y="390" text-anchor="middle" font-size="10" fill="#1A7AA8" font-family="system-ui,sans-serif">James R.</text>
+    <rect x="458" y="376" width="60" height="20" rx="4" fill="#EDE4F8"/>
+    <text x="488" y="390" text-anchor="middle" font-size="10" fill="#7B3FAF" font-family="system-ui,sans-serif">Lucy F.</text>
+    <text x="673" y="389" text-anchor="middle" font-size="16" fill="#C8C2B8" font-family="system-ui,sans-serif">—</text>
+    <rect x="758" y="376" width="62" height="20" rx="4" fill="#EDE4F8"/>
+    <text x="789" y="390" text-anchor="middle" font-size="10" fill="#7B3FAF" font-family="system-ui,sans-serif">Peter L.</text>
+
+    <!-- Bottom fade -->
+    <rect y="330" width="900" height="190" fill="url(#schFade)"/>
+
+    <!-- Outer border -->
+    <rect width="900" height="520" rx="14" fill="none" stroke="#D8D3C8" stroke-width="1.5"/>
+  </g>
+</svg>

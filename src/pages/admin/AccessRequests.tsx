@@ -81,9 +81,9 @@ const AccessRequests = () => {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="font-serif text-2xl sm:text-3xl font-bold">Access Requests</h1>
+        <h1 className="font-serif text-2xl sm:text-3xl font-bold">Info & Demo Enquiries</h1>
         <p className="text-sm sm:text-base text-muted-foreground">
-          Organisations that have requested access to ServeTogether. Onboard them manually after reviewing.
+          Organisations that want more information and a demo. Review each enquiry and follow up to collect onboarding details.
         </p>
       </div>
 
@@ -91,9 +91,9 @@ const AccessRequests = () => {
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-16 text-center">
             <ClipboardList className="h-12 w-12 text-muted-foreground mb-4" />
-            <p className="font-medium">No access requests yet</p>
+            <p className="font-medium">No info/demo enquiries yet</p>
             <p className="text-sm text-muted-foreground mt-1">
-              Requests submitted from the landing page will appear here.
+              Enquiries submitted from the landing page will appear here.
             </p>
           </CardContent>
         </Card>

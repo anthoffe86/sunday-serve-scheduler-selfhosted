@@ -1,0 +1,90 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 520">
+  <defs>
+    <linearGradient id="dashFade" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#FAF9F5" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#FAF9F5" stop-opacity="1"/>
+    </linearGradient>
+    <clipPath id="dashClip">
+      <rect width="900" height="520" rx="14"/>
+    </clipPath>
+  </defs>
+  <g clip-path="url(#dashClip)">
+    <!-- Background -->
+    <rect width="900" height="520" fill="#FAF9F5"/>
+
+    <!-- Browser chrome -->
+    <rect width="900" height="38" fill="#E5E0D5"/>
+    <circle cx="18" cy="19" r="5.5" fill="#FF5F57"/>
+    <circle cx="32" cy="19" r="5.5" fill="#FEBC2E"/>
+    <circle cx="46" cy="19" r="5.5" fill="#28C840"/>
+    <rect x="64" y="11" width="772" height="16" rx="8" fill="#F5F3EE" opacity="0.8"/>
+    <text x="450" y="23" text-anchor="middle" font-size="9.5" fill="#9A9180" font-family="system-ui,sans-serif">app.servetogether.com/dashboard</text>
+
+    <!-- App nav -->
+    <rect y="38" width="900" height="44" fill="#FAF9F5"/>
+    <line x1="0" y1="82" x2="900" y2="82" stroke="#E4DFD0" stroke-width="1"/>
+    <text x="20" y="65" font-size="15" font-weight="700" fill="#43705A" font-family="Georgia,serif">ServeTogether</text>
+    <rect x="616" y="52" width="76" height="22" rx="5" fill="#ECF3EF"/>
+    <text x="654" y="67" text-anchor="middle" font-size="12" font-weight="600" fill="#43705A" font-family="system-ui,sans-serif">Dashboard</text>
+    <text x="706" y="65" font-size="12" fill="#9A9180" font-family="system-ui,sans-serif">Schedule</text>
+    <text x="780" y="65" font-size="12" fill="#9A9180" font-family="system-ui,sans-serif">Swaps</text>
+    <text x="838" y="65" font-size="12" fill="#9A9180" font-family="system-ui,sans-serif">Profile</text>
+
+    <!-- Welcome header -->
+    <text x="20" y="114" font-size="20" font-weight="700" fill="#3D2F22" font-family="Georgia,serif">Welcome back, Sarah</text>
+    <text x="20" y="132" font-size="11" fill="#9A9180" font-family="system-ui,sans-serif">3 upcoming services this month · St Matthew's Church</text>
+
+    <!-- Section label -->
+    <text x="20" y="158" font-size="12" font-weight="600" fill="#3D2F22" font-family="system-ui,sans-serif">Your upcoming services</text>
+    <text x="880" y="158" text-anchor="end" font-size="11" fill="#43705A" font-family="system-ui,sans-serif">View all →</text>
+
+    <!-- CARD 1: Next Service (highlighted, y=168, height=96) -->
+    <rect x="16" y="168" width="868" height="96" rx="10" fill="#EEF8F2" stroke="#B8D8C8" stroke-width="1.5"/>
+    <!-- Primary date block -->
+    <rect x="30" y="192" width="44" height="44" rx="7" fill="#43705A"/>
+    <text x="52" y="203" text-anchor="middle" font-size="7.5" fill="#B8D8C8" font-family="system-ui,sans-serif">SUN</text>
+    <text x="52" y="218" text-anchor="middle" font-size="14" font-weight="700" fill="white" font-family="system-ui,sans-serif">6</text>
+    <text x="52" y="227" text-anchor="middle" font-size="7.5" fill="#B8D8C8" font-family="system-ui,sans-serif">JUL</text>
+    <!-- "Next Service" badge -->
+    <rect x="86" y="178" width="74" height="18" rx="5" fill="#D0E8D8"/>
+    <text x="123" y="190" text-anchor="middle" font-size="9.5" font-weight="600" fill="#2D5C40" font-family="system-ui,sans-serif">Next Service</text>
+    <!-- Event name and details -->
+    <text x="86" y="211" font-size="13.5" font-weight="600" fill="#3D2F22" font-family="system-ui,sans-serif">Morning Service</text>
+    <text x="86" y="228" font-size="11" fill="#9A9180" font-family="system-ui,sans-serif">Sunday 6 July · 9:30 am</text>
+    <!-- Role badge -->
+    <rect x="86" y="238" width="54" height="18" rx="4" fill="#DAEEF7"/>
+    <text x="113" y="250" text-anchor="middle" font-size="10" fill="#1A7AA8" font-family="system-ui,sans-serif">Sound</text>
+    <!-- View link -->
+    <text x="868" y="218" text-anchor="end" font-size="11" fill="#43705A" font-family="system-ui,sans-serif">View details →</text>
+
+    <!-- CARD 2 (y=276, height=80) -->
+    <rect x="16" y="276" width="868" height="80" rx="10" fill="#FDFCF8" stroke="#E4DFD0" stroke-width="1"/>
+    <rect x="30" y="296" width="40" height="40" rx="7" fill="#EDE9DC"/>
+    <text x="50" y="306" text-anchor="middle" font-size="7.5" fill="#9A9180" font-family="system-ui,sans-serif">SUN</text>
+    <text x="50" y="321" text-anchor="middle" font-size="14" font-weight="700" fill="#7A7068" font-family="system-ui,sans-serif">20</text>
+    <text x="50" y="330" text-anchor="middle" font-size="7.5" fill="#9A9180" font-family="system-ui,sans-serif">JUL</text>
+    <text x="84" y="302" font-size="13" font-weight="600" fill="#3D2F22" font-family="system-ui,sans-serif">Morning Service</text>
+    <text x="84" y="319" font-size="11" fill="#9A9180" font-family="system-ui,sans-serif">Sunday 20 July · 9:30 am</text>
+    <rect x="84" y="328" width="56" height="18" rx="4" fill="#EDE4F8"/>
+    <text x="112" y="340" text-anchor="middle" font-size="10" fill="#7B3FAF" font-family="system-ui,sans-serif">Reader</text>
+    <text x="868" y="319" text-anchor="end" font-size="11" fill="#43705A" font-family="system-ui,sans-serif">View details →</text>
+
+    <!-- CARD 3 (y=368, height=80) -->
+    <rect x="16" y="368" width="868" height="80" rx="10" fill="#FDFCF8" stroke="#E4DFD0" stroke-width="1"/>
+    <rect x="30" y="388" width="40" height="40" rx="7" fill="#EDE9DC"/>
+    <text x="50" y="398" text-anchor="middle" font-size="7.5" fill="#9A9180" font-family="system-ui,sans-serif">SUN</text>
+    <text x="50" y="413" text-anchor="middle" font-size="14" font-weight="700" fill="#7A7068" font-family="system-ui,sans-serif">3</text>
+    <text x="50" y="422" text-anchor="middle" font-size="7.5" fill="#9A9180" font-family="system-ui,sans-serif">AUG</text>
+    <text x="84" y="394" font-size="13" font-weight="600" fill="#3D2F22" font-family="system-ui,sans-serif">Morning Service</text>
+    <text x="84" y="411" font-size="11" fill="#9A9180" font-family="system-ui,sans-serif">Sunday 3 August · 9:30 am</text>
+    <rect x="84" y="420" width="66" height="18" rx="4" fill="#DAEEF7"/>
+    <text x="117" y="432" text-anchor="middle" font-size="10" fill="#1A7AA8" font-family="system-ui,sans-serif">Welcome</text>
+    <text x="868" y="411" text-anchor="end" font-size="11" fill="#43705A" font-family="system-ui,sans-serif">View details →</text>
+
+    <!-- Bottom fade -->
+    <rect y="380" width="900" height="140" fill="url(#dashFade)"/>
+
+    <!-- Outer border -->
+    <rect width="900" height="520" rx="14" fill="none" stroke="#D8D3C8" stroke-width="1.5"/>
+  </g>
+</svg>

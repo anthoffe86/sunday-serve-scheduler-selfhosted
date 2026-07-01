@@ -16,6 +16,9 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { z } from 'zod';
 import logoUrl from '@/assets/servetogether-logo.png';
+import mockupScheduleUrl from '@/assets/mockup-schedule.svg';
+import mockupDashboardUrl from '@/assets/mockup-dashboard.svg';
+import mockupSwapsUrl from '@/assets/mockup-swaps.svg';
 import {
   Calendar,
   Users,
@@ -154,7 +157,7 @@ const faqs = [
   },
   {
     q: 'How do I get started?',
-    a: 'Request access using the form on this page. We onboard new organisations manually so we can set up your branding, roles and templates correctly from day one.',
+    a: 'Request more information and a demo using the form on this page. We will then collect your onboarding details so we can set up your branding, roles and templates correctly from day one.',
   },
   {
     q: 'Can I export the rota for printing?',
@@ -216,7 +219,7 @@ const Landing = () => {
     setSubmitting(false);
     if (error) {
       console.error(error);
-      toast.error('Something went wrong submitting your request. Please try again.');
+      toast.error('Something went wrong submitting your enquiry. Please try again.');
       return;
     }
 
@@ -284,7 +287,7 @@ const Landing = () => {
             <a href="#faq" className="text-muted-foreground transition-colors hover:text-foreground">FAQ</a>
           </nav>
           <div className="flex items-center gap-2">
-            <Button asChild variant="ghost" className="hidden sm:inline-flex"><a href="#request-access">Request access</a></Button>
+            <Button asChild variant="ghost" className="hidden sm:inline-flex"><a href="#request-info-demo">Request info & demo</a></Button>
             <Button asChild><Link to="/auth">Sign in<ArrowRight className="ml-2 h-4 w-4" /></Link></Button>
           </div>
         </div>
@@ -297,16 +300,137 @@ const Landing = () => {
             <h1 className="font-serif text-4xl font-bold tracking-tight md:text-5xl lg:text-6xl">Volunteer & church rota software<span className="block text-primary">that runs itself</span></h1>
             <p className="mx-auto mt-6 max-w-2xl text-lg text-muted-foreground md:text-xl">ServeTogether helps churches, charities and volunteer-led organisations build rotas, manage swaps, track availability and notify their teams - automatically, and without spreadsheets.</p>
             <div className="mt-10 flex flex-col gap-4 sm:flex-row sm:justify-center">
-              <Button asChild size="lg" className="text-base"><a href="#request-access">Request access for your organisation<ArrowRight className="ml-2 h-5 w-5" /></a></Button>
+              <Button asChild size="lg" className="text-base"><a href="#request-info-demo">Request info & demo<ArrowRight className="ml-2 h-5 w-5" /></a></Button>
               <Button asChild size="lg" variant="outline" className="text-base"><Link to="/auth">Sign in to your account</Link></Button>
             </div>
             <p className="mt-6 text-sm text-muted-foreground">Invite-only · Mobile-friendly · Built for churches, designed for any volunteer team</p>
+          </div>
+          <div className="relative mt-16 mx-auto max-w-5xl">
+            <div className="absolute -inset-6 rounded-3xl bg-primary/5 blur-3xl" aria-hidden="true" />
+            <img
+              src={mockupScheduleUrl}
+              alt="ServeTogether schedule view showing volunteer assignments across service dates"
+              className="relative w-full rounded-2xl shadow-2xl border border-primary/10"
+              loading="eager"
+            />
           </div>
         </div>
         <div className="absolute -top-24 left-1/2 h-96 w-96 -translate-x-1/2 rounded-full bg-primary/10 blur-3xl" />
       </section>
 
-      <section id="features" className="py-20"><div className="container mx-auto px-4"><div className="mx-auto max-w-3xl text-center"><h2 className="font-serif text-3xl font-bold md:text-4xl">The full feature set</h2><p className="mt-4 text-muted-foreground">Everything you need to coordinate a volunteer team - from auto-scheduling and swaps to email notifications, calendar feeds and admin oversight.</p></div><div className="mt-16 space-y-16">{featureGroups.map((group) => (<div key={group.title}><div className="mb-8 flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary"><group.icon className="h-5 w-5" /></div><h3 className="font-serif text-2xl font-semibold">{group.title}</h3></div><div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">{group.features.map((f) => (<Card key={f.name} className="border-2 transition-colors hover:border-primary/50"><CardContent className="pt-6"><div className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary"><f.icon className="h-5 w-5" /></div><h4 className="font-serif text-lg font-semibold">{f.name}</h4><p className="mt-2 text-sm text-muted-foreground">{f.desc}</p></CardContent></Card>))}</div></div>))}</div></div></section>
+      <section id="features" className="py-20">
+        <div className="container mx-auto px-4">
+          <div className="mx-auto max-w-3xl text-center">
+            <h2 className="font-serif text-3xl font-bold md:text-4xl">The full feature set</h2>
+            <p className="mt-4 text-muted-foreground">Everything you need to coordinate a volunteer team - from auto-scheduling and swaps to email notifications, calendar feeds and admin oversight.</p>
+          </div>
+
+          <div className="mt-20 space-y-28">
+
+            {/* Scheduling & rota building */}
+            <div className="grid items-center gap-12 lg:grid-cols-2">
+              <div>
+                <div className="mb-6 flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary"><Calendar className="h-5 w-5" /></div>
+                  <h3 className="font-serif text-2xl font-semibold">{featureGroups[0].title}</h3>
+                </div>
+                <ul className="space-y-5">
+                  {featureGroups[0].features.map((f) => (
+                    <li key={f.name} className="flex gap-4">
+                      <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"><f.icon className="h-4 w-4" /></div>
+                      <div>
+                        <p className="font-semibold">{f.name}</p>
+                        <p className="mt-0.5 text-sm text-muted-foreground">{f.desc}</p>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <div className="relative">
+                <div className="absolute -inset-4 rounded-3xl bg-primary/5 blur-2xl" aria-hidden="true" />
+                <img src={mockupScheduleUrl} alt="Schedule table showing volunteer assignments with colour-coded role badges across service dates" className="relative w-full rounded-2xl border border-primary/10 shadow-xl" loading="lazy" />
+              </div>
+            </div>
+
+            {/* Volunteer experience */}
+            <div className="grid items-center gap-12 lg:grid-cols-2">
+              <div className="relative lg:order-first">
+                <div className="absolute -inset-4 rounded-3xl bg-primary/5 blur-2xl" aria-hidden="true" />
+                <img src={mockupDashboardUrl} alt="Volunteer dashboard showing upcoming service assignments with date blocks and role badges" className="relative w-full rounded-2xl border border-primary/10 shadow-xl" loading="lazy" />
+              </div>
+              <div className="lg:order-last">
+                <div className="mb-6 flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary"><Users className="h-5 w-5" /></div>
+                  <h3 className="font-serif text-2xl font-semibold">{featureGroups[1].title}</h3>
+                </div>
+                <ul className="space-y-5">
+                  {featureGroups[1].features.map((f) => (
+                    <li key={f.name} className="flex gap-4">
+                      <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"><f.icon className="h-4 w-4" /></div>
+                      <div>
+                        <p className="font-semibold">{f.name}</p>
+                        <p className="mt-0.5 text-sm text-muted-foreground">{f.desc}</p>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+
+            {/* Fair swap system */}
+            <div className="grid items-center gap-12 lg:grid-cols-2">
+              <div>
+                <div className="mb-6 flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary"><RefreshCw className="h-5 w-5" /></div>
+                  <h3 className="font-serif text-2xl font-semibold">{featureGroups[2].title}</h3>
+                </div>
+                <ul className="space-y-5">
+                  {featureGroups[2].features.map((f) => (
+                    <li key={f.name} className="flex gap-4">
+                      <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"><f.icon className="h-4 w-4" /></div>
+                      <div>
+                        <p className="font-semibold">{f.name}</p>
+                        <p className="mt-0.5 text-sm text-muted-foreground">{f.desc}</p>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <div className="relative">
+                <div className="absolute -inset-4 rounded-3xl bg-primary/5 blur-2xl" aria-hidden="true" />
+                <img src={mockupSwapsUrl} alt="Swap requests view showing pending and approved volunteer swap exchanges" className="relative w-full rounded-2xl border border-primary/10 shadow-xl" loading="lazy" />
+              </div>
+            </div>
+
+          </div>
+
+          {/* Remaining features: Communications, Admin tools, Security */}
+          <div className="mt-24 border-t pt-20">
+            <h3 className="mb-12 text-center font-serif text-2xl font-bold">And much more</h3>
+            <div className="grid gap-10 md:grid-cols-3">
+              {featureGroups.slice(3).map((group) => (
+                <div key={group.title}>
+                  <div className="mb-5 flex items-center gap-3">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary"><group.icon className="h-4 w-4" /></div>
+                    <h4 className="font-serif text-lg font-semibold">{group.title}</h4>
+                  </div>
+                  <ul className="space-y-3">
+                    {group.features.map((f) => (
+                      <li key={f.name} className="flex gap-3">
+                        <f.icon className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                        <div>
+                          <p className="text-sm font-semibold">{f.name}</p>
+                          <p className="mt-0.5 text-xs text-muted-foreground">{f.desc}</p>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
 
       <section id="how-it-works" className="border-y bg-muted/50 py-20"><div className="container mx-auto px-4"><div className="mx-auto max-w-2xl text-center"><h2 className="font-serif text-3xl font-bold md:text-4xl">How it works</h2><p className="mt-4 text-muted-foreground">Four steps from sign-up to a published, fairly-built rota.</p></div><div className="mx-auto mt-12 grid max-w-5xl gap-6 md:grid-cols-2 lg:grid-cols-4">{howItWorks.map((s) => (<div key={s.step} className="rounded-2xl border-2 bg-background p-6"><div className="font-serif text-3xl font-bold text-primary">{s.step}</div><h3 className="mt-3 font-serif text-lg font-semibold">{s.title}</h3><p className="mt-2 text-sm text-muted-foreground">{s.desc}</p></div>))}</div></div></section>
 
@@ -316,7 +440,7 @@ const Landing = () => {
 
       <section id="faq" className="py-20"><div className="container mx-auto px-4"><div className="mx-auto max-w-3xl"><div className="text-center"><h2 className="font-serif text-3xl font-bold md:text-4xl">Frequently asked questions</h2><p className="mt-4 text-muted-foreground">Quick answers about how ServeTogether works.</p></div><Accordion type="single" collapsible className="mt-10">{faqs.map((f, i) => (<AccordionItem key={i} value={`item-${i}`}><AccordionTrigger className="text-left font-serif text-base">{f.q}</AccordionTrigger><AccordionContent className="text-muted-foreground">{f.a}</AccordionContent></AccordionItem>))}</Accordion></div></div></section>
 
-      <section id="request-access" className="border-t bg-muted/50 py-20"><div className="container mx-auto px-4"><div className="mx-auto max-w-2xl"><div className="text-center"><h2 className="font-serif text-3xl font-bold md:text-4xl">Bring ServeTogether to your organisation</h2><p className="mt-4 text-muted-foreground">Tell us about your church or organisation and we will be in touch to set up your own ServeTogether instance.</p></div><Card className="mt-10 border-2"><CardContent className="pt-6">{submitted ? (<div className="py-8 text-center"><CheckCircle2 className="mx-auto h-12 w-12 text-primary" /><h3 className="mt-4 font-serif text-xl font-semibold">Thanks - we have got your request</h3><p className="mt-2 text-muted-foreground">We will be in touch by email shortly to get you set up.</p><Button variant="outline" className="mt-6" onClick={() => setSubmitted(false)}>Send another</Button></div>) : (<form onSubmit={handleSubmit} className="space-y-4"><div className="grid gap-4 sm:grid-cols-2"><div className="space-y-2"><Label htmlFor="ra-name">Your name</Label><Input id="ra-name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required /></div><div className="space-y-2"><Label htmlFor="ra-email">Email</Label><Input id="ra-email" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required /></div></div><div className="space-y-2"><Label htmlFor="ra-org">Organisation name</Label><Input id="ra-org" placeholder="e.g. St Matthew's Church, North Park Foodbank" value={form.organisation_name} onChange={(e) => setForm({ ...form, organisation_name: e.target.value })} required /></div><div className="space-y-2"><Label htmlFor="ra-notes">Anything we should know? (optional)</Label><Textarea id="ra-notes" rows={4} placeholder="How many volunteers, what kind of rota, any specific needs..." value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></div><Button type="submit" className="w-full" disabled={submitting}>{submitting ? (<><Loader2 className="mr-2 h-4 w-4 animate-spin" />Sending...</>) : ('Request access')}</Button></form>)}</CardContent></Card></div></div></section>
+      <section id="request-info-demo" className="border-t bg-muted/50 py-20"><div className="container mx-auto px-4"><div className="mx-auto max-w-2xl"><div className="text-center"><h2 className="font-serif text-3xl font-bold md:text-4xl">Request info & demo</h2><p className="mt-4 text-muted-foreground">Tell us about your church or organisation and we will be in touch to arrange a demo and collect the details needed for onboarding.</p></div><Card className="mt-10 border-2"><CardContent className="pt-6">{submitted ? (<div className="py-8 text-center"><CheckCircle2 className="mx-auto h-12 w-12 text-primary" /><h3 className="mt-4 font-serif text-xl font-semibold">Thanks - we have received your enquiry</h3><p className="mt-2 text-muted-foreground">We will be in touch by email shortly with more information and next steps.</p><Button variant="outline" className="mt-6" onClick={() => setSubmitted(false)}>Send another</Button></div>) : (<form onSubmit={handleSubmit} className="space-y-4"><div className="grid gap-4 sm:grid-cols-2"><div className="space-y-2"><Label htmlFor="ra-name">Your name</Label><Input id="ra-name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required /></div><div className="space-y-2"><Label htmlFor="ra-email">Email</Label><Input id="ra-email" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required /></div></div><div className="space-y-2"><Label htmlFor="ra-org">Organisation name</Label><Input id="ra-org" placeholder="e.g. St Matthew's Church, North Park Foodbank" value={form.organisation_name} onChange={(e) => setForm({ ...form, organisation_name: e.target.value })} required /></div><div className="space-y-2"><Label htmlFor="ra-notes">Anything we should know? (optional)</Label><Textarea id="ra-notes" rows={4} placeholder="Team size, kind of rota, preferred demo times, any specific needs..." value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></div><Button type="submit" className="w-full" disabled={submitting}>{submitting ? (<><Loader2 className="mr-2 h-4 w-4 animate-spin" />Sending...</>) : ('Request info & demo')}</Button></form>)}</CardContent></Card></div></div></section>
 
       <footer className="border-t py-10"><div className="container mx-auto flex flex-col items-center justify-between gap-4 px-4 text-sm text-muted-foreground sm:flex-row"><div className="flex items-center gap-3"><img src={logoUrl} alt="ServeTogether" className="h-8 w-auto" /><span>&copy; {new Date().getFullYear()} ServeTogether. All rights reserved.</span></div><div className="flex items-center gap-5"><a href="#features" className="hover:text-foreground">Features</a><a href="#how-it-works" className="hover:text-foreground">How it works</a><a href="#faq" className="hover:text-foreground">FAQ</a><Link to="/auth" className="hover:text-foreground">Sign in</Link></div></div></footer>
     </div>
