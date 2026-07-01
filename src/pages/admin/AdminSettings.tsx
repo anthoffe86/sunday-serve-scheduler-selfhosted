@@ -67,6 +67,11 @@ const AdminSettings = () => {
         updateSetting.mutate({ key, value: !currentValue });
     };
 
+    const normalizeOrgShortName = (value: string) => value
+        .replace(/[^a-zA-Z0-9]/g, '')
+        .toUpperCase()
+        .slice(0, 3);
+
     const emailSettings = [
         {
             key: 'email_on_invite',
@@ -139,20 +144,25 @@ const AdminSettings = () => {
                                 <Input
                                     id="org-short"
                                     value={orgShortName}
-                                    onChange={(e) => setOrgShortName(e.target.value.slice(0, 3))}
+                                    onChange={(e) => setOrgShortName(normalizeOrgShortName(e.target.value))}
                                     placeholder="S"
                                     maxLength={3}
                                     className="w-24"
                                 />
                                 <Button
                                     variant="outline"
-                                    onClick={() => updateSetting.mutate({ key: 'organisation_short_name', value: orgShortName })}
-                                    disabled={updateSetting.isPending || !orgShortName.trim()}
+                                    onClick={() => {
+                                        const cleaned = normalizeOrgShortName(orgShortName);
+                                        if (!cleaned) return;
+                                        setOrgShortName(cleaned);
+                                        updateSetting.mutate({ key: 'organisation_short_name', value: cleaned });
+                                    }}
+                                    disabled={updateSetting.isPending || !normalizeOrgShortName(orgShortName)}
                                 >
                                     Save
                                 </Button>
                             </div>
-                            <p className="text-xs text-muted-foreground">Up to 3 characters - shown in the avatar mark in the header.</p>
+                            <p className="text-xs text-muted-foreground">Up to 3 letters/numbers, automatically uppercased - shown in the avatar mark in the header.</p>
                         </div>
                     </CardContent>
                 </Card>
