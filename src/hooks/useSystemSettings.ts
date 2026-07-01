@@ -42,6 +42,7 @@ export function useUpdateSystemSetting() {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['system-settings'] });
+            queryClient.invalidateQueries({ queryKey: ['public-org-settings'] });
             toast({
                 title: 'Setting updated',
                 description: 'The changes have been saved successfully.',
