@@ -114,7 +114,7 @@ const AdminSettings = () => {
                     </CardHeader>
                     <CardContent className="space-y-5">
                         <div className="space-y-2">
-                            <Label htmlFor="org-name">Organisation name</Label>
+                            <Label htmlFor="org-name">Organisation name1</Label>
                             <div className="flex gap-2">
                                 <Input
                                     id="org-name"
