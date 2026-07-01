@@ -37,7 +37,7 @@ const adminNav = [
   { to: '/admin/schedule', icon: CalendarDays, label: 'Schedule' },
   { to: '/admin/volunteers', icon: Users, label: 'Volunteers' },
   { to: '/admin/swaps', icon: ArrowLeftRight, label: 'Swap Requests' },
-  { to: '/admin/access-requests', icon: ClipboardList, label: 'Access Requests' },
+  { to: '/admin/access-requests', icon: ClipboardList, label: 'Info & Demo Enquiries' },
   { to: '/admin/settings', icon: Settings, label: 'Settings' },
 ];
 
