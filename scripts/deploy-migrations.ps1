@@ -1,5 +1,5 @@
-# deploy-functions.ps1
-# Deploy all Supabase Edge Functions to a specific environment.
+# deploy-migrations.ps1
+# Push schema migrations to a specific Supabase environment.
 
 param(
     [Parameter(Mandatory = $false)]
@@ -16,19 +16,6 @@ param(
     [switch]$SkipConfirmation
 )
 
-function Get-RequiredEnvVar {
-    param(
-        [Parameter(Mandatory = $true)]
-        [string]$Name
-    )
-
-    $value = [Environment]::GetEnvironmentVariable($Name)
-    if ([string]::IsNullOrWhiteSpace($value)) {
-        throw "Missing required environment variable: $Name"
-    }
-    return $value
-}
-
 if ([string]::IsNullOrWhiteSpace($NonProdProjectRef)) {
     $NonProdProjectRef = [Environment]::GetEnvironmentVariable("SUPABASE_PROJECT_REF_NONPROD")
 }
@@ -44,9 +31,9 @@ if ($Environment -eq "prod") {
     }
 
     if (-not $SkipConfirmation) {
-        $confirmation = Read-Host "Type 'DEPLOY_PROD' to confirm deploying functions to PRODUCTION ($ProdProjectRef)"
+        $confirmation = Read-Host "Type 'DEPLOY_PROD' to confirm applying migrations to PRODUCTION ($ProdProjectRef)"
         if ($confirmation -ne "DEPLOY_PROD") {
-            throw "Production deployment cancelled."
+            throw "Production migration deployment cancelled."
         }
     }
 
@@ -56,33 +43,21 @@ else {
     if ([string]::IsNullOrWhiteSpace($NonProdProjectRef)) {
         throw "Non-production project ref is required. Set SUPABASE_PROJECT_REF_NONPROD or pass -NonProdProjectRef."
     }
+
     $projectRef = $NonProdProjectRef
 }
 
-$null = Get-RequiredEnvVar -Name "SUPABASE_ACCESS_TOKEN"
-
-# Run guardrail checks before deploying edge functions.
+# Run guardrail checks before pushing schema changes.
 & "$PSScriptRoot/preflight-supabase.ps1" -Environment $Environment -NonProdProjectRef $NonProdProjectRef -ProdProjectRef $ProdProjectRef
 if ($LASTEXITCODE -ne 0) {
     throw "Preflight checks failed."
 }
 
-$functionsPath = "supabase/functions"
-$functions = Get-ChildItem -Path $functionsPath -Directory
-
-if (-not $functions -or $functions.Count -eq 0) {
-    throw "No functions found under $functionsPath"
+Write-Host "Applying migrations to '$Environment' ($projectRef)..." -ForegroundColor Cyan
+npx supabase db push --project-ref $projectRef
+if ($LASTEXITCODE -ne 0) {
+    throw "Migration deployment failed for '$Environment'."
 }
 
-Write-Host "Starting deployment of Supabase Edge Functions to '$Environment' ($projectRef)..." -ForegroundColor Cyan
-
-foreach ($function in $functions) {
-    $name = $function.Name
-    Write-Host "Deploying function: $name..." -ForegroundColor Yellow
-    npx supabase functions deploy $name --project-ref $projectRef
-    if ($LASTEXITCODE -ne 0) {
-        throw "Failed deploying function '$name'"
-    }
-}
-
-Write-Host "Finished deployment of all functions to '$Environment'!" -ForegroundColor Green
+Write-Host "Migrations applied successfully to '$Environment'." -ForegroundColor Green
+Write-Host "Note: This command applies schema changes only. It does not apply test/demo seed data." -ForegroundColor DarkYellow

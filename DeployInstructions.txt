@@ -1,0 +1,81 @@
+Your regular command flow
+Non-prod:
+
+npm run preflight:nonprod
+npm run deploy:migrations:nonprod (if schema changed)
+npm run deploy:functions:nonprod (if edge functions changed)
+Prod:
+
+npm run preflight:prod
+npm run deploy:migrations:prod (if schema changed)
+npm run deploy:functions:prod (if edge functions changed)
+This setup satisfies your requirement to update both databases/functions safely without carrying test data into production.
+
+
+
+GitHub Branch Protection (main)
+
+Open your repository on GitHub.
+Go to Settings → Branches.
+Under Branch protection rules, click Add rule.
+Branch name pattern: main.
+Turn on:
+Require a pull request before merging
+Require approvals (set at least 1)
+Require status checks to pass before merging
+Require branches to be up to date before merging
+Restrict who can push to matching branches
+Do not allow bypassing the above settings (include admins)
+Save changes.
+If your repo uses Rulesets instead:
+
+Settings → Rules → Rulesets → New branch ruleset
+Target branch: main
+Enable the same controls above
+Save and enable ruleset
+Netlify Production Branch
+
+Open Netlify for this site.
+Site configuration → Build & deploy.
+Continuous Deployment → Branches.
+Set Production branch to main.
+Keep Deploy Previews enabled for PRs.
+This gives you:
+
+Feature branches and PRs for safe testing
+Main as the only production website deploy trigger
+How You Should Manage Branches
+Use:
+
+main for production only
+feature/anything for normal work
+hotfix/anything for urgent fixes
+Daily flow:
+
+Create feature branch from latest main
+Work against non-prod Supabase only
+Validate and deploy to non-prod if needed
+Open PR to main
+Merge after approval/checks
+Promote backend to prod with explicit commands
+Main deploys production website
+Detailed docs already added:
+
+docs/BRANCHING_STRATEGY.md
+docs/RELEASE_CHECKLIST.md
+README.md
+Release Commands You Now Have
+Non-prod validation/promotion:
+
+npm run preflight:nonprod
+npm run deploy:migrations:nonprod
+npm run deploy:functions:nonprod
+Prod promotion:
+
+npm run preflight:prod
+npm run deploy:migrations:prod
+npm run deploy:functions:prod
+Production commands require explicit confirmation and are environment-gated.
+
+Important Ordering Note
+For changes involving schema/functions, keep changes backward-compatible and promote backend first, then merge to main for frontend deploy. That avoids the site deploying code that expects backend changes not yet live.

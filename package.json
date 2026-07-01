@@ -7,11 +7,20 @@
     "dev": "vite",
     "build": "vite build",
     "build:dev": "vite build --mode development",
+    "build:prod": "vite build --mode production",
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "deploy:functions": "powershell -ExecutionPolicy Bypass -File ./scripts/deploy-functions.ps1"
+    "preflight:nonprod": "powershell -ExecutionPolicy Bypass -File ./scripts/preflight-supabase.ps1 -Environment nonprod",
+    "preflight:prod": "powershell -ExecutionPolicy Bypass -File ./scripts/preflight-supabase.ps1 -Environment prod",
+    "deploy:migrations": "powershell -ExecutionPolicy Bypass -File ./scripts/deploy-migrations.ps1 -Environment nonprod",
+    "deploy:migrations:nonprod": "powershell -ExecutionPolicy Bypass -File ./scripts/deploy-migrations.ps1 -Environment nonprod",
+    "deploy:migrations:prod": "powershell -ExecutionPolicy Bypass -File ./scripts/deploy-migrations.ps1 -Environment prod",
+    "deploy:functions": "powershell -ExecutionPolicy Bypass -File ./scripts/deploy-functions.ps1 -Environment nonprod",
+    "deploy:functions:nonprod": "powershell -ExecutionPolicy Bypass -File ./scripts/deploy-functions.ps1 -Environment nonprod",
+    "deploy:functions:prod": "powershell -ExecutionPolicy Bypass -File ./scripts/deploy-functions.ps1 -Environment prod",
+    "release:prod": "powershell -ExecutionPolicy Bypass -File ./scripts/release-prod.ps1"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
