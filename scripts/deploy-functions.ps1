@@ -16,17 +16,16 @@ param(
     [switch]$SkipConfirmation
 )
 
-function Get-RequiredEnvVar {
-    param(
-        [Parameter(Mandatory = $true)]
-        [string]$Name
-    )
-
-    $value = [Environment]::GetEnvironmentVariable($Name)
-    if ([string]::IsNullOrWhiteSpace($value)) {
-        throw "Missing required environment variable: $Name"
+function Assert-SupabaseAuth {
+    $token = [Environment]::GetEnvironmentVariable("SUPABASE_ACCESS_TOKEN")
+    if (-not [string]::IsNullOrWhiteSpace($token)) {
+        return
     }
-    return $value
+
+    npx supabase projects list --output json *> $null
+    if ($LASTEXITCODE -ne 0) {
+        throw "Missing Supabase authentication. Set SUPABASE_ACCESS_TOKEN or run 'supabase login' with an sbp_ personal access token."
+    }
 }
 
 if ([string]::IsNullOrWhiteSpace($NonProdProjectRef)) {
@@ -59,11 +58,11 @@ else {
     $projectRef = $NonProdProjectRef
 }
 
-$null = Get-RequiredEnvVar -Name "SUPABASE_ACCESS_TOKEN"
+Assert-SupabaseAuth
 
 # Run guardrail checks before deploying edge functions.
 & "$PSScriptRoot/preflight-supabase.ps1" -Environment $Environment -NonProdProjectRef $NonProdProjectRef -ProdProjectRef $ProdProjectRef
-if ($LASTEXITCODE -ne 0) {
+if (-not $?) {
     throw "Preflight checks failed."
 }
 
@@ -78,6 +77,12 @@ Write-Host "Starting deployment of Supabase Edge Functions to '$Environment' ($p
 
 foreach ($function in $functions) {
     $name = $function.Name
+
+    if ($name.StartsWith("_")) {
+        Write-Host "Skipping internal function folder: $name" -ForegroundColor DarkGray
+        continue
+    }
+
     Write-Host "Deploying function: $name..." -ForegroundColor Yellow
     npx supabase functions deploy $name --project-ref $projectRef
     if ($LASTEXITCODE -ne 0) {

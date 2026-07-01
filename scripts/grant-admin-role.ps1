@@ -1,10 +1,13 @@
-# deploy-migrations.ps1
-# Push schema migrations to a specific Supabase environment.
+# grant-admin-role.ps1
+# Grant admin role to an existing auth user in a target Supabase environment.
 
 param(
     [Parameter(Mandatory = $false)]
     [ValidateSet("nonprod", "prod")]
     [string]$Environment = "nonprod",
+
+    [Parameter(Mandatory = $true)]
+    [string]$Email,
 
     [Parameter(Mandatory = $false)]
     [string]$NonProdProjectRef = "",
@@ -34,9 +37,9 @@ if ($Environment -eq "prod") {
     }
 
     if (-not $SkipConfirmation) {
-        $confirmation = Read-Host "Type 'DEPLOY_PROD' to confirm applying migrations to PRODUCTION ($ProdProjectRef)"
+        $confirmation = Read-Host "Type 'DEPLOY_PROD' to confirm granting admin in PRODUCTION ($ProdProjectRef)"
         if ($confirmation -ne "DEPLOY_PROD") {
-            throw "Production migration deployment cancelled."
+            throw "Production admin grant cancelled."
         }
     }
 
@@ -50,13 +53,11 @@ else {
     $projectRef = $NonProdProjectRef
 }
 
-# Run guardrail checks before pushing schema changes.
+# Run guardrail checks first.
 & "$PSScriptRoot/preflight-supabase.ps1" -Environment $Environment -NonProdProjectRef $NonProdProjectRef -ProdProjectRef $ProdProjectRef
 if (-not $?) {
     throw "Preflight checks failed."
 }
-
-Write-Host "Applying migrations to '$Environment' ($projectRef)..." -ForegroundColor Cyan
 
 if ([string]::IsNullOrWhiteSpace($DatabasePassword)) {
     $DatabasePassword = [Environment]::GetEnvironmentVariable("SUPABASE_DB_PASSWORD")
@@ -70,13 +71,43 @@ else {
 }
 
 if ($LASTEXITCODE -ne 0) {
-    throw "Failed to link Supabase project '$projectRef'."
+        throw "Failed to link Supabase project '$projectRef'."
 }
 
-npx supabase db push --linked --include-all
+$escapedEmail = $Email.Replace("'", "''")
+
+$sql = @"
+INSERT INTO public.user_roles (user_id, role)
+SELECT u.id, 'admin'::public.app_role
+FROM auth.users u
+WHERE lower(u.email) = lower('$escapedEmail')
+ON CONFLICT (user_id, role) DO NOTHING;
+
+SELECT u.id AS user_id, u.email,
+    EXISTS (
+        SELECT 1
+        FROM public.user_roles r
+        WHERE r.user_id = u.id
+            AND r.role = 'admin'
+    ) AS is_admin
+FROM auth.users u
+WHERE lower(u.email) = lower('$escapedEmail');
+"@
+
+Write-Host "Granting admin role for $Email in '$Environment' ($projectRef)..." -ForegroundColor Cyan
+$tempSqlFile = Join-Path $env:TEMP ("grant-admin-" + [Guid]::NewGuid().ToString("N") + ".sql")
+try {
+    Set-Content -Path $tempSqlFile -Value $sql -Encoding utf8
+    npx supabase db query --linked --file "$tempSqlFile"
+}
+finally {
+    if (Test-Path -Path $tempSqlFile) {
+        Remove-Item -Path $tempSqlFile -Force -ErrorAction SilentlyContinue
+    }
+}
+
 if ($LASTEXITCODE -ne 0) {
-    throw "Migration deployment failed for '$Environment'."
+    throw "Failed to grant admin role for '$Email'."
 }
 
-Write-Host "Migrations applied successfully to '$Environment'." -ForegroundColor Green
-Write-Host "Note: This command applies schema changes only. It does not apply test/demo seed data." -ForegroundColor DarkYellow
+Write-Host "Admin role grant completed for $Email." -ForegroundColor Green

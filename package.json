@@ -20,6 +20,8 @@
     "deploy:functions": "powershell -ExecutionPolicy Bypass -File ./scripts/deploy-functions.ps1 -Environment nonprod",
     "deploy:functions:nonprod": "powershell -ExecutionPolicy Bypass -File ./scripts/deploy-functions.ps1 -Environment nonprod",
     "deploy:functions:prod": "powershell -ExecutionPolicy Bypass -File ./scripts/deploy-functions.ps1 -Environment prod",
+    "grant:admin:nonprod": "powershell -ExecutionPolicy Bypass -File ./scripts/grant-admin-role.ps1 -Environment nonprod",
+    "grant:admin:prod": "powershell -ExecutionPolicy Bypass -File ./scripts/grant-admin-role.ps1 -Environment prod",
     "release:prod": "powershell -ExecutionPolicy Bypass -File ./scripts/release-prod.ps1"
   },
   "dependencies": {

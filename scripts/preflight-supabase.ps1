@@ -13,17 +13,17 @@ param(
     [string]$ProdProjectRef = ""
 )
 
-function Get-RequiredEnvVar {
-    param(
-        [Parameter(Mandatory = $true)]
-        [string]$Name
-    )
-
-    $value = [Environment]::GetEnvironmentVariable($Name)
-    if ([string]::IsNullOrWhiteSpace($value)) {
-        throw "Missing required environment variable: $Name"
+function Assert-SupabaseAuth {
+    $token = [Environment]::GetEnvironmentVariable("SUPABASE_ACCESS_TOKEN")
+    if (-not [string]::IsNullOrWhiteSpace($token)) {
+        return
     }
-    return $value
+
+    # If no token env var is set, allow authenticated CLI sessions from `supabase login`.
+    npx supabase projects list --output json *> $null
+    if ($LASTEXITCODE -ne 0) {
+        throw "Missing Supabase authentication. Set SUPABASE_ACCESS_TOKEN or run 'supabase login' with an sbp_ personal access token."
+    }
 }
 
 function Get-OptionalProjectIdFromEnvFile {
@@ -68,7 +68,7 @@ if ($NonProdProjectRef -eq $ProdProjectRef) {
     throw "Non-production and production project refs are identical. They must be different."
 }
 
-$null = Get-RequiredEnvVar -Name "SUPABASE_ACCESS_TOKEN"
+Assert-SupabaseAuth
 
 $rootEnvProjectRef = Get-OptionalProjectIdFromEnvFile -Path ".env"
 $devEnvProjectRef = Get-OptionalProjectIdFromEnvFile -Path ".env.development"

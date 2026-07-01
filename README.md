@@ -141,6 +141,14 @@ npm run deploy:functions:prod
 
 Production deploy requires typing `DEPLOY_PROD` to confirm.
 
+If CLI reports an invalid access token format, authenticate with a Supabase Personal Access Token first:
+
+```sh
+supabase login
+```
+
+The token must be an `sbp_...` token from Supabase account settings.
+
 ### 3) Migration promotion flow
 
 1. Create and test migrations in non-production first.
@@ -231,6 +239,20 @@ This gives you a safe split:
 Detailed guide: see `docs/BRANCHING_STRATEGY.md`
 
 Release checklist: see `docs/RELEASE_CHECKLIST.md`
+
+### 10) Granting an admin user in non-production
+
+After the user has signed up in non-production, grant admin role by email:
+
+```sh
+npm run grant:admin:nonprod -- -Email "admin@example.com"
+```
+
+For production (explicit confirmation required):
+
+```sh
+npm run grant:admin:prod -- -Email "admin@example.com"
+```
 
 ## Can I connect a custom domain to my Lovable project?
 
