@@ -11,6 +11,16 @@ node_modules
 dist
 dist-ssr
 *.local
+.env.local
+.env.*.local
+
+# Optional local environment files for non-committed secrets
+.env.development.local
+.env.production.local
+
+# Supabase local CLI environment values
+supabase/.env
+supabase/.env.local
 
 # Editor directories and files
 .vscode/*
