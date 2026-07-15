@@ -41,6 +41,10 @@ const adminNav = [
   { to: '/admin/settings', icon: Settings, label: 'Settings' },
 ];
 
+const superAdminNav = [
+  { to: '/super-admin', icon: Shield, label: 'Super Admin' },
+];
+
 function NavItem({ to, icon: Icon, label, onClick }: { to: string; icon: typeof Home; label: string; onClick?: () => void }) {
   const location = useLocation();
   const isActive = location.pathname === to;
@@ -63,7 +67,7 @@ function NavItem({ to, icon: Icon, label, onClick }: { to: string; icon: typeof 
 }
 
 export function AppSidebar({ isOpen, onClose }: AppSidebarProps) {
-  const { isAdmin } = useAuth();
+  const { isAdmin, isSuperAdmin } = useAuth();
 
   return (
     <>
@@ -90,14 +94,18 @@ export function AppSidebar({ isOpen, onClose }: AppSidebarProps) {
         </div>
 
         <nav className="flex flex-1 flex-col gap-1 overflow-y-auto p-4 pb-8">
-          <p className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Volunteer
-          </p>
-          {volunteerNav.map((item) => (
-            <NavItem key={item.to} {...item} onClick={onClose} />
-          ))}
+          {!isSuperAdmin && (
+            <>
+              <p className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Volunteer
+              </p>
+              {volunteerNav.map((item) => (
+                <NavItem key={item.to} {...item} onClick={onClose} />
+              ))}
+            </>
+          )}
 
-          {isAdmin && (
+          {isAdmin && !isSuperAdmin && (
             <>
               <div className="my-4 border-t" />
               <p className="mb-2 flex items-center gap-1.5 px-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -105,6 +113,19 @@ export function AppSidebar({ isOpen, onClose }: AppSidebarProps) {
                 Admin
               </p>
               {adminNav.map((item) => (
+                <NavItem key={item.to} {...item} onClick={onClose} />
+              ))}
+            </>
+          )}
+
+          {isSuperAdmin && (
+            <>
+              <div className="my-4 border-t" />
+              <p className="mb-2 flex items-center gap-1.5 px-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                <Shield className="h-3 w-3" />
+                Super Admin
+              </p>
+              {superAdminNav.map((item) => (
                 <NavItem key={item.to} {...item} onClick={onClose} />
               ))}
             </>
