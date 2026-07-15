@@ -15,7 +15,8 @@ export function AppHeader({
   const {
     user,
     signOut,
-    isAdmin
+    isAdmin,
+    isSuperAdmin
   } = useAuth();
   const {
     data: profile
@@ -24,6 +25,9 @@ export function AppHeader({
   const navigate = useNavigate();
   const orgName = orgSettings.organisationName;
   const orgShortName = orgSettings.organisationShortName;
+  const headerName = isSuperAdmin ? 'ServeTogether Support' : orgName;
+  const headerShortName = isSuperAdmin ? 'SA' : orgShortName;
+  const subtitle = isSuperAdmin ? 'Super Admin' : 'Volunteer Scheduling';
   const displayName = profile?.name || user?.email?.split('@')[0] || 'User';
   const initials = displayName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
   const handleSignOut = async () => {
@@ -38,24 +42,24 @@ export function AppHeader({
 
         <div className="flex items-center gap-3">
           <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-            <span className="font-serif text-lg font-bold">{orgShortName}</span>
+            <span className="font-serif text-lg font-bold">{headerShortName}</span>
           </div>
           <div className="hidden md:block">
-            <h1 className="font-serif text-lg font-semibold">{orgName}</h1>
-            <p className="text-xs text-muted-foreground">Volunteer Scheduling</p>
+            <h1 className="font-serif text-lg font-semibold">{headerName}</h1>
+            <p className="text-xs text-muted-foreground">{subtitle}</p>
           </div>
         </div>
 
         <div className="flex-1" />
 
-        {isAdmin && <div className="hidden items-center gap-1 rounded-full bg-accent/20 px-2 py-0.5 text-xs font-medium text-accent-foreground md:flex">
+        {(isAdmin || isSuperAdmin) && <div className="hidden items-center gap-1 rounded-full bg-accent/20 px-2 py-0.5 text-xs font-medium text-accent-foreground md:flex">
             <Shield className="h-3 w-3" />
-            Admin
+            {isSuperAdmin ? 'Super Admin' : 'Admin'}
           </div>}
 
-        <Button variant="ghost" size="icon" className="relative">
-          <Bell className="h-5 w-5" />
-        </Button>
+        {!isSuperAdmin && <Button variant="ghost" size="icon" className="relative">
+            <Bell className="h-5 w-5" />
+          </Button>}
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -80,11 +84,13 @@ export function AppHeader({
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => navigate('/profile')}>
-              <User className="mr-2 h-4 w-4" />
-              My Profile
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
+            {!isSuperAdmin && <>
+                <DropdownMenuItem onClick={() => navigate('/profile')}>
+                  <User className="mr-2 h-4 w-4" />
+                  My Profile
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+              </>}
             <DropdownMenuItem onClick={handleSignOut} className="text-destructive">
               <LogOut className="mr-2 h-4 w-4" />
               Sign Out

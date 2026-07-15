@@ -1,4 +1,4 @@
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { Loader2 } from 'lucide-react';
 
@@ -13,6 +13,7 @@ export function ProtectedRoute({
   requireOrgAdmin = false,
   requireSuperAdmin = false,
 }: ProtectedRouteProps) {
+  const location = useLocation();
   const { user, isLoading, isAdmin, isSuperAdmin } = useAuth();
 
   if (isLoading) {
@@ -25,6 +26,10 @@ export function ProtectedRoute({
 
   if (!user) {
     return <Navigate to="/auth" replace />;
+  }
+
+  if (isSuperAdmin && !requireSuperAdmin && location.pathname !== '/super-admin') {
+    return <Navigate to="/super-admin" replace />;
   }
 
   if (requireSuperAdmin && !isSuperAdmin) {

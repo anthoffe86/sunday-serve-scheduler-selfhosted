@@ -57,6 +57,7 @@ const SuperAdminDashboard = () => {
   const [working, setWorking] = useState(false);
   const [organisations, setOrganisations] = useState<Organisation[]>([]);
   const [users, setUsers] = useState<UserRow[]>([]);
+  const [superAdminUserIds, setSuperAdminUserIds] = useState<string[]>([]);
   const [search, setSearch] = useState('');
 
   const [newUserName, setNewUserName] = useState('');
@@ -67,7 +68,7 @@ const SuperAdminDashboard = () => {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const [orgsRes, usersRes] = await Promise.all([
+      const [orgsRes, usersRes, rolesRes] = await Promise.all([
         supabaseAny
           .from('organisations')
           .select('id, name, slug, active')
@@ -76,6 +77,10 @@ const SuperAdminDashboard = () => {
           .from('profiles')
           .select('user_id, name, email, active, org_id')
           .order('name', { ascending: true }),
+        supabaseAny
+          .from('user_roles')
+          .select('user_id, role')
+          .order('user_id', { ascending: true }),
       ]);
 
       if (orgsRes.error) {
@@ -84,10 +89,18 @@ const SuperAdminDashboard = () => {
       if (usersRes.error) {
         throw usersRes.error;
       }
+      if (rolesRes.error) {
+        throw rolesRes.error;
+      }
 
       const loadedOrgs = ((orgsRes.data ?? []) as Organisation[]);
       setOrganisations(loadedOrgs);
       setUsers((usersRes.data ?? []) as UserRow[]);
+      setSuperAdminUserIds(
+        ((rolesRes.data ?? []) as Array<{ user_id: string; role: string }>)
+          .filter((row) => row.role === 'super_admin')
+          .map((row) => row.user_id)
+      );
       if (!newUserOrgId && loadedOrgs.length) {
         setNewUserOrgId(loadedOrgs[0].id);
       }
@@ -113,6 +126,7 @@ const SuperAdminDashboard = () => {
     }
 
     return users
+      .filter((user) => !superAdminUserIds.includes(user.user_id))
       .filter((user) => {
         const orgName = orgLookup.get(user.org_id)?.name?.toLowerCase() ?? '';
         return (
@@ -122,7 +136,7 @@ const SuperAdminDashboard = () => {
         );
       })
       .slice(0, USER_PAGE_SIZE);
-  }, [users, search, orgLookup]);
+  }, [users, search, orgLookup, superAdminUserIds]);
 
   const runSupportAction = async (payload: Record<string, unknown>) => {
     setWorking(true);

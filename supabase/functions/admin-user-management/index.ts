@@ -74,6 +74,114 @@ Deno.serve(async (req) => {
       }
     }
 
+    const findAuthUserByEmail = async (email: string) => {
+      let page = 1
+
+      while (true) {
+        const { data: listedUsers, error: listUsersError } = await supabaseAdmin.auth.admin.listUsers({
+          page,
+          perPage: 1000,
+        })
+
+        if (listUsersError) {
+          throw listUsersError
+        }
+
+        const users = listedUsers.users ?? []
+        const matchedUser = users.find((candidate) => candidate.email?.toLowerCase() === email)
+        if (matchedUser) {
+          return matchedUser
+        }
+
+        if (users.length < 1000) {
+          return null
+        }
+
+        page += 1
+      }
+    }
+
+    const assignExistingUserToOrg = async ({
+      existingUserId,
+      existingOrgId,
+      name,
+      email,
+      orgId,
+      role,
+    }: {
+      existingUserId: string
+      existingOrgId: string | null
+      name: string
+      email: string
+      orgId: string
+      role: string
+    }) => {
+      const isOrgMove = !!existingOrgId && existingOrgId !== orgId
+
+      const { error: profileUpdateError } = await supabaseAdmin
+        .from('profiles')
+        .upsert({
+          user_id: existingUserId,
+          name,
+          email,
+          active: true,
+          org_id: orgId,
+          ...(isOrgMove ? { family_group_id: null } : {}),
+        }, { onConflict: 'user_id' })
+
+      if (profileUpdateError) {
+        throw profileUpdateError
+      }
+
+      if (isOrgMove) {
+        const tablesToReassign = ['role_preferences', 'availability', 'service_history'] as const
+
+        for (const tableName of tablesToReassign) {
+          const { error: reassignmentError } = await supabaseAdmin
+            .from(tableName)
+            .update({ org_id: orgId })
+            .eq('user_id', existingUserId)
+
+          if (reassignmentError) {
+            throw reassignmentError
+          }
+        }
+      }
+
+      const { error: roleCleanupError } = await supabaseAdmin
+        .from('user_roles')
+        .delete()
+        .eq('user_id', existingUserId)
+        .in('role', ['volunteer', 'admin'])
+
+      if (roleCleanupError) {
+        throw roleCleanupError
+      }
+
+      const { error: roleInsertError } = await supabaseAdmin
+        .from('user_roles')
+        .insert({
+          user_id: existingUserId,
+          role,
+          org_id: orgId,
+        })
+
+      if (roleInsertError) {
+        throw roleInsertError
+      }
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          message: isOrgMove
+            ? 'Existing user moved to organisation and role updated'
+            : 'Existing user assigned to organisation',
+          userId: existingUserId,
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
     const getTargetOrgId = async (targetUserId: string): Promise<string> => {
       const { data: targetProfile, error: targetProfileError } = await supabaseAdmin
         .from('profiles')
@@ -221,72 +329,36 @@ Deno.serve(async (req) => {
         }
 
         if (existingProfile) {
-          const existingUserId = existingProfile.user_id as string
-          const existingOrgId = existingProfile.org_id as string | null
-          const isOrgMove = !!existingOrgId && existingOrgId !== orgId
+          return await assignExistingUserToOrg({
+            existingUserId: existingProfile.user_id as string,
+            existingOrgId: existingProfile.org_id as string | null,
+            name,
+            email: normalizedEmail,
+            orgId,
+            role,
+          })
+        }
 
-          const { error: profileUpdateError } = await supabaseAdmin
+        const existingAuthUser = await findAuthUserByEmail(normalizedEmail)
+        if (existingAuthUser) {
+          const { data: fallbackProfile, error: fallbackProfileError } = await supabaseAdmin
             .from('profiles')
-            .update({
-              name,
-              email: normalizedEmail,
-              active: true,
-              org_id: orgId,
-              family_group_id: isOrgMove ? null : undefined,
-            })
-            .eq('user_id', existingUserId)
+            .select('org_id')
+            .eq('user_id', existingAuthUser.id)
+            .maybeSingle()
 
-          if (profileUpdateError) {
-            throw profileUpdateError
+          if (fallbackProfileError) {
+            throw fallbackProfileError
           }
 
-          if (isOrgMove) {
-            const tablesToReassign = ['role_preferences', 'availability', 'service_history'] as const
-
-            for (const tableName of tablesToReassign) {
-              const { error: reassignmentError } = await supabaseAdmin
-                .from(tableName)
-                .update({ org_id: orgId })
-                .eq('user_id', existingUserId)
-
-              if (reassignmentError) {
-                throw reassignmentError
-              }
-            }
-          }
-
-          const { error: roleCleanupError } = await supabaseAdmin
-            .from('user_roles')
-            .delete()
-            .eq('user_id', existingUserId)
-            .in('role', ['volunteer', 'admin'])
-
-          if (roleCleanupError) {
-            throw roleCleanupError
-          }
-
-          const { error: roleInsertError } = await supabaseAdmin
-            .from('user_roles')
-            .insert({
-              user_id: existingUserId,
-              role,
-              org_id: orgId,
-            })
-
-          if (roleInsertError) {
-            throw roleInsertError
-          }
-
-          return new Response(
-            JSON.stringify({
-              success: true,
-              message: isOrgMove
-                ? 'Existing user moved to organisation and role updated'
-                : 'Existing user assigned to organisation',
-              userId: existingUserId,
-            }),
-            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          )
+          return await assignExistingUserToOrg({
+            existingUserId: existingAuthUser.id,
+            existingOrgId: (fallbackProfile as { org_id?: string | null } | null)?.org_id ?? null,
+            name,
+            email: normalizedEmail,
+            orgId,
+            role,
+          })
         }
 
         const temporaryPassword = `${crypto.randomUUID()}Aa1!`

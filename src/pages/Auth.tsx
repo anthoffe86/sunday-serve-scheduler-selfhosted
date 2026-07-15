@@ -14,7 +14,7 @@ const emailSchema = z.string().email('Please enter a valid email address');
 const passwordSchema = z.string().min(8, 'Password must be at least 8 characters');
 
 const Auth = () => {
-  const { user, isLoading, signIn } = useAuth();
+  const { user, isLoading, isSuperAdmin, signIn } = useAuth();
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -24,9 +24,9 @@ const Auth = () => {
 
   useEffect(() => {
     if (user && !isLoading) {
-      navigate('/dashboard');
+      navigate(isSuperAdmin ? '/super-admin' : '/dashboard');
     }
-  }, [user, isLoading, navigate]);
+  }, [user, isLoading, isSuperAdmin, navigate]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -53,7 +53,7 @@ const Auth = () => {
       }
     } else {
       toast.success('Welcome back!');
-      navigate('/dashboard');
+      navigate(isSuperAdmin ? '/super-admin' : '/dashboard');
     }
   };
 

@@ -94,12 +94,16 @@ export function AppSidebar({ isOpen, onClose }: AppSidebarProps) {
         </div>
 
         <nav className="flex flex-1 flex-col gap-1 overflow-y-auto p-4 pb-8">
-          <p className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Volunteer
-          </p>
-          {volunteerNav.map((item) => (
-            <NavItem key={item.to} {...item} onClick={onClose} />
-          ))}
+          {!isSuperAdmin && (
+            <>
+              <p className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Volunteer
+              </p>
+              {volunteerNav.map((item) => (
+                <NavItem key={item.to} {...item} onClick={onClose} />
+              ))}
+            </>
+          )}
 
           {isAdmin && !isSuperAdmin && (
             <>
