@@ -208,10 +208,91 @@ Deno.serve(async (req) => {
           throw new Error('data.role must be volunteer or admin')
         }
 
+        const normalizedEmail = email.trim().toLowerCase()
+
+        const { data: existingProfile, error: existingProfileError } = await supabaseAdmin
+          .from('profiles')
+          .select('user_id, org_id')
+          .eq('email', normalizedEmail)
+          .maybeSingle()
+
+        if (existingProfileError) {
+          throw existingProfileError
+        }
+
+        if (existingProfile) {
+          const existingUserId = existingProfile.user_id as string
+          const existingOrgId = existingProfile.org_id as string | null
+          const isOrgMove = !!existingOrgId && existingOrgId !== orgId
+
+          const { error: profileUpdateError } = await supabaseAdmin
+            .from('profiles')
+            .update({
+              name,
+              email: normalizedEmail,
+              active: true,
+              org_id: orgId,
+              family_group_id: isOrgMove ? null : undefined,
+            })
+            .eq('user_id', existingUserId)
+
+          if (profileUpdateError) {
+            throw profileUpdateError
+          }
+
+          if (isOrgMove) {
+            const tablesToReassign = ['role_preferences', 'availability', 'service_history'] as const
+
+            for (const tableName of tablesToReassign) {
+              const { error: reassignmentError } = await supabaseAdmin
+                .from(tableName)
+                .update({ org_id: orgId })
+                .eq('user_id', existingUserId)
+
+              if (reassignmentError) {
+                throw reassignmentError
+              }
+            }
+          }
+
+          const { error: roleCleanupError } = await supabaseAdmin
+            .from('user_roles')
+            .delete()
+            .eq('user_id', existingUserId)
+            .in('role', ['volunteer', 'admin'])
+
+          if (roleCleanupError) {
+            throw roleCleanupError
+          }
+
+          const { error: roleInsertError } = await supabaseAdmin
+            .from('user_roles')
+            .insert({
+              user_id: existingUserId,
+              role,
+              org_id: orgId,
+            })
+
+          if (roleInsertError) {
+            throw roleInsertError
+          }
+
+          return new Response(
+            JSON.stringify({
+              success: true,
+              message: isOrgMove
+                ? 'Existing user moved to organisation and role updated'
+                : 'Existing user assigned to organisation',
+              userId: existingUserId,
+            }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
+        }
+
         const temporaryPassword = `${crypto.randomUUID()}Aa1!`
 
         const { data: createdUser, error: createUserError } = await supabaseAdmin.auth.admin.createUser({
-          email,
+          email: normalizedEmail,
           password: temporaryPassword,
           email_confirm: true,
           user_metadata: { name },
@@ -228,7 +309,7 @@ Deno.serve(async (req) => {
           .upsert({
             user_id: createdUserId,
             name,
-            email,
+            email: normalizedEmail,
             active: true,
             org_id: orgId,
           }, { onConflict: 'user_id' })
