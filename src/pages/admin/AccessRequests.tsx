@@ -1,15 +1,23 @@
 import { Navigate } from 'react-router-dom';
-import { Loader2, ClipboardList } from 'lucide-react';
+import { Loader2, ClipboardList, Trash2 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Button } from '@/components/ui/button';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { useAuth } from '@/hooks/useAuth';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
-
-type AccessRequestStatus = 'pending' | 'contacted' | 'approved' | 'rejected';
+import { useState } from 'react';
 
 interface AccessRequest {
   id: string;
@@ -17,20 +25,14 @@ interface AccessRequest {
   organisation_name: string;
   email: string;
   notes: string | null;
-  status: AccessRequestStatus;
+  status: string;
   created_at: string;
 }
-
-const STATUS_BADGE: Record<AccessRequestStatus, string> = {
-  pending: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-  contacted: 'bg-blue-100 text-blue-800 border-blue-200',
-  approved: 'bg-green-100 text-green-800 border-green-200',
-  rejected: 'bg-red-100 text-red-800 border-red-200',
-};
 
 const AccessRequests = () => {
   const { isAdmin, isLoading: authLoading } = useAuth();
   const queryClient = useQueryClient();
+  const [deleteTarget, setDeleteTarget] = useState<AccessRequest | null>(null);
 
   const { data: requests, isLoading } = useQuery({
     queryKey: ['access-requests'],
@@ -45,20 +47,20 @@ const AccessRequests = () => {
     enabled: !!isAdmin,
   });
 
-  const updateStatus = useMutation({
-    mutationFn: async ({ id, status }: { id: string; status: AccessRequestStatus }) => {
+  const deleteRequest = useMutation({
+    mutationFn: async (id: string) => {
       const { error } = await supabase
         .from('access_requests')
-        .update({ status })
+        .delete()
         .eq('id', id);
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['access-requests'] });
-      toast.success('Status updated');
+      toast.success('Enquiry deleted');
     },
     onError: (err: any) => {
-      toast.error(err.message || 'Failed to update status');
+      toast.error(err.message || 'Failed to delete enquiry');
     },
   });
 
@@ -74,16 +76,23 @@ const AccessRequests = () => {
     return <Navigate to="/" replace />;
   }
 
-  const pending = requests?.filter((r) => r.status === 'pending') ?? [];
-  const others = requests?.filter((r) => r.status !== 'pending') ?? [];
-  const sorted = [...pending, ...others];
+  const sorted = requests ?? [];
+
+  const handleDelete = () => {
+    if (!deleteTarget) return;
+    deleteRequest.mutate(deleteTarget.id, {
+      onSuccess: () => {
+        setDeleteTarget(null);
+      },
+    });
+  };
 
   return (
     <div className="space-y-8">
       <div>
         <h1 className="font-serif text-2xl sm:text-3xl font-bold">Info & Demo Enquiries</h1>
         <p className="text-sm sm:text-base text-muted-foreground">
-          Organisations that want more information and a demo. Review each enquiry and follow up to collect onboarding details.
+          Organisations that want more information and a demo. Review what was submitted and remove enquiries once they are no longer needed.
         </p>
       </div>
 
@@ -112,30 +121,16 @@ const AccessRequests = () => {
                       {format(new Date(req.created_at), 'd MMM yyyy, HH:mm')}
                     </p>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Badge
-                      variant="outline"
-                      className={`capitalize ${STATUS_BADGE[req.status]}`}
+                  <div className="flex items-center gap-2 self-start">
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => setDeleteTarget(req)}
+                      aria-label={`Delete enquiry from ${req.organisation_name}`}
                     >
-                      {req.status}
-                    </Badge>
-                    <Select
-                      value={req.status}
-                      onValueChange={(val) =>
-                        updateStatus.mutate({ id: req.id, status: val as AccessRequestStatus })
-                      }
-                      disabled={updateStatus.isPending}
-                    >
-                      <SelectTrigger className="w-36 h-8 text-xs">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="pending">Pending</SelectItem>
-                        <SelectItem value="contacted">Contacted</SelectItem>
-                        <SelectItem value="approved">Approved</SelectItem>
-                        <SelectItem value="rejected">Rejected</SelectItem>
-                      </SelectContent>
-                    </Select>
+                      <Trash2 className="h-4 w-4 mr-1" />
+                      Delete
+                    </Button>
                   </div>
                 </div>
               </CardHeader>
@@ -150,6 +145,28 @@ const AccessRequests = () => {
           ))}
         </div>
       )}
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete enquiry?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently remove the enquiry from {deleteTarget?.organisation_name}.
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteRequest.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={deleteRequest.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteRequest.isPending ? 'Deleting...' : 'Delete enquiry'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
