@@ -45,9 +45,21 @@ Deno.serve(async (req) => {
       )
     }
 
-    // Verify the caller is an admin
-    const { data: isAdmin } = await supabaseAdmin.rpc('is_admin', { _user_id: user.id })
-    if (!isAdmin) {
+    const { data: roleRows, error: roleError } = await supabaseAdmin
+      .from('user_roles')
+      .select('role, org_id')
+      .eq('user_id', user.id)
+
+    if (roleError) {
+      throw roleError
+    }
+
+    const roles = (roleRows ?? []) as Array<{ role: string; org_id: string | null }>
+    const isSuperAdmin = roles.some((row) => row.role === 'super_admin')
+    const isOrgAdmin = roles.some((row) => row.role === 'admin')
+    const callerOrgId = roles.find((row) => row.role === 'admin' && row.org_id)?.org_id ?? null
+
+    if (!isSuperAdmin && !isOrgAdmin) {
       return new Response(
         JSON.stringify({ error: 'Admin access required' }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -56,12 +68,44 @@ Deno.serve(async (req) => {
 
     const { action, userId, data } = await req.json()
 
+    const ensureSuperAdmin = () => {
+      if (!isSuperAdmin) {
+        throw new Error('Super admin access required')
+      }
+    }
+
+    const getTargetOrgId = async (targetUserId: string): Promise<string> => {
+      const { data: targetProfile, error: targetProfileError } = await supabaseAdmin
+        .from('profiles')
+        .select('org_id')
+        .eq('user_id', targetUserId)
+        .maybeSingle()
+
+      if (targetProfileError) {
+        throw targetProfileError
+      }
+
+      const orgId = (targetProfile as { org_id?: string } | null)?.org_id
+      if (!orgId) {
+        throw new Error('Target user organisation not found')
+      }
+
+      return orgId
+    }
+
     switch (action) {
       case 'reset-password': {
+        ensureSuperAdmin()
+
+        const targetEmail = data?.email as string | undefined
+        if (!targetEmail) {
+          throw new Error('Email is required for password reset')
+        }
+
         // Generate a password reset link
         const { data: resetData, error: resetError } = await supabaseAdmin.auth.admin.generateLink({
           type: 'recovery',
-          email: data.email,
+          email: targetEmail,
         })
 
         if (resetError) {
@@ -79,8 +123,15 @@ Deno.serve(async (req) => {
       }
 
       case 'update-email': {
+        ensureSuperAdmin()
+
+        const nextEmail = data?.email as string | undefined
+        if (!userId || !nextEmail) {
+          throw new Error('userId and data.email are required')
+        }
+
         const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(userId, {
-          email: data.email,
+          email: nextEmail,
           email_confirm: true, // Auto-confirm the new email
         })
 
@@ -91,7 +142,7 @@ Deno.serve(async (req) => {
         // Also update the profile
         await supabaseAdmin
           .from('profiles')
-          .update({ email: data.email })
+          .update({ email: nextEmail })
           .eq('user_id', userId)
 
         return new Response(
@@ -101,6 +152,17 @@ Deno.serve(async (req) => {
       }
 
       case 'update-role-preferences': {
+        if (!userId) {
+          throw new Error('userId is required')
+        }
+
+        const targetOrgId = await getTargetOrgId(userId)
+        if (!isSuperAdmin) {
+          if (!isOrgAdmin || !callerOrgId || targetOrgId !== callerOrgId) {
+            throw new Error('Org admin can only manage users in their organisation')
+          }
+        }
+
         // Delete existing preferences
         await supabaseAdmin
           .from('role_preferences')
@@ -115,6 +177,7 @@ Deno.serve(async (req) => {
               data.roles.map((role: string, index: number) => ({
                 user_id: userId,
                 role: role,
+                org_id: targetOrgId,
                 preference_order: index + 1,
               }))
             )
@@ -126,6 +189,118 @@ Deno.serve(async (req) => {
 
         return new Response(
           JSON.stringify({ success: true, message: 'Role preferences updated' }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
+      case 'add-user': {
+        ensureSuperAdmin()
+
+        const email = data?.email as string | undefined
+        const name = data?.name as string | undefined
+        const orgId = data?.orgId as string | undefined
+        const role = (data?.role as string | undefined) ?? 'volunteer'
+
+        if (!email || !name || !orgId) {
+          throw new Error('data.email, data.name, and data.orgId are required')
+        }
+        if (!['volunteer', 'admin'].includes(role)) {
+          throw new Error('data.role must be volunteer or admin')
+        }
+
+        const temporaryPassword = `${crypto.randomUUID()}Aa1!`
+
+        const { data: createdUser, error: createUserError } = await supabaseAdmin.auth.admin.createUser({
+          email,
+          password: temporaryPassword,
+          email_confirm: true,
+          user_metadata: { name },
+        })
+
+        if (createUserError || !createdUser.user) {
+          throw createUserError ?? new Error('Failed to create user')
+        }
+
+        const createdUserId = createdUser.user.id
+
+        const { error: profileError } = await supabaseAdmin
+          .from('profiles')
+          .upsert({
+            user_id: createdUserId,
+            name,
+            email,
+            active: true,
+            org_id: orgId,
+          }, { onConflict: 'user_id' })
+
+        if (profileError) {
+          throw profileError
+        }
+
+        const { error: roleCleanupError } = await supabaseAdmin
+          .from('user_roles')
+          .delete()
+          .eq('user_id', createdUserId)
+          .in('role', ['volunteer', 'admin'])
+
+        if (roleCleanupError) {
+          throw roleCleanupError
+        }
+
+        const { error: roleInsertError } = await supabaseAdmin
+          .from('user_roles')
+          .insert({
+            user_id: createdUserId,
+            role,
+            org_id: orgId,
+          })
+
+        if (roleInsertError) {
+          throw roleInsertError
+        }
+
+        return new Response(
+          JSON.stringify({
+            success: true,
+            message: 'User created and assigned to organisation',
+            userId: createdUserId,
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
+      case 'remove-user': {
+        ensureSuperAdmin()
+
+        if (!userId) {
+          throw new Error('userId is required')
+        }
+
+        const targetOrgId = await getTargetOrgId(userId)
+
+        const { error: roleDeleteError } = await supabaseAdmin
+          .from('user_roles')
+          .delete()
+          .eq('user_id', userId)
+          .eq('org_id', targetOrgId)
+          .neq('role', 'super_admin')
+
+        if (roleDeleteError) {
+          throw roleDeleteError
+        }
+
+        const { error: profileUpdateError } = await supabaseAdmin
+          .from('profiles')
+          .update({ active: false })
+          .eq('user_id', userId)
+          .eq('org_id', targetOrgId)
+
+        if (profileUpdateError) {
+          throw profileUpdateError
+        }
+
+        return new Response(
+          JSON.stringify({ success: true, message: 'User removed from organisation and deactivated' }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
       }

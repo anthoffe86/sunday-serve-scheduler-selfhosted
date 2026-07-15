@@ -7,6 +7,8 @@ interface AuthContextType {
   session: Session | null;
   isLoading: boolean;
   isAdmin: boolean;
+  isSuperAdmin: boolean;
+  orgId: string | null;
   signUp: (email: string, password: string, name: string) => Promise<{ error: Error | null }>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
@@ -19,6 +21,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  const [orgId, setOrgId] = useState<string | null>(null);
 
   useEffect(() => {
     // Set up auth state listener FIRST
@@ -31,10 +35,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Check admin status after auth change
         if (session?.user) {
           setTimeout(() => {
-            checkAdminStatus(session.user.id);
+            checkRoleStatus(session.user.id);
           }, 0);
         } else {
           setIsAdmin(false);
+          setIsSuperAdmin(false);
+          setOrgId(null);
         }
       }
     );
@@ -46,22 +52,46 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setIsLoading(false);
       
       if (session?.user) {
-        checkAdminStatus(session.user.id);
+        checkRoleStatus(session.user.id);
       }
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
-  const checkAdminStatus = async (userId: string) => {
+  const checkRoleStatus = async (userId: string) => {
     const { data, error } = await supabase
       .from('user_roles')
-      .select('role')
+      .select('role, org_id')
+      .eq('user_id', userId);
+
+    if (error || !data) {
+      setIsAdmin(false);
+      setIsSuperAdmin(false);
+      setOrgId(null);
+      return;
+    }
+
+    const roleRows = (data as Array<{ role: string; org_id?: string | null }>) || [];
+    const adminRole = roleRows.find((r) => r.role === 'admin');
+    const superAdminRole = roleRows.find((r) => r.role === 'super_admin');
+
+    setIsAdmin(!!adminRole);
+    setIsSuperAdmin(!!superAdminRole);
+
+    if (adminRole?.org_id) {
+      setOrgId(adminRole.org_id);
+      return;
+    }
+
+    const { data: profileData } = await supabase
+      .from('profiles')
+      .select('org_id')
       .eq('user_id', userId)
-      .eq('role', 'admin')
       .maybeSingle();
-    
-    setIsAdmin(!!data && !error);
+
+    const profile = profileData as { org_id?: string | null } | null;
+    setOrgId(profile?.org_id ?? null);
   };
 
   const signUp = async (email: string, password: string, name: string) => {
@@ -93,6 +123,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     setSession(null);
     setIsAdmin(false);
+    setIsSuperAdmin(false);
+    setOrgId(null);
   };
 
   return (
@@ -101,6 +133,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       session, 
       isLoading, 
       isAdmin,
+      isSuperAdmin,
+      orgId,
       signUp, 
       signIn, 
       signOut 

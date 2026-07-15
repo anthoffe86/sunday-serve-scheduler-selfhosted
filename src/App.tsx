@@ -23,6 +23,7 @@ import AdminEventDetail from "./pages/admin/EventDetail";
 import AdminSwapManagement from "./pages/admin/SwapManagement";
 import AdminSettings from "./pages/admin/AdminSettings";
 import AccessRequests from "./pages/admin/AccessRequests";
+import SuperAdminDashboard from "./pages/superadmin/SuperAdminDashboard";
 import Auth from "./pages/Auth";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
@@ -84,14 +85,80 @@ const App = () => (
               <Route path="/swaps" element={<Swaps />} />
               <Route path="/invitations" element={<Invitations />} />
               <Route path="/profile" element={<Profile />} />
-              <Route path="/admin" element={<AdminDashboard />} />
-              <Route path="/admin/volunteers" element={<VolunteerManagement />} />
-              <Route path="/admin/schedule" element={<AdminSchedule />} />
-              <Route path="/admin/events" element={<AdminEvents />} />
-              <Route path="/admin/events/:eventId" element={<AdminEventDetail />} />
-              <Route path="/admin/swaps" element={<AdminSwapManagement />} />
-              <Route path="/admin/access-requests" element={<AccessRequests />} />
-              <Route path="/admin/settings" element={<AdminSettings />} />
+
+              <Route
+                path="/admin"
+                element={
+                  <ProtectedRoute requireOrgAdmin>
+                    <AdminDashboard />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/volunteers"
+                element={
+                  <ProtectedRoute requireOrgAdmin>
+                    <VolunteerManagement />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/schedule"
+                element={
+                  <ProtectedRoute requireOrgAdmin>
+                    <AdminSchedule />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/events"
+                element={
+                  <ProtectedRoute requireOrgAdmin>
+                    <AdminEvents />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/events/:eventId"
+                element={
+                  <ProtectedRoute requireOrgAdmin>
+                    <AdminEventDetail />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/swaps"
+                element={
+                  <ProtectedRoute requireOrgAdmin>
+                    <AdminSwapManagement />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/access-requests"
+                element={
+                  <ProtectedRoute requireOrgAdmin>
+                    <AccessRequests />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/settings"
+                element={
+                  <ProtectedRoute requireOrgAdmin>
+                    <AdminSettings />
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
+                path="/super-admin"
+                element={
+                  <ProtectedRoute requireSuperAdmin>
+                    <SuperAdminDashboard />
+                  </ProtectedRoute>
+                }
+              />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>

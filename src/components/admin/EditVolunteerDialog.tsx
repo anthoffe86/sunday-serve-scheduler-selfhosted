@@ -43,6 +43,14 @@ import type { Database } from '@/integrations/supabase/types';
 import { format, parseISO, differenceInDays, addDays } from 'date-fns';
 import { AddUnavailableDatesDialog } from '@/components/AddUnavailableDatesDialog';
 import { EditUnavailableDateDialog } from '@/components/EditUnavailableDateDialog';
+import { useAuth } from '@/hooks/useAuth';
+
+const getErrorMessage = (error: unknown, fallback: string) => {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  return fallback;
+};
 
 type ServiceRole = Database['public']['Enums']['service_role'];
 
@@ -68,6 +76,7 @@ export function EditVolunteerDialog({
   onOpenChange, 
   onSuccess 
 }: EditVolunteerDialogProps) {
+  const { isSuperAdmin } = useAuth();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [selectedRoles, setSelectedRoles] = useState<ServiceRole[]>([]);
@@ -122,7 +131,7 @@ export function EditVolunteerDialog({
       });
 
       // Update email if changed
-      if (email.trim().toLowerCase() !== volunteer.email.toLowerCase()) {
+      if (isSuperAdmin && email.trim().toLowerCase() !== volunteer.email.toLowerCase()) {
         const response = await supabase.functions.invoke('admin-user-management', {
           body: {
             action: 'update-email',
@@ -153,9 +162,9 @@ export function EditVolunteerDialog({
       refetchRolePrefs();
       onSuccess?.();
       onOpenChange(false);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to update volunteer:', err);
-      toast.error(err.message || 'Failed to update volunteer');
+      toast.error(getErrorMessage(err, 'Failed to update volunteer'));
     } finally {
       setIsSubmitting(false);
     }
@@ -188,9 +197,9 @@ export function EditVolunteerDialog({
       } else {
         toast.success('Password reset email sent to volunteer');
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to reset password:', err);
-      toast.error(err.message || 'Failed to generate password reset');
+      toast.error(getErrorMessage(err, 'Failed to generate password reset'));
     } finally {
       setIsSubmitting(false);
     }
@@ -370,8 +379,14 @@ export function EditVolunteerDialog({
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="Enter email"
+                disabled={!isSuperAdmin}
               />
-              {email.toLowerCase() !== volunteer.email.toLowerCase() && (
+              {!isSuperAdmin && (
+                <p className="text-xs text-muted-foreground">
+                  Only super admins can change login email addresses.
+                </p>
+              )}
+              {isSuperAdmin && email.toLowerCase() !== volunteer.email.toLowerCase() && (
                 <p className="text-xs text-amber-600">
                   Changing email will update the login credentials
                 </p>
@@ -528,10 +543,15 @@ export function EditVolunteerDialog({
               <p className="text-sm text-muted-foreground">
                 Generate a password reset link for this volunteer. The link will be copied to your clipboard.
               </p>
+              {!isSuperAdmin && (
+                <p className="text-xs text-muted-foreground">
+                  Password reset is restricted to super admins.
+                </p>
+              )}
               <Button 
                 variant="outline" 
                 onClick={handleResetPassword}
-                disabled={isSubmitting}
+                disabled={isSubmitting || !isSuperAdmin}
                 className="w-full"
               >
                 {isSubmitting ? (
