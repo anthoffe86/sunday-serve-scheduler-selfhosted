@@ -7,6 +7,8 @@ ON CONFLICT (key) DO NOTHING;
 
 -- Allow public (anon) users to read the two non-sensitive organisation branding keys.
 -- This lets logged-out pages (invite signup, invitation response) show the org name.
+DROP POLICY IF EXISTS "Public can read organisation branding settings" ON public.system_settings;
+
 CREATE POLICY "Public can read organisation branding settings"
   ON public.system_settings
   FOR SELECT
@@ -15,7 +17,7 @@ CREATE POLICY "Public can read organisation branding settings"
 
 -- ─── Access requests ────────────────────────────────────────────────────────
 
-CREATE TABLE public.access_requests (
+CREATE TABLE IF NOT EXISTS public.access_requests (
   id               UUID                     PRIMARY KEY DEFAULT gen_random_uuid(),
   name             TEXT                     NOT NULL,
   organisation_name TEXT                    NOT NULL,
@@ -29,6 +31,8 @@ CREATE TABLE public.access_requests (
 ALTER TABLE public.access_requests ENABLE ROW LEVEL SECURITY;
 
 -- Anyone (including anonymous visitors) can submit a request
+DROP POLICY IF EXISTS "Anyone can submit access requests" ON public.access_requests;
+
 CREATE POLICY "Anyone can submit access requests"
   ON public.access_requests
   FOR INSERT
@@ -36,6 +40,8 @@ CREATE POLICY "Anyone can submit access requests"
   WITH CHECK (status = 'pending');
 
 -- Only admins can view requests
+DROP POLICY IF EXISTS "Admins can view access requests" ON public.access_requests;
+
 CREATE POLICY "Admins can view access requests"
   ON public.access_requests
   FOR SELECT
@@ -48,6 +54,8 @@ CREATE POLICY "Admins can view access requests"
   );
 
 -- Only admins can update request status
+DROP POLICY IF EXISTS "Admins can update access requests" ON public.access_requests;
+
 CREATE POLICY "Admins can update access requests"
   ON public.access_requests
   FOR UPDATE
