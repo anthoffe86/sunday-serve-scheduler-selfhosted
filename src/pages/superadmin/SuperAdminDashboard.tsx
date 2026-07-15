@@ -35,6 +35,16 @@ type FunctionInvokeResult = {
   error: { message?: string } | null;
 };
 
+type AddUserResult = {
+  userId?: string;
+};
+
+type SupportDataResult = {
+  organisations?: Organisation[];
+  users?: UserRow[];
+  superAdminUserIds?: string[];
+};
+
 const getErrorMessage = (error: unknown, fallback: string) => {
   if (error instanceof Error) {
     return error.message;
@@ -42,17 +52,13 @@ const getErrorMessage = (error: unknown, fallback: string) => {
   return fallback;
 };
 
+const sortUsersByName = (rows: UserRow[]) => {
+  return [...rows].sort((left, right) => left.name.localeCompare(right.name, undefined, { sensitivity: 'base' }));
+};
+
 const USER_PAGE_SIZE = 25;
 
 const SuperAdminDashboard = () => {
-  const supabaseAny = supabase as unknown as {
-    from: (table: string) => {
-      select: (columns: string) => {
-        order: (column: string, opts?: { ascending?: boolean }) => Promise<{ data: unknown; error: Error | null }>;
-        limit: (count: number) => Promise<{ data: unknown; error: Error | null }>;
-      };
-    };
-  };
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState(false);
   const [organisations, setOrganisations] = useState<Organisation[]>([]);
@@ -65,42 +71,29 @@ const SuperAdminDashboard = () => {
   const [newUserOrgId, setNewUserOrgId] = useState('');
   const [newUserRole, setNewUserRole] = useState<'volunteer' | 'admin'>('volunteer');
 
+  const invokeSupportAction = useCallback(async (payload: Record<string, unknown>) => {
+    const response = (await supabase.functions.invoke('admin-user-management', {
+      body: payload,
+    })) as FunctionInvokeResult;
+
+    if (response.error) {
+      throw new Error(response.error.message ?? 'Support action failed');
+    }
+
+    return response.data;
+  }, []);
+
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const [orgsRes, usersRes, rolesRes] = await Promise.all([
-        supabaseAny
-          .from('organisations')
-          .select('id, name, slug, active')
-          .order('name', { ascending: true }),
-        supabaseAny
-          .from('profiles')
-          .select('user_id, name, email, active, org_id')
-          .order('name', { ascending: true }),
-        supabaseAny
-          .from('user_roles')
-          .select('user_id, role')
-          .order('user_id', { ascending: true }),
-      ]);
+      const supportData = (await invokeSupportAction({
+        action: 'list-support-data',
+      })) as SupportDataResult | null;
 
-      if (orgsRes.error) {
-        throw orgsRes.error;
-      }
-      if (usersRes.error) {
-        throw usersRes.error;
-      }
-      if (rolesRes.error) {
-        throw rolesRes.error;
-      }
-
-      const loadedOrgs = ((orgsRes.data ?? []) as Organisation[]);
+      const loadedOrgs = supportData?.organisations ?? [];
       setOrganisations(loadedOrgs);
-      setUsers((usersRes.data ?? []) as UserRow[]);
-      setSuperAdminUserIds(
-        ((rolesRes.data ?? []) as Array<{ user_id: string; role: string }>)
-          .filter((row) => row.role === 'super_admin')
-          .map((row) => row.user_id)
-      );
+      setUsers(sortUsersByName(supportData?.users ?? []));
+      setSuperAdminUserIds(supportData?.superAdminUserIds ?? []);
       if (!newUserOrgId && loadedOrgs.length) {
         setNewUserOrgId(loadedOrgs[0].id);
       }
@@ -109,7 +102,7 @@ const SuperAdminDashboard = () => {
     } finally {
       setLoading(false);
     }
-  }, [newUserOrgId, supabaseAny]);
+  }, [invokeSupportAction, newUserOrgId]);
 
   useEffect(() => {
     fetchData();
@@ -141,15 +134,7 @@ const SuperAdminDashboard = () => {
   const runSupportAction = async (payload: Record<string, unknown>) => {
     setWorking(true);
     try {
-      const response = (await supabase.functions.invoke('admin-user-management', {
-        body: payload,
-      })) as FunctionInvokeResult;
-
-      if (response.error) {
-        throw new Error(response.error.message ?? 'Support action failed');
-      }
-
-      return response.data;
+      return await invokeSupportAction(payload);
     } finally {
       setWorking(false);
     }
@@ -161,13 +146,17 @@ const SuperAdminDashboard = () => {
       return;
     }
 
+    const pendingName = newUserName.trim();
+    const pendingEmail = newUserEmail.trim().toLowerCase();
+    const pendingOrgId = newUserOrgId;
+
     try {
-      await runSupportAction({
+      const data = await runSupportAction({
         action: 'add-user',
         data: {
-          name: newUserName.trim(),
-          email: newUserEmail.trim().toLowerCase(),
-          orgId: newUserOrgId,
+          name: pendingName,
+          email: pendingEmail,
+          orgId: pendingOrgId,
           role: newUserRole,
         },
       });
@@ -176,6 +165,28 @@ const SuperAdminDashboard = () => {
       setNewUserName('');
       setNewUserEmail('');
       await fetchData();
+      setUsers((currentUsers) => {
+        const addedUserId = (data as AddUserResult | null)?.userId;
+        if (!addedUserId) {
+          return currentUsers;
+        }
+
+        const alreadyPresent = currentUsers.some((user) => user.user_id === addedUserId);
+        if (alreadyPresent) {
+          return currentUsers;
+        }
+
+        return sortUsersByName([
+          ...currentUsers,
+          {
+            user_id: addedUserId,
+            name: pendingName,
+            email: pendingEmail,
+            active: true,
+            org_id: pendingOrgId,
+          },
+        ]);
+      });
     } catch (error: unknown) {
       toast.error(getErrorMessage(error, 'Failed to add user'));
     }

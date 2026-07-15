@@ -5,6 +5,17 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+type AuthIdentityCandidate = {
+  identity_data?: {
+    email?: string | null
+  } | null
+}
+
+type AuthUserCandidate = {
+  email?: string | null
+  identities?: AuthIdentityCandidate[] | null
+}
+
 Deno.serve(async (req) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
@@ -74,6 +85,10 @@ Deno.serve(async (req) => {
       }
     }
 
+    const isEmailExistsError = (error: unknown): error is { code?: string } => {
+      return !!error && typeof error === 'object' && 'code' in error && error.code === 'email_exists'
+    }
+
     const findAuthUserByEmail = async (email: string) => {
       let page = 1
 
@@ -88,7 +103,18 @@ Deno.serve(async (req) => {
         }
 
         const users = listedUsers.users ?? []
-        const matchedUser = users.find((candidate) => candidate.email?.toLowerCase() === email)
+        const matchedUser = users.find((candidate: AuthUserCandidate) => {
+          if (candidate.email?.toLowerCase() === email) {
+            return true
+          }
+
+          const identityEmailMatch = (candidate.identities ?? []).some((identity: AuthIdentityCandidate) => {
+            const identityEmail = identity.identity_data?.email
+            return typeof identityEmail === 'string' && identityEmail.toLowerCase() === email
+          })
+
+          return identityEmailMatch
+        })
         if (matchedUser) {
           return matchedUser
         }
@@ -98,6 +124,21 @@ Deno.serve(async (req) => {
         }
 
         page += 1
+      }
+    }
+
+    const findAuthUserByEmailOrIdentity = async (email: string) => {
+      return await findAuthUserByEmail(email)
+    }
+
+    const ensureAuthUserCanOwnEmail = (resolvedAuthUser: { id: string; email?: string | null } | null, email: string) => {
+      if (!resolvedAuthUser) {
+        return
+      }
+
+      const resolvedEmail = resolvedAuthUser.email?.trim().toLowerCase() ?? null
+      if (resolvedEmail && resolvedEmail !== email) {
+        throw new Error(`Email address ${email} is already linked to auth user ${resolvedEmail}. Repair or update that existing account before creating a separate user.`)
       }
     }
 
@@ -202,6 +243,50 @@ Deno.serve(async (req) => {
     }
 
     switch (action) {
+      case 'list-support-data': {
+        ensureSuperAdmin()
+
+        const [organisationsResult, usersResult, roleRowsResult] = await Promise.all([
+          supabaseAdmin
+            .from('organisations')
+            .select('id, name, slug, active')
+            .order('name', { ascending: true }),
+          supabaseAdmin
+            .from('profiles')
+            .select('user_id, name, email, active, org_id')
+            .order('name', { ascending: true }),
+          supabaseAdmin
+            .from('user_roles')
+            .select('user_id, role')
+            .order('user_id', { ascending: true }),
+        ])
+
+        if (organisationsResult.error) {
+          throw organisationsResult.error
+        }
+
+        if (usersResult.error) {
+          throw usersResult.error
+        }
+
+        if (roleRowsResult.error) {
+          throw roleRowsResult.error
+        }
+
+        const superAdminUserIds = ((roleRowsResult.data ?? []) as Array<{ user_id: string; role: string }>)
+          .filter((row) => row.role === 'super_admin')
+          .map((row) => row.user_id)
+
+        return new Response(
+          JSON.stringify({
+            organisations: organisationsResult.data ?? [],
+            users: usersResult.data ?? [],
+            superAdminUserIds,
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
       case 'reset-password': {
         ensureSuperAdmin()
 
@@ -339,7 +424,9 @@ Deno.serve(async (req) => {
           })
         }
 
-        const existingAuthUser = await findAuthUserByEmail(normalizedEmail)
+        const existingAuthUser = await findAuthUserByEmailOrIdentity(normalizedEmail)
+        ensureAuthUserCanOwnEmail(existingAuthUser, normalizedEmail)
+
         if (existingAuthUser) {
           const { data: fallbackProfile, error: fallbackProfileError } = await supabaseAdmin
             .from('profiles')
@@ -363,14 +450,52 @@ Deno.serve(async (req) => {
 
         const temporaryPassword = `${crypto.randomUUID()}Aa1!`
 
-        const { data: createdUser, error: createUserError } = await supabaseAdmin.auth.admin.createUser({
-          email: normalizedEmail,
-          password: temporaryPassword,
-          email_confirm: true,
-          user_metadata: { name },
-        })
+        let createdUser: Awaited<ReturnType<typeof supabaseAdmin.auth.admin.createUser>>['data'] | null = null
+        let createUserError: unknown = null
 
-        if (createUserError || !createdUser.user) {
+        try {
+          const createUserResult = await supabaseAdmin.auth.admin.createUser({
+            email: normalizedEmail,
+            password: temporaryPassword,
+            email_confirm: true,
+            user_metadata: { name },
+          })
+
+          createdUser = createUserResult.data
+          createUserError = createUserResult.error
+        } catch (error) {
+          createUserError = error
+        }
+
+        if (isEmailExistsError(createUserError)) {
+          const existingAuthUserAfterCreate = await findAuthUserByEmailOrIdentity(normalizedEmail)
+          ensureAuthUserCanOwnEmail(existingAuthUserAfterCreate, normalizedEmail)
+
+          if (!existingAuthUserAfterCreate) {
+            throw createUserError
+          }
+
+          const { data: fallbackProfile, error: fallbackProfileError } = await supabaseAdmin
+            .from('profiles')
+            .select('org_id')
+            .eq('user_id', existingAuthUserAfterCreate.id)
+            .maybeSingle()
+
+          if (fallbackProfileError) {
+            throw fallbackProfileError
+          }
+
+          return await assignExistingUserToOrg({
+            existingUserId: existingAuthUserAfterCreate.id,
+            existingOrgId: (fallbackProfile as { org_id?: string | null } | null)?.org_id ?? null,
+            name,
+            email: normalizedEmail,
+            orgId,
+            role,
+          })
+        }
+
+        if (createUserError || !createdUser?.user) {
           throw createUserError ?? new Error('Failed to create user')
         }
 
