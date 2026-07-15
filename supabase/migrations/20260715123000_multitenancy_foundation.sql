@@ -1,7 +1,5 @@
 -- Multi-tenant foundation: organisations, org scoping, and super-admin role
 
-ALTER TYPE public.app_role ADD VALUE IF NOT EXISTS 'super_admin';
-
 CREATE TABLE IF NOT EXISTS public.organisations (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL,
@@ -435,8 +433,9 @@ CREATE POLICY "Org admins can view organisations"
 
 DROP POLICY IF EXISTS "profiles tenant boundary" ON public.profiles;
 CREATE POLICY "profiles tenant boundary"
+  ON public.profiles
   AS RESTRICTIVE
-  ON public.profiles FOR ALL
+  FOR ALL
   TO authenticated
   USING (
     org_id = public.current_user_org_id(auth.uid())
@@ -449,8 +448,9 @@ CREATE POLICY "profiles tenant boundary"
 
 DROP POLICY IF EXISTS "family_groups tenant boundary" ON public.family_groups;
 CREATE POLICY "family_groups tenant boundary"
+  ON public.family_groups
   AS RESTRICTIVE
-  ON public.family_groups FOR ALL
+  FOR ALL
   TO authenticated
   USING (
     org_id = public.current_user_org_id(auth.uid())
@@ -463,8 +463,9 @@ CREATE POLICY "family_groups tenant boundary"
 
 DROP POLICY IF EXISTS "role_preferences tenant boundary" ON public.role_preferences;
 CREATE POLICY "role_preferences tenant boundary"
+  ON public.role_preferences
   AS RESTRICTIVE
-  ON public.role_preferences FOR ALL
+  FOR ALL
   TO authenticated
   USING (
     org_id = public.current_user_org_id(auth.uid())
@@ -477,8 +478,9 @@ CREATE POLICY "role_preferences tenant boundary"
 
 DROP POLICY IF EXISTS "availability tenant boundary" ON public.availability;
 CREATE POLICY "availability tenant boundary"
+  ON public.availability
   AS RESTRICTIVE
-  ON public.availability FOR ALL
+  FOR ALL
   TO authenticated
   USING (
     org_id = public.current_user_org_id(auth.uid())
@@ -491,8 +493,9 @@ CREATE POLICY "availability tenant boundary"
 
 DROP POLICY IF EXISTS "service_history tenant boundary" ON public.service_history;
 CREATE POLICY "service_history tenant boundary"
+  ON public.service_history
   AS RESTRICTIVE
-  ON public.service_history FOR ALL
+  FOR ALL
   TO authenticated
   USING (
     org_id = public.current_user_org_id(auth.uid())
@@ -505,8 +508,9 @@ CREATE POLICY "service_history tenant boundary"
 
 DROP POLICY IF EXISTS "event_templates tenant boundary" ON public.event_templates;
 CREATE POLICY "event_templates tenant boundary"
+  ON public.event_templates
   AS RESTRICTIVE
-  ON public.event_templates FOR ALL
+  FOR ALL
   TO authenticated
   USING (
     org_id = public.current_user_org_id(auth.uid())
@@ -519,8 +523,9 @@ CREATE POLICY "event_templates tenant boundary"
 
 DROP POLICY IF EXISTS "event_template_roles tenant boundary" ON public.event_template_roles;
 CREATE POLICY "event_template_roles tenant boundary"
+  ON public.event_template_roles
   AS RESTRICTIVE
-  ON public.event_template_roles FOR ALL
+  FOR ALL
   TO authenticated
   USING (
     org_id = public.current_user_org_id(auth.uid())
@@ -533,8 +538,9 @@ CREATE POLICY "event_template_roles tenant boundary"
 
 DROP POLICY IF EXISTS "events tenant boundary" ON public.events;
 CREATE POLICY "events tenant boundary"
+  ON public.events
   AS RESTRICTIVE
-  ON public.events FOR ALL
+  FOR ALL
   TO authenticated
   USING (
     org_id = public.current_user_org_id(auth.uid())
@@ -547,8 +553,9 @@ CREATE POLICY "events tenant boundary"
 
 DROP POLICY IF EXISTS "event_roles tenant boundary" ON public.event_roles;
 CREATE POLICY "event_roles tenant boundary"
+  ON public.event_roles
   AS RESTRICTIVE
-  ON public.event_roles FOR ALL
+  FOR ALL
   TO authenticated
   USING (
     org_id = public.current_user_org_id(auth.uid())
@@ -561,8 +568,9 @@ CREATE POLICY "event_roles tenant boundary"
 
 DROP POLICY IF EXISTS "event_assignments tenant boundary" ON public.event_assignments;
 CREATE POLICY "event_assignments tenant boundary"
+  ON public.event_assignments
   AS RESTRICTIVE
-  ON public.event_assignments FOR ALL
+  FOR ALL
   TO authenticated
   USING (
     org_id = public.current_user_org_id(auth.uid())
@@ -575,8 +583,9 @@ CREATE POLICY "event_assignments tenant boundary"
 
 DROP POLICY IF EXISTS "invite_tokens tenant boundary" ON public.invite_tokens;
 CREATE POLICY "invite_tokens tenant boundary"
+  ON public.invite_tokens
   AS RESTRICTIVE
-  ON public.invite_tokens FOR ALL
+  FOR ALL
   TO authenticated
   USING (
     org_id = public.current_user_org_id(auth.uid())
@@ -589,8 +598,9 @@ CREATE POLICY "invite_tokens tenant boundary"
 
 DROP POLICY IF EXISTS "sunday_services tenant boundary" ON public.sunday_services;
 CREATE POLICY "sunday_services tenant boundary"
+  ON public.sunday_services
   AS RESTRICTIVE
-  ON public.sunday_services FOR ALL
+  FOR ALL
   TO authenticated
   USING (
     org_id = public.current_user_org_id(auth.uid())
@@ -603,8 +613,9 @@ CREATE POLICY "sunday_services tenant boundary"
 
 DROP POLICY IF EXISTS "assignments tenant boundary" ON public.assignments;
 CREATE POLICY "assignments tenant boundary"
+  ON public.assignments
   AS RESTRICTIVE
-  ON public.assignments FOR ALL
+  FOR ALL
   TO authenticated
   USING (
     org_id = public.current_user_org_id(auth.uid())
@@ -617,8 +628,9 @@ CREATE POLICY "assignments tenant boundary"
 
 DROP POLICY IF EXISTS "swap_requests tenant boundary" ON public.swap_requests;
 CREATE POLICY "swap_requests tenant boundary"
+  ON public.swap_requests
   AS RESTRICTIVE
-  ON public.swap_requests FOR ALL
+  FOR ALL
   TO authenticated
   USING (
     org_id = public.current_user_org_id(auth.uid())
@@ -631,45 +643,51 @@ CREATE POLICY "swap_requests tenant boundary"
 
 DROP POLICY IF EXISTS "No super-admin schedule writes to events" ON public.events;
 CREATE POLICY "No super-admin schedule writes to events"
+  ON public.events
   AS RESTRICTIVE
-  ON public.events FOR UPDATE
+  FOR UPDATE
   TO authenticated
   USING (NOT public.is_super_admin(auth.uid()))
   WITH CHECK (NOT public.is_super_admin(auth.uid()));
 
 DROP POLICY IF EXISTS "No super-admin schedule inserts to events" ON public.events;
 CREATE POLICY "No super-admin schedule inserts to events"
+  ON public.events
   AS RESTRICTIVE
-  ON public.events FOR INSERT
+  FOR INSERT
   TO authenticated
   WITH CHECK (NOT public.is_super_admin(auth.uid()));
 
 DROP POLICY IF EXISTS "No super-admin schedule deletes to events" ON public.events;
 CREATE POLICY "No super-admin schedule deletes to events"
+  ON public.events
   AS RESTRICTIVE
-  ON public.events FOR DELETE
+  FOR DELETE
   TO authenticated
   USING (NOT public.is_super_admin(auth.uid()));
 
 DROP POLICY IF EXISTS "No super-admin schedule writes to templates" ON public.event_templates;
 CREATE POLICY "No super-admin schedule writes to templates"
+  ON public.event_templates
   AS RESTRICTIVE
-  ON public.event_templates FOR UPDATE
+  FOR UPDATE
   TO authenticated
   USING (NOT public.is_super_admin(auth.uid()))
   WITH CHECK (NOT public.is_super_admin(auth.uid()));
 
 DROP POLICY IF EXISTS "No super-admin schedule inserts to templates" ON public.event_templates;
 CREATE POLICY "No super-admin schedule inserts to templates"
+  ON public.event_templates
   AS RESTRICTIVE
-  ON public.event_templates FOR INSERT
+  FOR INSERT
   TO authenticated
   WITH CHECK (NOT public.is_super_admin(auth.uid()));
 
 DROP POLICY IF EXISTS "No super-admin schedule deletes to templates" ON public.event_templates;
 CREATE POLICY "No super-admin schedule deletes to templates"
+  ON public.event_templates
   AS RESTRICTIVE
-  ON public.event_templates FOR DELETE
+  FOR DELETE
   TO authenticated
   USING (NOT public.is_super_admin(auth.uid()));
 
