@@ -37,12 +37,12 @@ const adminNav = [
   { to: '/admin/schedule', icon: CalendarDays, label: 'Schedule' },
   { to: '/admin/volunteers', icon: Users, label: 'Volunteers' },
   { to: '/admin/swaps', icon: ArrowLeftRight, label: 'Swap Requests' },
-  { to: '/admin/access-requests', icon: ClipboardList, label: 'Info & Demo Enquiries' },
   { to: '/admin/settings', icon: Settings, label: 'Settings' },
 ];
 
 const superAdminNav = [
   { to: '/super-admin', icon: Shield, label: 'Super Admin' },
+  { to: '/super-admin/enquiries', icon: ClipboardList, label: 'Info & Demo Enquiries' },
 ];
 
 function NavItem({ to, icon: Icon, label, onClick }: { to: string; icon: typeof Home; label: string; onClick?: () => void }) {

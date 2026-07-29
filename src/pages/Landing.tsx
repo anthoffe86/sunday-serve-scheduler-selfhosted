@@ -203,6 +203,16 @@ const Landing = () => {
       status: 'pending',
     });
 
+    setSubmitting(false);
+    if (error) {
+      console.error(error);
+      toast.error('Something went wrong submitting your enquiry. Please try again.');
+      return;
+    }
+
+    // Only notify once the row is safely stored, so we never email a lead that has
+    // no enquiry record behind it for the super admin to action. Deliberately not
+    // awaited: a Resend outage must not fail the visitor's submission.
     supabase.functions
       .invoke('notify-access-request', {
         body: {
@@ -215,13 +225,6 @@ const Landing = () => {
       .catch(() => {
         // best effort only
       });
-
-    setSubmitting(false);
-    if (error) {
-      console.error(error);
-      toast.error('Something went wrong submitting your enquiry. Please try again.');
-      return;
-    }
 
     setSubmitted(true);
     setForm({ name: '', email: '', organisation_name: '', notes: '' });
