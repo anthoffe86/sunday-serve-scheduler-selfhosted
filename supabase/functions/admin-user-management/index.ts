@@ -1,4 +1,12 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import {
+  PASSWORD_RESET_NOT_CONFIGURED,
+  generateRecoveryLink,
+  isResendConfigured,
+  isValidEmail,
+  resolveAppOrigin,
+  sendPasswordResetEmail,
+} from '../_shared/password-reset.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -290,26 +298,65 @@ Deno.serve(async (req) => {
       case 'reset-password': {
         ensureSuperAdmin()
 
-        const targetEmail = data?.email as string | undefined
-        if (!targetEmail) {
-          throw new Error('Email is required for password reset')
+        if (!isValidEmail(data?.email)) {
+          throw new Error('A valid email address is required for password reset')
+        }
+        const targetEmail = (data.email as string).trim().toLowerCase()
+
+        // Same pipeline as the self-service /forgot-password flow: the link is
+        // built from APP_BASE_URL, not from Supabase's Site URL setting.
+        const appOrigin = resolveAppOrigin(data?.baseUrl)
+        if (!appOrigin) {
+          console.error('APP_BASE_URL is not set. Cannot build a reset link.')
+          return new Response(
+            JSON.stringify({ error: PASSWORD_RESET_NOT_CONFIGURED }),
+            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
         }
 
-        // Generate a password reset link
-        const { data: resetData, error: resetError } = await supabaseAdmin.auth.admin.generateLink({
-          type: 'recovery',
+        if (!isResendConfigured()) {
+          console.error('RESEND_API_KEY secret is not set. Cannot send the reset email.')
+          return new Response(
+            JSON.stringify({ error: PASSWORD_RESET_NOT_CONFIGURED }),
+            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
+        }
+
+        const resetLink = await generateRecoveryLink(supabaseAdmin, targetEmail, appOrigin)
+        if (!resetLink) {
+          // The caller is an authenticated super admin acting on a user they can
+          // already see, so a precise message is more useful than the
+          // enumeration-safe wording used on the public endpoint.
+          return new Response(
+            JSON.stringify({ error: 'No account was found for that email address.' }),
+            { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
+        }
+
+        // Emailed to the account holder rather than returned to the caller: the
+        // reset link is a bearer credential for that account, and sending it
+        // leaves a trail instead of allowing a silent takeover.
+        const sendError = await sendPasswordResetEmail({
+          supabaseAdmin,
           email: targetEmail,
+          resetLink,
+          initiatedByAdmin: true,
         })
 
-        if (resetError) {
-          throw resetError
+        if (sendError) {
+          return new Response(
+            JSON.stringify({ error: sendError }),
+            { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
         }
 
+        console.log(`Super admin ${user.id} sent a password reset to a user account.`)
+
         return new Response(
-          JSON.stringify({ 
-            success: true, 
-            message: 'Password reset link generated',
-            resetLink: resetData.properties?.action_link 
+          JSON.stringify({
+            success: true,
+            emailed: true,
+            email: targetEmail,
           }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )

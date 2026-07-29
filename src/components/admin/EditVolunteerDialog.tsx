@@ -82,7 +82,7 @@ export function EditVolunteerDialog({
   const [selectedRoles, setSelectedRoles] = useState<ServiceRole[]>([]);
   const [selectedFamilyGroup, setSelectedFamilyGroup] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [resetLinkCopied, setResetLinkCopied] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingRange, setEditingRange] = useState<{ startDate: string; notes?: string | null } | null>(null);
   
@@ -179,27 +179,32 @@ export function EditVolunteerDialog({
         body: {
           action: 'reset-password',
           userId: volunteer.user_id,
-          data: { email: volunteer.email },
+          data: { email: volunteer.email, baseUrl: window.location.origin },
         },
       });
 
       if (response.error) {
-        throw new Error(response.error.message);
+        // The function's own message lives on the raw Response; invoke() only
+        // reports a generic non-2xx error.
+        const context = (response.error as { context?: Response }).context;
+        let message = response.error.message;
+        if (context && typeof context.json === 'function') {
+          try {
+            const body = await context.json();
+            if (typeof body?.error === 'string' && body.error) message = body.error;
+          } catch {
+            // Non-JSON body; keep the generic message.
+          }
+        }
+        throw new Error(message);
       }
 
-      const resetLink = response.data?.resetLink;
-      
-      if (resetLink) {
-        await navigator.clipboard.writeText(resetLink);
-        setResetLinkCopied(true);
-        toast.success('Password reset link copied to clipboard!');
-        setTimeout(() => setResetLinkCopied(false), 3000);
-      } else {
-        toast.success('Password reset email sent to volunteer');
-      }
+      setResetSent(true);
+      toast.success(`Password reset email sent to ${volunteer.email}`);
+      setTimeout(() => setResetSent(false), 3000);
     } catch (err: unknown) {
       console.error('Failed to reset password:', err);
-      toast.error(getErrorMessage(err, 'Failed to generate password reset'));
+      toast.error(getErrorMessage(err, 'Failed to send password reset email'));
     } finally {
       setIsSubmitting(false);
     }
@@ -335,7 +340,7 @@ export function EditVolunteerDialog({
     setEmail('');
     setSelectedRoles([]);
     setSelectedFamilyGroup(null);
-    setResetLinkCopied(false);
+    setResetSent(false);
     setEditingRange(null);
     onOpenChange(false);
   };
@@ -541,15 +546,16 @@ export function EditVolunteerDialog({
                 <h4 className="font-medium">Password Reset</h4>
               </div>
               <p className="text-sm text-muted-foreground">
-                Generate a password reset link for this volunteer. The link will be copied to your clipboard.
+                Email this volunteer a link to set a new password. Their current password keeps
+                working until they use it.
               </p>
               {!isSuperAdmin && (
                 <p className="text-xs text-muted-foreground">
                   Password reset is restricted to super admins.
                 </p>
               )}
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 onClick={handleResetPassword}
                 disabled={isSubmitting || !isSuperAdmin}
                 className="w-full"
@@ -557,12 +563,12 @@ export function EditVolunteerDialog({
                 {isSubmitting ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Generating...
+                    Sending...
                   </>
-                ) : resetLinkCopied ? (
-                  'Link Copied!'
+                ) : resetSent ? (
+                  'Email Sent!'
                 ) : (
-                  'Generate Reset Link'
+                  'Send Reset Email'
                 )}
               </Button>
             </div>
