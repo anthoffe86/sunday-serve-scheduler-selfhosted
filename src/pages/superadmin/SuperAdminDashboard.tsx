@@ -12,6 +12,16 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -32,7 +42,30 @@ type UserRow = {
 
 type FunctionInvokeResult = {
   data: unknown;
-  error: { message?: string } | null;
+  error: { message?: string; context?: Response } | null;
+};
+
+/**
+ * supabase.functions.invoke collapses every non-2xx response into a generic
+ * "non-2xx status code" message, so the function's own error text has to be read
+ * back off the raw Response it hangs on `context`.
+ */
+const readInvokeError = async (
+  error: { message?: string; context?: Response },
+  fallback: string
+): Promise<string> => {
+  const context = error.context;
+  if (context && typeof context.json === 'function') {
+    try {
+      const body = await context.json();
+      if (typeof body?.error === 'string' && body.error) {
+        return body.error;
+      }
+    } catch {
+      // Non-JSON body; fall through.
+    }
+  }
+  return error.message ?? fallback;
 };
 
 type AddUserResult = {
@@ -65,6 +98,7 @@ const SuperAdminDashboard = () => {
   const [users, setUsers] = useState<UserRow[]>([]);
   const [superAdminUserIds, setSuperAdminUserIds] = useState<string[]>([]);
   const [search, setSearch] = useState('');
+  const [resetTarget, setResetTarget] = useState<UserRow | null>(null);
 
   const [newUserName, setNewUserName] = useState('');
   const [newUserEmail, setNewUserEmail] = useState('');
@@ -77,7 +111,7 @@ const SuperAdminDashboard = () => {
     })) as FunctionInvokeResult;
 
     if (response.error) {
-      throw new Error(response.error.message ?? 'Support action failed');
+      throw new Error(await readInvokeError(response.error, 'Support action failed'));
     }
 
     return response.data;
@@ -192,21 +226,25 @@ const SuperAdminDashboard = () => {
     }
   };
 
-  const handleResetPassword = async (email: string) => {
+  const handleResetPassword = async () => {
+    if (!resetTarget) {
+      return;
+    }
+
+    const { email } = resetTarget;
+
     try {
-      const data = await runSupportAction({
+      // Sends the same branded reset email as the self-service
+      // /forgot-password flow. The link goes to the account holder, not back to
+      // this dashboard, so a reset always leaves a trail in their inbox.
+      await runSupportAction({
         action: 'reset-password',
-        data: { email },
+        data: { email, baseUrl: window.location.origin },
       });
-      const resetLink = (data as { resetLink?: string } | null)?.resetLink;
-      if (resetLink) {
-        await navigator.clipboard.writeText(resetLink);
-        toast.success('Password reset link copied to clipboard');
-      } else {
-        toast.success('Password reset action completed');
-      }
+      toast.success(`Password reset email sent to ${email}`);
+      setResetTarget(null);
     } catch (error: unknown) {
-      toast.error(getErrorMessage(error, 'Failed to reset password'));
+      toast.error(getErrorMessage(error, 'Failed to send password reset email'));
     }
   };
 
@@ -400,10 +438,10 @@ const SuperAdminDashboard = () => {
                         size="sm"
                         variant="outline"
                         disabled={working}
-                        onClick={() => handleResetPassword(user.email)}
+                        onClick={() => setResetTarget(user)}
                       >
                         <RefreshCcw className="mr-1 h-3.5 w-3.5" />
-                        Reset Password
+                        Send Reset Email
                       </Button>
                       <Button
                         size="sm"
@@ -435,6 +473,44 @@ const SuperAdminDashboard = () => {
           </div>
         </CardContent>
       </Card>
+
+      <AlertDialog
+        open={!!resetTarget}
+        onOpenChange={(open) => !open && !working && setResetTarget(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="font-serif">Send password reset email?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {resetTarget?.name} will receive an email at{' '}
+              <span className="font-medium text-foreground">{resetTarget?.email}</span> with a link
+              to set a new password. The link expires in 1 hour and can only be used once. Their
+              current password keeps working until they use it.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={working}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(event) => {
+                // Keep the dialog mounted while the request is in flight so the
+                // button can show progress; handleResetPassword closes it.
+                event.preventDefault();
+                handleResetPassword();
+              }}
+              disabled={working}
+            >
+              {working ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Sending...
+                </>
+              ) : (
+                'Send Reset Email'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

@@ -93,6 +93,61 @@ supabase secrets set RESEND_FROM_EMAIL="Your Org <noreply@your-verified-domain.c
 
 If `RESEND_FROM_EMAIL` is not set, the functions fall back to `St Matthews Church <noreply@updates.servetogether.co.uk>`.
 
+## Password reset setup
+
+Password reset emails are sent via Resend, **not** by Supabase's built-in mailer. This is deliberate:
+Supabase's own recovery emails build their link from the project's *Site URL*, which produces
+`localhost` links on any project that was first set up locally.
+
+There are two entry points, both sharing `supabase/functions/_shared/password-reset.ts`:
+
+| Entry point | Function | Who can trigger it |
+| --- | --- | --- |
+| **Forgot password?** on the sign-in page | `send-password-reset` | Anyone (unauthenticated, throttled) |
+| **Send Reset Email** in Super Admin → Users, and the volunteer edit dialog's Account tab | `admin-user-management`, `reset-password` action | Super admins only |
+
+Both send the same branded email to the **account holder**, and both need the secrets below. The
+admin path deliberately does not hand the link back to the caller: a recovery link is a bearer
+credential for that account, so emailing it leaves a trail rather than allowing a silent takeover.
+This replaces the old "copy reset link to clipboard" behaviour, whose links pointed at `localhost`
+anyway.
+
+Required secrets, per Supabase project:
+
+```sh
+# The public URL of the site this project serves (no trailing slash).
+supabase secrets set APP_BASE_URL="https://your-site.example.com"
+
+# Already required by the other email functions.
+supabase secrets set RESEND_API_KEY=your_resend_api_key
+```
+
+Optional — additional origins that are allowed to receive reset links, comma separated. Use this for
+Netlify deploy previews or a staging host:
+
+```sh
+supabase secrets set ALLOWED_APP_ORIGINS="https://staging.example.com,http://localhost:8080"
+```
+
+The browser sends its own origin with the request, but the function only honours it when it is in
+this allow-list. Anything else falls back to `APP_BASE_URL`. That check is what stops someone
+requesting a reset for another person's address with a link pointing at a site they control.
+
+Notes:
+
+- The reset link expires after **1 hour** by default. This follows the project's
+  *Authentication → Emails → Email OTP expiration* setting in the Supabase dashboard; change it there
+  if you want a different window.
+- The public endpoint is throttled to 3 requests per email address per 15 minutes and 10 per IP per
+  hour, recorded in `public.password_reset_attempts` (HMAC-hashed, auto-purged after 24 hours).
+  Requires the `20260729120000_password_reset_rate_limit.sql` migration. The super-admin path is not
+  throttled — the caller is already authenticated and privileged.
+- The public endpoint always responds with success whether or not the address is registered, so it
+  cannot be used to discover which volunteers have accounts. The super-admin path returns a precise
+  "no account found" instead, since that caller can already see the user list.
+- Because reset links no longer go through Supabase's Site URL, that dashboard setting does not affect
+  this flow. It is still worth pointing Site URL at the production site for any other auth emails.
+
 ## Two-project Supabase workflow (free tier)
 
 This repository is designed to work with two Supabase projects:
