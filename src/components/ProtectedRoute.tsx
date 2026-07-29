@@ -28,7 +28,14 @@ export function ProtectedRoute({
     return <Navigate to="/auth" replace />;
   }
 
-  if (isSuperAdmin && !requireSuperAdmin && location.pathname !== '/super-admin') {
+  // Super admins are confined to their own area. Match the whole /super-admin
+  // subtree, not just the exact path, or the outer AppLayout route (which has no
+  // requireSuperAdmin) bounces them off every nested super-admin page. The
+  // trailing slash keeps a path like /super-admin-other from matching.
+  const inSuperAdminArea =
+    location.pathname === '/super-admin' || location.pathname.startsWith('/super-admin/');
+
+  if (isSuperAdmin && !requireSuperAdmin && !inSuperAdminArea) {
     return <Navigate to="/super-admin" replace />;
   }
 

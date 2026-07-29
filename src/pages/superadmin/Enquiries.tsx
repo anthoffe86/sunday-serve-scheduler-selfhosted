@@ -29,13 +29,13 @@ interface AccessRequest {
   created_at: string;
 }
 
-const AccessRequests = () => {
-  const { isAdmin, isLoading: authLoading } = useAuth();
+const Enquiries = () => {
+  const { isSuperAdmin, isLoading: authLoading } = useAuth();
   const queryClient = useQueryClient();
   const [deleteTarget, setDeleteTarget] = useState<AccessRequest | null>(null);
 
   const { data: requests, isLoading } = useQuery({
-    queryKey: ['access-requests'],
+    queryKey: ['super-admin', 'enquiries'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('access_requests')
@@ -44,7 +44,7 @@ const AccessRequests = () => {
       if (error) throw error;
       return data as AccessRequest[];
     },
-    enabled: !!isAdmin,
+    enabled: !!isSuperAdmin,
   });
 
   const deleteRequest = useMutation({
@@ -56,7 +56,7 @@ const AccessRequests = () => {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['access-requests'] });
+      queryClient.invalidateQueries({ queryKey: ['super-admin', 'enquiries'] });
       toast.success('Enquiry deleted');
     },
     onError: (err: any) => {
@@ -72,8 +72,10 @@ const AccessRequests = () => {
     );
   }
 
-  if (!isAdmin) {
-    return <Navigate to="/" replace />;
+  // Defence-in-depth behind the route-level requireSuperAdmin guard; RLS is the
+  // real boundary, this just avoids rendering an empty list to the wrong role.
+  if (!isSuperAdmin) {
+    return <Navigate to="/dashboard" replace />;
   }
 
   const sorted = requests ?? [];
@@ -171,4 +173,4 @@ const AccessRequests = () => {
   );
 };
 
-export default AccessRequests;
+export default Enquiries;
