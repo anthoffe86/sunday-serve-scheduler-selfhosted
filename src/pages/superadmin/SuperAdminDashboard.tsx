@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Loader2, Shield, UserPlus, RefreshCcw, UserX, Mail } from 'lucide-react';
+import { Loader2, Shield, UserPlus, RefreshCcw, UserX, Mail, Trash2 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -99,6 +99,7 @@ const SuperAdminDashboard = () => {
   const [superAdminUserIds, setSuperAdminUserIds] = useState<string[]>([]);
   const [search, setSearch] = useState('');
   const [resetTarget, setResetTarget] = useState<UserRow | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<UserRow | null>(null);
 
   const [newUserName, setNewUserName] = useState('');
   const [newUserEmail, setNewUserEmail] = useState('');
@@ -148,12 +149,15 @@ const SuperAdminDashboard = () => {
 
   const filteredUsers = useMemo(() => {
     const term = search.trim().toLowerCase();
+    // Super admins are excluded from this list whether or not a search is active, so the
+    // destructive buttons never render against them. The edge function enforces the same rule.
+    const manageableUsers = users.filter((user) => !superAdminUserIds.includes(user.user_id));
+
     if (!term) {
-      return users.slice(0, USER_PAGE_SIZE);
+      return manageableUsers.slice(0, USER_PAGE_SIZE);
     }
 
-    return users
-      .filter((user) => !superAdminUserIds.includes(user.user_id))
+    return manageableUsers
       .filter((user) => {
         const orgName = orgLookup.get(user.org_id)?.name?.toLowerCase() ?? '';
         return (
@@ -282,6 +286,26 @@ const SuperAdminDashboard = () => {
       await fetchData();
     } catch (error: unknown) {
       toast.error(getErrorMessage(error, 'Failed to remove user'));
+    }
+  };
+
+  const handleDeleteUserPermanently = async () => {
+    if (!deleteTarget) {
+      return;
+    }
+
+    const { user_id: userId, name } = deleteTarget;
+
+    try {
+      await runSupportAction({
+        action: 'delete-user-permanently',
+        userId,
+      });
+      toast.success(`${name} and all their data were permanently deleted`);
+      setDeleteTarget(null);
+      await fetchData();
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, 'Failed to permanently delete user'));
     }
   };
 
@@ -461,6 +485,15 @@ const SuperAdminDashboard = () => {
                         <UserX className="mr-1 h-3.5 w-3.5" />
                         Remove User
                       </Button>
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        disabled={working}
+                        onClick={() => setDeleteTarget(user)}
+                      >
+                        <Trash2 className="mr-1 h-3.5 w-3.5" />
+                        Delete Permanently
+                      </Button>
                     </div>
                   </div>
                 </div>
@@ -506,6 +539,48 @@ const SuperAdminDashboard = () => {
                 </>
               ) : (
                 'Send Reset Email'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => !open && !working && setDeleteTarget(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="font-serif">Permanently delete this user?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteTarget?.name} (
+              <span className="font-medium text-foreground">{deleteTarget?.email}</span>) and all of
+              their data will be erased: every event assignment past and future, availability, role
+              preferences, swap requests, service history and their profile. Their sign-in account is
+              deleted, so they can no longer log in and the email address becomes available for a new
+              account. This cannot be undone — use Remove User instead if you only want to deactivate
+              them.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={working}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(event) => {
+                // Keep the dialog mounted while the request is in flight so the
+                // button can show progress; handleDeleteUserPermanently closes it.
+                event.preventDefault();
+                handleDeleteUserPermanently();
+              }}
+              disabled={working}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {working ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                'Delete Permanently'
               )}
             </AlertDialogAction>
           </AlertDialogFooter>
