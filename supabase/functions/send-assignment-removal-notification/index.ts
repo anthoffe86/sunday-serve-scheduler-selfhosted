@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { Resend } from "https://esm.sh/resend@2.0.0";
-import { getOrgName } from "../_shared/org-settings.ts";
+import { getOrgName, isNotificationEnabled } from "../_shared/org-settings.ts";
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
 const resend = new Resend(RESEND_API_KEY);
@@ -89,30 +89,6 @@ serve(async (req) => {
       }
     }
 
-    // Check if email notifications are enabled by admin
-    const { data: setting, error: settingError } = await supabase
-      .from("system_settings")
-      .select("value")
-      .eq("key", "email_on_assignment_remove")
-      .maybeSingle();
-
-    console.log("Admin setting check (email_on_assignment_remove):", { setting, error: settingError });
-
-    if (settingError) {
-      console.error("Error fetching system setting email_on_assignment_remove:", settingError);
-    } else if (setting && (setting.value === false || setting.value === "false")) {
-      console.log("Assignment removal emails are disabled in system settings. Returning early.");
-      return new Response(
-        JSON.stringify({
-          success: true,
-          message: "Email notifications are disabled by admin.",
-        }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    console.log("Proceeding with assignment removal notification email...");
-
     const {
       volunteerId,
       eventName,
@@ -125,7 +101,7 @@ serve(async (req) => {
     // Get volunteer email
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
-      .select("email, name")
+      .select("email, name, org_id")
       .eq("user_id", volunteerId)
       .single();
 
@@ -139,6 +115,22 @@ serve(async (req) => {
         }
       );
     }
+
+    // Check the toggle for the volunteer's own organisation, so one org switching
+    // removal emails off does not switch them off for every org.
+    const volunteerOrgId = (profile as { org_id?: string | null }).org_id ?? null;
+    if (!(await isNotificationEnabled(supabase, "email_on_assignment_remove", volunteerOrgId))) {
+      console.log(`Assignment removal emails are disabled for org ${volunteerOrgId}. Returning early.`);
+      return new Response(
+        JSON.stringify({
+          success: true,
+          message: "Email notifications are disabled by admin.",
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    console.log("Proceeding with assignment removal notification email...");
 
     // HTML entity escaping to prevent XSS in email content
     function escapeHtml(unsafe: string | null | undefined): string {

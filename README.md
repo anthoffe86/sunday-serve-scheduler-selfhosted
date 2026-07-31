@@ -105,6 +105,23 @@ There are two entry points, both sharing `supabase/functions/_shared/password-re
 | --- | --- | --- |
 | **Forgot password?** on the sign-in page | `send-password-reset` | Anyone (unauthenticated, throttled) |
 | **Send Reset Email** in Super Admin → Users, and the volunteer edit dialog's Account tab | `admin-user-management`, `reset-password` action | Super admins only |
+| **Add User To Organisation** in Super Admin | `admin-user-management`, `add-user` action | Super admins only |
+
+`add-user` creates the auth account with a random password that is never disclosed, so the same
+recovery link doubles as the account's set-password invitation — worded as "Set up your account"
+rather than a reset. It is only sent when a new account is actually created; assigning an existing
+account to an organisation sends nothing, because that person already has a password of their own.
+If the email cannot be sent the user is still created and the dashboard says so, so the super admin
+can retry with **Send Reset Email**.
+
+Note that this is a different path from **Admin → Volunteers → Invite Volunteer**, which mints a
+7-day `invite_tokens` row and sends the `send-invite-email` invitation to `/invite`, where the
+volunteer sets their own password and `complete-invite-signup` creates the account for them. That
+function creates the account with the address already confirmed — opening a link that was only ever
+emailed to that address is the proof of ownership — so the volunteer can log in straight away
+instead of being turned away with "email not verified". Use this path for normal volunteer
+onboarding; `add-user` exists for cross-organisation support work where the org and role need to be
+set explicitly.
 
 Both send the same branded email to the **account holder**, and both need the secrets below. The
 admin path deliberately does not hand the link back to the caller: a recovery link is a bearer

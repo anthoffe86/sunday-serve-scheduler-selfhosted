@@ -83,28 +83,46 @@ const InviteSignup = () => {
     setIsSubmitting(true);
 
     try {
-      // Create the user account
-      const { data: authData, error: signUpError } = await supabase.auth.signUp({
-        email: inviteData.email,
-        password,
-        options: {
-          data: {
-            name: inviteData.name,
-          },
-          emailRedirectTo: `${window.location.origin}/`,
-        },
-      });
+      // Created server-side rather than with auth.signUp: signUp leaves the account
+      // unconfirmed while "Confirm email" is on, so the volunteer was bounced with
+      // "email not verified" on their first login. Opening a link that was only ever
+      // emailed to this address is the proof of ownership, so the edge function
+      // confirms the address as it creates the account. It also consumes the token,
+      // which is why mark-invite-used is no longer called here.
+      const { data: result, error: invokeError } = await supabase.functions.invoke(
+        'complete-invite-signup',
+        { body: { token, password } }
+      );
 
-      if (signUpError) throw signUpError;
+      if (invokeError) {
+        // invoke collapses every non-2xx into a generic message, so the function's own
+        // error text has to be read back off the raw Response it hangs on `context`.
+        const context = (invokeError as { context?: Response }).context;
+        let message = invokeError.message || 'Failed to create account';
+        let code: string | undefined;
 
-      if (!authData.user) {
-        throw new Error('Failed to create account');
+        if (context && typeof context.json === 'function') {
+          try {
+            const body = await context.json();
+            if (typeof body?.error === 'string' && body.error) message = body.error;
+            if (typeof body?.code === 'string') code = body.code;
+          } catch {
+            // Non-JSON body; fall through to the generic message.
+          }
+        }
+
+        if (code === 'already_registered') {
+          toast.error(message);
+          navigate('/auth');
+          return;
+        }
+
+        throw new Error(message);
       }
 
-      // Mark the invite token as used via edge function
-      await supabase.functions.invoke('mark-invite-used', {
-        body: { token },
-      });
+      if (result?.error) {
+        throw new Error(result.error);
+      }
 
       toast.success('Account created successfully! You can now log in.');
       navigate('/auth');

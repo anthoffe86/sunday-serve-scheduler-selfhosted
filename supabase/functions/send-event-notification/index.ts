@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { Resend } from "https://esm.sh/resend@2.0.0";
-import { getOrgName } from "../_shared/org-settings.ts";
+import { getOrgName, isNotificationEnabled } from "../_shared/org-settings.ts";
 
 const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
 
@@ -131,20 +131,21 @@ const handler = async (req: Request): Promise<Response> => {
 
     const { eventIds, baseUrl, userIds }: NotificationRequest = await req.json();
 
-    // Check if email notifications are enabled by admin
+    // Check if email notifications are enabled, for the organisation these events
+    // belong to rather than for the whole deployment.
     const settingKey = (userIds && userIds.length > 0) ? "email_on_assignment_add" : "email_on_publish";
-    const { data: setting, error: settingError } = await supabase
-      .from("system_settings")
-      .select("value")
-      .eq("key", settingKey)
+    const { data: settingOrgRow } = await supabase
+      .from('events')
+      .select('org_id')
+      .in('id', eventIds)
+      .limit(1)
       .maybeSingle();
 
-    console.log(`Admin setting check (${settingKey}):`, { setting, error: settingError });
+    const notificationOrgId = (settingOrgRow as { org_id?: string | null } | null)?.org_id ?? null;
+    const notificationsEnabled = await isNotificationEnabled(supabase, settingKey, notificationOrgId);
 
-    if (settingError) {
-      console.error(`Error fetching system setting ${settingKey}:`, settingError);
-    } else if (setting && (setting.value === false || setting.value === "false")) {
-      console.log(`Email notifications (${settingKey}) are disabled in system settings. Returning early.`);
+    if (!notificationsEnabled) {
+      console.log(`Email notifications (${settingKey}) are disabled for org ${notificationOrgId}. Returning early.`);
       return new Response(
         JSON.stringify({
           success: true,

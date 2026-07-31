@@ -7,12 +7,19 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { useSystemSettings, useUpdateSystemSetting } from "@/hooks/useSystemSettings";
+import {
+    NotificationSettingKey,
+    useOrgNotificationSettings,
+    useUpdateOrgNotificationSetting,
+} from "@/hooks/useOrgNotificationSettings";
 import { Navigate } from "react-router-dom";
 
 const AdminSettings = () => {
     const { isAdmin, isLoading: authLoading } = useAuth();
     const { data: settings, isLoading: settingsLoading } = useSystemSettings();
     const updateSetting = useUpdateSystemSetting();
+    const { data: orgOverrides, isLoading: overridesLoading } = useOrgNotificationSettings();
+    const updateNotificationSetting = useUpdateOrgNotificationSetting();
     const [orgName, setOrgName] = useState('');
     const [orgShortName, setOrgShortName] = useState('');
     const [orgNameInitialised, setOrgNameInitialised] = useState(false);
@@ -41,7 +48,7 @@ const AdminSettings = () => {
         }
     }, [settings, orgNameInitialised]);
 
-    if (authLoading || settingsLoading) {
+    if (authLoading || settingsLoading || overridesLoading) {
         return (
             <div className="flex items-center justify-center py-12">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -63,8 +70,26 @@ const AdminSettings = () => {
         }
     };
 
-    const handleToggle = (key: string, currentValue: boolean) => {
-        updateSetting.mutate({ key, value: !currentValue });
+    /**
+     * The effective state of a notification toggle for this organisation: its own
+     * override if it has one, otherwise the deployment-wide system_settings
+     * default, otherwise on. Mirrors isNotificationEnabled in
+     * supabase/functions/_shared/org-settings.ts, which is what actually decides
+     * whether an email goes out.
+     */
+    const isNotificationEnabled = (key: NotificationSettingKey) => {
+        const override = orgOverrides?.[key];
+        if (typeof override === 'boolean') return override;
+
+        const fallback = getSettingValue(key);
+        return !(fallback === false || fallback === 'false');
+    };
+
+    const handleToggle = (key: NotificationSettingKey, currentValue: boolean) => {
+        // Writes an override for this organisation only; the global default row is
+        // left alone so switching a notification off here cannot switch it off for
+        // another organisation.
+        updateNotificationSetting.mutate({ key, enabled: !currentValue });
     };
 
     const normalizeOrgShortName = (value: string) => value
@@ -72,7 +97,7 @@ const AdminSettings = () => {
         .toUpperCase()
         .slice(0, 3);
 
-    const emailSettings = [
+    const emailSettings: Array<{ key: NotificationSettingKey; label: string; description: string }> = [
         {
             key: 'email_on_invite',
             label: 'New Invite Emails',
@@ -174,12 +199,12 @@ const AdminSettings = () => {
                         Email Notifications
                     </CardTitle>
                     <CardDescription>
-                        Toggle which automated emails are sent by the system.
+                        Toggle which automated emails are sent for your organisation.
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
                     {emailSettings.map((setting) => {
-                        const isEnabled = !!getSettingValue(setting.key);
+                        const isEnabled = isNotificationEnabled(setting.key);
                         return (
                             <div key={setting.key} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
                                 <div className="flex flex-col space-y-1 flex-1">
@@ -194,7 +219,7 @@ const AdminSettings = () => {
                                     id={setting.key}
                                     checked={isEnabled}
                                     onCheckedChange={() => handleToggle(setting.key, isEnabled)}
-                                    disabled={updateSetting.isPending}
+                                    disabled={updateNotificationSetting.isPending}
                                     className="self-start sm:self-auto"
                                 />
                             </div>
@@ -207,7 +232,7 @@ const AdminSettings = () => {
                 <Shield className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600 shrink-0 mt-0.5" />
                 <div className="text-xs sm:text-sm text-blue-800">
                     <p className="font-semibold mb-1">Note for Admins</p>
-                    <p>These settings affect all users. Disabling "Event Publication Emails" will prevent volunteers from receiving their schedules automatically when you hit publish.</p>
+                    <p>These settings affect every user in your organisation, and only your organisation. Disabling "Event Publication Emails" will prevent volunteers from receiving their schedules automatically when you hit publish.</p>
                 </div>
             </div>
         </div>

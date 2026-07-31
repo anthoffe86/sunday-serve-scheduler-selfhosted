@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { Resend } from "https://esm.sh/resend@2.0.0";
-import { getOrgName } from "../_shared/org-settings.ts";
+import { getOrgName, isNotificationEnabled } from "../_shared/org-settings.ts";
 
 const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
 
@@ -90,20 +90,6 @@ const handler = async (req: Request): Promise<Response> => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
   const orgName = await getOrgName(supabase);
 
-    // Check if email notifications are enabled
-    const { data: setting } = await supabase
-      .from("system_settings")
-      .select("value")
-      .eq("key", "email_on_swap_request")
-      .maybeSingle();
-
-    if (setting && (setting.value === false || setting.value === "false")) {
-      return new Response(
-        JSON.stringify({ success: true, emailsSent: 0, message: "Email notifications are disabled." }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
     const { swapRequestId, baseUrl }: SwapOfferNotificationRequest = await req.json();
 
     // Get the swap request
@@ -142,6 +128,18 @@ const handler = async (req: Request): Promise<Response> => {
       return new Response(
         JSON.stringify({ error: "No offer on this swap request" }),
         { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
+    // Read the toggle for the swap's own organisation, not for the whole
+    // deployment. Placed after the ownership check so only someone entitled to
+    // the swap learns how their organisation is configured.
+    const swapOrgId = (swapRequest as { org_id?: string | null }).org_id ?? null;
+    if (!(await isNotificationEnabled(supabase, "email_on_swap_request", swapOrgId))) {
+      console.log(`Swap offer emails are disabled for org ${swapOrgId}. Returning early.`);
+      return new Response(
+        JSON.stringify({ success: true, emailsSent: 0, message: "Email notifications are disabled." }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
