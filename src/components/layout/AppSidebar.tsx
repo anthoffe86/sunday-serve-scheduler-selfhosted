@@ -79,10 +79,19 @@ export function AppSidebar({ isOpen, onClose }: AppSidebarProps) {
         />
       )}
 
-      {/* Sidebar */}
+      {/*
+        Sidebar. Mobile: an off-canvas drawer over the backdrop, so it needs z-50 to sit above the
+        header as well. Desktop: pinned under the header and given exactly the viewport that
+        is left below it, so the content column scrolls on its own. The 4rem+1px is the
+        header's h-16 row plus its bottom border -- offsetting by the border too is what
+        keeps the page from overflowing by 1px and growing a scrollbar on short pages.
+        self-start stops the flex row stretching it (which would leave sticky nothing to move
+        within), and z-30 keeps it below the header's z-50 -- equal z-index is what let it
+        paint over the header on the way past.
+      */}
       <aside
         className={cn(
-          'fixed left-0 top-0 z-50 flex h-full w-64 flex-col border-r bg-sidebar transition-transform duration-200 ease-in-out md:relative md:translate-x-0',
+          'fixed left-0 top-0 z-50 flex h-full w-64 flex-col border-r bg-sidebar transition-transform duration-200 ease-in-out md:sticky md:top-[calc(4rem+1px)] md:z-30 md:h-[calc(100vh-4rem-1px)] md:translate-x-0 md:self-start',
           isOpen ? 'translate-x-0' : '-translate-x-full'
         )}
       >
@@ -93,7 +102,9 @@ export function AppSidebar({ isOpen, onClose }: AppSidebarProps) {
           </Button>
         </div>
 
-        <nav className="flex flex-1 flex-col gap-1 overflow-y-auto p-4 pb-8">
+        {/* min-h-0: a flex child defaults to min-height:auto, which would keep the nav at its
+            content height and stop overflow-y-auto ever engaging on a short viewport. */}
+        <nav className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto p-4 pb-8">
           {!isSuperAdmin && (
             <>
               <p className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
