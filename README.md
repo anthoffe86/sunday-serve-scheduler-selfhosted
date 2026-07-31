@@ -116,8 +116,12 @@ can retry with **Send Reset Email**.
 
 Note that this is a different path from **Admin → Volunteers → Invite Volunteer**, which mints a
 7-day `invite_tokens` row and sends the `send-invite-email` invitation to `/invite`, where the
-volunteer creates their own account. Use that for normal volunteer onboarding; `add-user` exists for
-cross-organisation support work where the org and role need to be set explicitly.
+volunteer sets their own password and `complete-invite-signup` creates the account for them. That
+function creates the account with the address already confirmed — opening a link that was only ever
+emailed to that address is the proof of ownership — so the volunteer can log in straight away
+instead of being turned away with "email not verified". Use this path for normal volunteer
+onboarding; `add-user` exists for cross-organisation support work where the org and role need to be
+set explicitly.
 
 Both send the same branded email to the **account holder**, and both need the secrets below. The
 admin path deliberately does not hand the link back to the caller: a recovery link is a bearer
