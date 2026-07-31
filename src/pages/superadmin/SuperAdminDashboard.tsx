@@ -70,6 +70,10 @@ const readInvokeError = async (
 
 type AddUserResult = {
   userId?: string;
+  /** False when no set-password email went out — either it failed, or the account already existed. */
+  emailed?: boolean;
+  emailError?: string | null;
+  emailSkippedReason?: 'existing-account';
 };
 
 type SupportDataResult = {
@@ -189,22 +193,40 @@ const SuperAdminDashboard = () => {
     const pendingOrgId = newUserOrgId;
 
     try {
-      const data = await runSupportAction({
+      const data = (await runSupportAction({
         action: 'add-user',
         data: {
           name: pendingName,
           email: pendingEmail,
           orgId: pendingOrgId,
           role: newUserRole,
+          // Lets deploy previews and local dev build links back to themselves.
+          // Only honoured by the function if allow-listed.
+          baseUrl: window.location.origin,
         },
-      });
+      })) as AddUserResult | null;
 
-      toast.success('User added successfully');
+      // A new account is unusable until its owner sets a password, so whether the
+      // email actually went out is the important half of the result.
+      if (data?.emailSkippedReason === 'existing-account') {
+        toast.success(
+          `${pendingEmail} already had an account, so they were just added to the organisation. No email was sent — they keep their existing password.`
+        );
+      } else if (data?.emailed) {
+        toast.success(`User added. An email has been sent to ${pendingEmail} to set their password.`);
+      } else {
+        toast.warning(
+          data?.emailError
+            ? `User added, but the set-password email failed: ${data.emailError} Use "Send Reset Email" to try again.`
+            : 'User added, but the set-password email could not be sent. Use "Send Reset Email" to try again.'
+        );
+      }
+
       setNewUserName('');
       setNewUserEmail('');
       await fetchData();
       setUsers((currentUsers) => {
-        const addedUserId = (data as AddUserResult | null)?.userId;
+        const addedUserId = data?.userId;
         if (!addedUserId) {
           return currentUsers;
         }
@@ -363,7 +385,11 @@ const SuperAdminDashboard = () => {
             <UserPlus className="h-4 w-4" />
             Add User To Organisation
           </CardTitle>
-          <CardDescription>Create a new auth user, profile, and role in one action.</CardDescription>
+          <CardDescription>
+            Creates the auth user, profile, and role in one action, then emails them a link to set
+            their own password. The link expires in 1 hour; after that they can use "Forgot
+            password?" on the sign-in page.
+          </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-2">
           <div className="space-y-2">

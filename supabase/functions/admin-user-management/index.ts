@@ -5,6 +5,7 @@ import {
   isResendConfigured,
   isValidEmail,
   resolveAppOrigin,
+  sendAccountSetupEmail,
   sendPasswordResetEmail,
 } from '../_shared/password-reset.ts'
 
@@ -219,6 +220,9 @@ Deno.serve(async (req) => {
         throw roleInsertError
       }
 
+      // No email here on purpose. This account already has a password its owner
+      // chose, so minting a recovery link for it would hand out a credential
+      // nobody asked for. Use "Send Reset Email" if they have genuinely lost it.
       return new Response(
         JSON.stringify({
           success: true,
@@ -226,6 +230,8 @@ Deno.serve(async (req) => {
             ? 'Existing user moved to organisation and role updated'
             : 'Existing user assigned to organisation',
           userId: existingUserId,
+          emailed: false,
+          emailSkippedReason: 'existing-account',
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
@@ -248,6 +254,48 @@ Deno.serve(async (req) => {
       }
 
       return orgId
+    }
+
+    /**
+     * Invite a freshly created account to choose its own password.
+     *
+     * createUser below sets a random throwaway password that is never disclosed,
+     * so this link is the only way in. It is the same single-use recovery link
+     * the reset flow uses, and it is emailed to the account holder rather than
+     * returned to the caller because it is a bearer credential for that account.
+     *
+     * A send failure is reported, not thrown: the account already exists by this
+     * point, so failing the whole action would misreport what happened. The
+     * super admin can re-send with "Send Reset Email".
+     */
+    const sendSetupInvitation = async (email: string, requestedBaseUrl: unknown) => {
+      // The origin is only honoured when allow-listed (see resolveAppOrigin), so
+      // a caller cannot point the link at a site they control.
+      const appOrigin = resolveAppOrigin(requestedBaseUrl)
+      if (!appOrigin) {
+        console.error('APP_BASE_URL is not set. Cannot build an account setup link.')
+        return { emailed: false, emailError: PASSWORD_RESET_NOT_CONFIGURED }
+      }
+
+      if (!isResendConfigured()) {
+        console.error('RESEND_API_KEY secret is not set. Cannot send the account setup email.')
+        return { emailed: false, emailError: PASSWORD_RESET_NOT_CONFIGURED }
+      }
+
+      const setupLink = await generateRecoveryLink(supabaseAdmin, email, appOrigin)
+      if (!setupLink) {
+        return {
+          emailed: false,
+          emailError: 'The account was created but no set-password link could be generated.',
+        }
+      }
+
+      const sendError = await sendAccountSetupEmail({ supabaseAdmin, email, setupLink })
+      if (sendError) {
+        return { emailed: false, emailError: sendError }
+      }
+
+      return { emailed: true, emailError: null }
     }
 
     switch (action) {
@@ -584,11 +632,21 @@ Deno.serve(async (req) => {
           throw roleInsertError
         }
 
+        const invitation = await sendSetupInvitation(normalizedEmail, data?.baseUrl)
+
+        console.log(
+          `Super admin ${user.id} created a user in org ${orgId} (setup email sent: ${invitation.emailed}).`
+        )
+
         return new Response(
           JSON.stringify({
             success: true,
-            message: 'User created and assigned to organisation',
+            message: invitation.emailed
+              ? 'User created, assigned to organisation, and emailed a link to set their password'
+              : 'User created and assigned to organisation, but the set-password email could not be sent',
             userId: createdUserId,
+            emailed: invitation.emailed,
+            emailError: invitation.emailError,
           }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )

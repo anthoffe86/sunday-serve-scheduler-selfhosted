@@ -121,22 +121,42 @@ export async function generateRecoveryLink(
   return `${appOrigin}/reset-password?token_hash=${encodeURIComponent(hashedToken)}&type=recovery`;
 }
 
+/**
+ * Which flow produced the email. All three hand the recipient the same kind of
+ * single-use recovery link; only the wording differs.
+ *
+ * - `self`  — the recipient asked for a reset on /forgot-password
+ * - `admin` — an administrator started a reset for an existing account
+ * - `setup` — an administrator created the account, so there is no password yet
+ */
+type PasswordEmailVariant = "self" | "admin" | "setup";
+
 function buildPasswordResetEmailHtml(params: {
   orgName: string;
   resetLink: string;
   logoUrl: string;
-  initiatedByAdmin: boolean;
+  variant: PasswordEmailVariant;
 }): string {
-  const { orgName, resetLink, logoUrl, initiatedByAdmin } = params;
+  const { orgName, resetLink, logoUrl, variant } = params;
   const safeOrgName = escapeHtml(orgName);
 
-  const intro = initiatedByAdmin
+  const heading = variant === "setup" ? "Set up your account" : "Reset your password";
+
+  const buttonLabel = variant === "setup" ? "Set Your Password" : "Reset Password";
+
+  const intro = variant === "setup"
+    ? `An administrator has created a ${safeOrgName} volunteer account for you.
+       Click the button below to choose your password and get started:`
+    : variant === "admin"
     ? `An administrator has started a password reset for your ${safeOrgName} account.
        Click the button below to choose a new password:`
     : `We received a request to reset the password for your ${safeOrgName} volunteer account.
        Click the button below to choose a new password:`;
 
-  const footerNote = initiatedByAdmin
+  const footerNote = variant === "setup"
+    ? `If the link has expired, use "Forgot password?" on the sign-in page to send yourself a new one.<br>
+       If you weren't expecting this, contact your administrator before using the link.`
+    : variant === "admin"
     ? `If you weren't expecting this, contact your administrator before using the link.`
     : `If you didn't request a password reset, you can safely ignore this email &mdash; your password will not change.`;
 
@@ -149,7 +169,7 @@ function buildPasswordResetEmailHtml(params: {
     </head>
     <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
       <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; border-radius: 10px 10px 0 0; text-align: center;">
-        <h1 style="color: white; margin: 0; font-size: 24px;">Reset your password</h1>
+        <h1 style="color: white; margin: 0; font-size: 24px;">${heading}</h1>
       </div>
 
       <div style="background: #f9fafb; padding: 30px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 10px 10px;">
@@ -160,7 +180,7 @@ function buildPasswordResetEmailHtml(params: {
         <div style="text-align: center; margin: 30px 0;">
           <a href="${escapeUrl(resetLink)}"
              style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; text-decoration: none; padding: 14px 30px; border-radius: 8px; font-weight: 600; font-size: 16px;">
-            Reset Password
+            ${buttonLabel}
           </a>
         </div>
 
@@ -192,6 +212,51 @@ function buildPasswordResetEmailHtml(params: {
 }
 
 /**
+ * Send one of the branded recovery-link emails via Resend.
+ * Returns an error message on failure, or null on success.
+ */
+async function sendRecoveryLinkEmail(params: {
+  supabaseAdmin: SupabaseClient;
+  email: string;
+  resetLink: string;
+  variant: PasswordEmailVariant;
+}): Promise<string | null> {
+  const { supabaseAdmin, email, resetLink, variant } = params;
+
+  if (!resend) {
+    console.error("RESEND_API_KEY secret is not set. Cannot send the email.");
+    return PASSWORD_RESET_NOT_CONFIGURED;
+  }
+
+  const logoUrl = Deno.env.get("SERVETOGETHER_LOGO_URL") || "";
+  const orgName = await getOrgName(supabaseAdmin);
+  const from = buildOrgFromEmail(orgName);
+
+  const subject = variant === "setup"
+    ? `Set up your ${orgName} volunteer account`
+    : `Reset your ${orgName} password`;
+
+  const response = await resend.emails.send({
+    from,
+    to: [email],
+    subject,
+    // The link itself is never logged: it is a single-use bearer credential for
+    // the recipient's account.
+    html: buildPasswordResetEmailHtml({ orgName, resetLink, logoUrl, variant }),
+  });
+
+  if (response.error) {
+    console.error("Resend rejected the email:", response.error);
+    return variant === "setup"
+      ? "We couldn't send the account setup email. Please try again shortly."
+      : "We couldn't send the reset email. Please try again shortly.";
+  }
+
+  console.log(`Recovery-link email sent (variant: ${variant}).`);
+  return null;
+}
+
+/**
  * Send the branded reset email via Resend.
  * Returns an error message on failure, or null on success.
  */
@@ -203,27 +268,30 @@ export async function sendPasswordResetEmail(params: {
 }): Promise<string | null> {
   const { supabaseAdmin, email, resetLink, initiatedByAdmin = false } = params;
 
-  if (!resend) {
-    console.error("RESEND_API_KEY secret is not set. Cannot send the reset email.");
-    return PASSWORD_RESET_NOT_CONFIGURED;
-  }
-
-  const logoUrl = Deno.env.get("SERVETOGETHER_LOGO_URL") || "";
-  const orgName = await getOrgName(supabaseAdmin);
-  const from = buildOrgFromEmail(orgName);
-
-  const response = await resend.emails.send({
-    from,
-    to: [email],
-    subject: `Reset your ${orgName} password`,
-    html: buildPasswordResetEmailHtml({ orgName, resetLink, logoUrl, initiatedByAdmin }),
+  return await sendRecoveryLinkEmail({
+    supabaseAdmin,
+    email,
+    resetLink,
+    variant: initiatedByAdmin ? "admin" : "self",
   });
+}
 
-  if (response.error) {
-    console.error("Resend rejected the password reset email:", response.error);
-    return "We couldn't send the reset email. Please try again shortly.";
-  }
+/**
+ * Send the "an administrator created your account, now pick a password" email.
+ * Uses the same single-use recovery link as a reset, because a freshly created
+ * account only has a throwaway password that is never disclosed to anyone.
+ */
+export async function sendAccountSetupEmail(params: {
+  supabaseAdmin: SupabaseClient;
+  email: string;
+  setupLink: string;
+}): Promise<string | null> {
+  const { supabaseAdmin, email, setupLink } = params;
 
-  console.log("Password reset email sent.");
-  return null;
+  return await sendRecoveryLinkEmail({
+    supabaseAdmin,
+    email,
+    resetLink: setupLink,
+    variant: "setup",
+  });
 }
