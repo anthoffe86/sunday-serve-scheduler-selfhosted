@@ -90,6 +90,10 @@ const InviteSignup = () => {
         options: {
           data: {
             name: inviteData.name,
+            // handle_new_user resolves the organisation from this token (and only
+            // honours it when the token was issued to this same address), so the
+            // volunteer joins the org that invited them rather than the default one.
+            invite_token: token,
           },
           emailRedirectTo: `${window.location.origin}/`,
         },

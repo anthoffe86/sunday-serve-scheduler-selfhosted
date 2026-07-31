@@ -44,16 +44,29 @@ export function InviteVolunteerDialog({ open, onOpenChange, onSuccess }: InviteV
 
     setIsSubmitting(true);
 
-    try {
-      // Check if email already exists in profiles
-      const { data: existingProfile } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('email', email.trim().toLowerCase())
-        .maybeSingle();
+    const normalisedEmail = email.trim().toLowerCase();
 
-      if (existingProfile) {
+    try {
+      // A plain profiles lookup runs under the restrictive tenant policy, so it
+      // cannot see an address registered in another organisation -- the duplicate
+      // would only surface as a raw "already registered" at the end of signup.
+      // invite_email_status is admin-gated and checks every org plus auth.users.
+      const { data: emailStatus, error: statusError } = await supabase
+        .rpc('invite_email_status', { _email: normalisedEmail });
+
+      if (statusError) throw statusError;
+
+      if (emailStatus === 'in_org') {
         toast.error('A volunteer with this email already exists');
+        setIsSubmitting(false);
+        return;
+      }
+
+      if (emailStatus === 'registered_elsewhere') {
+        // Which organisation is deliberately not disclosed.
+        toast.error(
+          'This email is already registered on ServeTogether. Ask the volunteer to log in with their existing account, or contact support to move them.'
+        );
         setIsSubmitting(false);
         return;
       }
@@ -62,15 +75,16 @@ export function InviteVolunteerDialog({ open, onOpenChange, onSuccess }: InviteV
       await supabase
         .from('invite_tokens')
         .delete()
-        .eq('email', email.trim().toLowerCase())
+        .eq('email', normalisedEmail)
         .is('used_at', null);
 
-      // Create invite token
+      // org_id defaults to the caller's organisation, and handle_new_user reads it
+      // back at signup so the volunteer joins this org rather than the default one.
       const { data: invite, error } = await supabase
         .from('invite_tokens')
         .insert({
           name: name.trim(),
-          email: email.trim().toLowerCase(),
+          email: normalisedEmail,
           invited_by: user.id,
         })
         .select()
@@ -78,31 +92,30 @@ export function InviteVolunteerDialog({ open, onOpenChange, onSuccess }: InviteV
 
       if (error) throw error;
 
-      // Generate the invite link
-      const link = `${window.location.origin}/invite?token=${invite.token}`;
-      setInviteLink(link);
-      
-      // Send the invitation email
-      try {
-        const emailResponse = await supabase.functions.invoke('send-invite-email', {
-          body: {
-            name: name.trim(),
-            email: email.trim().toLowerCase(),
-            inviteLink: link,
-          },
-        });
-        
-        if (emailResponse.error) {
-          console.error('Failed to send invite email:', emailResponse.error);
-          toast.success('Invitation created! Email sending failed - please share the link manually.');
-        } else {
+      // The link is built server-side from the allow-listed APP_BASE_URL, not from
+      // window.location.origin: an invite created on a deploy preview or localhost
+      // must not hand out a link to that origin.
+      const { data: emailResult, error: emailError } = await supabase.functions.invoke(
+        'send-invite-email',
+        { body: { token: invite.token, baseUrl: window.location.origin } }
+      );
+
+      if (emailError || !emailResult?.inviteLink) {
+        console.error('Failed to prepare the invitation link:', emailError ?? emailResult);
+        toast.error(
+          'Invitation created, but the link could not be generated. Check that APP_BASE_URL is configured, then re-invite.'
+        );
+      } else {
+        setInviteLink(emailResult.inviteLink);
+        if (emailResult.emailed) {
           toast.success('Invitation sent! An email has been sent to the volunteer.');
+        } else if (emailResult.emailSkippedReason === 'disabled') {
+          toast.success('Invitation created! Invite emails are switched off - share the link below.');
+        } else {
+          toast.success('Invitation created! Email sending failed - please share the link manually.');
         }
-      } catch (emailErr) {
-        console.error('Failed to send invite email:', emailErr);
-        toast.success('Invitation created! Email sending failed - please share the link manually.');
       }
-      
+
       onSuccess?.();
     } catch (err: any) {
       console.error('Failed to create invitation:', err);

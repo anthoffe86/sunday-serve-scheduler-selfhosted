@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { Resend } from "https://esm.sh/resend@2.0.0";
-import { getOrgName } from "../_shared/org-settings.ts";
+import { getOrgName, isNotificationEnabled } from "../_shared/org-settings.ts";
 
 const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
 
@@ -76,31 +76,6 @@ const handler = async (req: Request): Promise<Response> => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
   const orgName = await getOrgName(supabase);
 
-    // Check if email notifications are enabled by admin
-    const { data: setting, error: settingError } = await supabase
-      .from("system_settings")
-      .select("value")
-      .eq("key", "email_on_swap_request")
-      .maybeSingle();
-
-    console.log("Admin setting check (email_on_swap_request):", { setting, error: settingError });
-
-    if (settingError) {
-      console.error("Error fetching system setting:", settingError);
-    } else if (setting && (setting.value === false || setting.value === "false")) {
-      console.log("Swap notification emails are disabled in system settings. Returning early.");
-      return new Response(
-        JSON.stringify({
-          success: true,
-          emailsSent: 0,
-          message: "Email notifications are disabled by admin.",
-        }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    console.log("Proceeding with swap notification emails...");
-
     const { swapRequestId, baseUrl }: SwapNotificationRequest = await req.json();
 
     console.log("Processing swap notification for request:", swapRequestId);
@@ -129,7 +104,7 @@ const handler = async (req: Request): Promise<Response> => {
         .eq('user_id', user.id)
         .eq('role', 'admin')
         .maybeSingle();
-      
+
       if (!adminCheck) {
         return new Response(
           JSON.stringify({ error: 'Forbidden: You can only send notifications for your own swap requests' }),
@@ -137,6 +112,26 @@ const handler = async (req: Request): Promise<Response> => {
         );
       }
     }
+
+    // The toggle is read for the swap's own organisation, so one org switching
+    // swap emails off does not switch them off for every org. It has to come after
+    // the swap is loaded, because that row is where the organisation comes from --
+    // and after the ownership check, so the answer is only shown to someone
+    // entitled to it.
+    const swapOrgId = (swapRequest as { org_id?: string | null }).org_id ?? null;
+    if (!(await isNotificationEnabled(supabase, "email_on_swap_request", swapOrgId))) {
+      console.log(`Swap notification emails are disabled for org ${swapOrgId}. Returning early.`);
+      return new Response(
+        JSON.stringify({
+          success: true,
+          emailsSent: 0,
+          message: "Email notifications are disabled by admin.",
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    console.log("Proceeding with swap notification emails...");
 
     // Get the event assignment details
     const { data: assignment, error: assignmentError } = await supabase

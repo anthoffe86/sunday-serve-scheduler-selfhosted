@@ -2,6 +2,10 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { Resend } from "https://esm.sh/resend@2.0.0";
 import { buildOrgFromEmail, getOrgName } from "./org-settings.ts";
 
+// Re-exported so existing importers keep working; the allow-list lives in
+// app-origin.ts now that the invitation flow shares it.
+export { normalizeOrigin, resolveAppOrigin } from "./app-origin.ts";
+
 // Reuse this type rather than importing the generated types (not available in edge functions)
 type SupabaseClient = ReturnType<typeof createClient>;
 
@@ -35,48 +39,6 @@ export function escapeUrl(url: string): string {
 
 export function isValidEmail(value: unknown): value is string {
   return typeof value === "string" && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
-}
-
-/** Reduce a URL to a bare origin, or null if it is not a usable http(s) URL. */
-export function normalizeOrigin(value: string | undefined | null): string | null {
-  if (!value) return null;
-  try {
-    const parsed = new URL(value.trim());
-    if (!["http:", "https:"].includes(parsed.protocol)) return null;
-    return parsed.origin;
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Decide which site a reset link points at.
- *
- * The caller may suggest an origin (useful for Netlify deploy previews and for
- * local dev on a shifting port) but it is only honoured when explicitly
- * allow-listed via ALLOWED_APP_ORIGINS. Trusting the request body here would let
- * an attacker request a reset with a link pointing at a site they control, then
- * harvest the recovery token when the victim clicks it from their own inbox.
- *
- * Returns null when APP_BASE_URL is unset or unusable, which callers should
- * treat as a configuration error rather than a user error.
- */
-export function resolveAppOrigin(requestedBaseUrl: unknown): string | null {
-  const configured = normalizeOrigin(Deno.env.get("APP_BASE_URL"));
-  const allowed = new Set(
-    (Deno.env.get("ALLOWED_APP_ORIGINS") ?? "")
-      .split(",")
-      .map((entry) => normalizeOrigin(entry))
-      .filter((entry): entry is string => entry !== null)
-  );
-  if (configured) allowed.add(configured);
-
-  if (typeof requestedBaseUrl === "string") {
-    const requested = normalizeOrigin(requestedBaseUrl);
-    if (requested && allowed.has(requested)) return requested;
-  }
-
-  return configured;
 }
 
 export function isResendConfigured(): boolean {
