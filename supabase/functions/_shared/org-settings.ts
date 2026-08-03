@@ -5,10 +5,27 @@ type SupabaseClient = ReturnType<typeof createClient>;
 
 /**
  * Reads organisation_name from system_settings.
+ * When an org id is provided, prefers that organisation's name.
  * Falls back to "St Matthew's Church" if not found or on error.
  */
-export async function getOrgName(supabase: SupabaseClient): Promise<string> {
+export async function getOrgName(
+  supabase: SupabaseClient,
+  orgId?: string | null
+): Promise<string> {
   try {
+    if (orgId) {
+      const { data: org } = await supabase
+        .from("organisations")
+        .select("name")
+        .eq("id", orgId)
+        .maybeSingle();
+
+      const orgName = (org as { name?: string | null } | null)?.name;
+      if (typeof orgName === "string" && orgName.trim()) {
+        return orgName.trim();
+      }
+    }
+
     const { data } = await supabase
       .from("system_settings")
       .select("value")

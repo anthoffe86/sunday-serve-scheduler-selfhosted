@@ -121,24 +121,8 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    // Use service role to check admin status
+    // Use service role for org-scoped reads/writes once the caller is authenticated.
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
-    const orgName = await getOrgName(supabase);
-    const resendFrom = buildOrgFromEmail(orgName);
-    
-    const { data: adminCheck } = await supabase
-      .from('user_roles')
-      .select('role')
-      .eq('user_id', user.id)
-      .eq('role', 'admin')
-      .maybeSingle();
-    
-    if (!adminCheck) {
-      return new Response(
-        JSON.stringify({ error: 'Forbidden: Admin access required' }),
-        { status: 403, headers: { "Content-Type": "application/json", ...corsHeaders } }
-      );
-    }
 
     const { eventIds, baseUrl }: InvitationRequest = await req.json();
 
@@ -155,6 +139,25 @@ const handler = async (req: Request): Promise<Response> => {
     // Read the toggle for the organisation these events belong to, so one org
     // switching invitation emails off does not switch them off for the others.
     const eventOrgId = (events?.[0] as { org_id?: string | null } | undefined)?.org_id ?? null;
+
+    const { data: adminCheck } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id)
+      .eq('role', 'admin')
+      .eq('org_id', eventOrgId)
+      .maybeSingle();
+
+    if (!adminCheck) {
+      return new Response(
+        JSON.stringify({ error: 'Forbidden: Admin access required' }),
+        { status: 403, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
+    const orgName = await getOrgName(supabase, eventOrgId);
+    const resendFrom = buildOrgFromEmail(orgName);
+
     const emailsEnabled = await isNotificationEnabled(supabase, "email_on_invitation_send", eventOrgId);
 
     if (!emailsEnabled) {
