@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Helmet } from 'react-helmet-async';
 import { supabase } from '@/integrations/supabase/client';
 import serveTogetherLogo from '@/assets/servetogether-logo.png';
 import { Button } from '@/components/ui/button';
@@ -9,12 +8,12 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
 import { Loader2 } from 'lucide-react';
+import { SeoMeta } from '@/components/seo/SeoMeta';
 
 type Status = 'verifying' | 'ready' | 'invalid';
 
 const DEFAULT_INVALID_MESSAGE =
   'This password reset link is invalid or has expired. Please request a new one.';
-const SITE_URL = import.meta.env.VITE_SITE_URL || window.location.origin;
 
 /** Remove the recovery token from the address bar so it is not left in history. */
 function stripTokensFromUrl() {
@@ -162,15 +161,12 @@ const ResetPassword = () => {
   if (status === 'invalid') {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background px-4">
-        <Helmet>
-          <title>Reset Password | ServeTogether</title>
-          <meta
-            name="description"
-            content="Set a new password for your ServeTogether account using your secure reset link."
-          />
-          <meta name="robots" content="noindex,follow" />
-          <link rel="canonical" href={`${SITE_URL}/reset-password`} />
-        </Helmet>
+        <SeoMeta
+          title="Reset Password | ServeTogether"
+          description="Set a new password for your ServeTogether account using your secure reset link."
+          path="/reset-password"
+          noindex
+        />
 
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
@@ -192,15 +188,12 @@ const ResetPassword = () => {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
-      <Helmet>
-        <title>Reset Password | ServeTogether</title>
-        <meta
-          name="description"
-          content="Set a new password for your ServeTogether account using your secure reset link."
-        />
-        <meta name="robots" content="noindex,follow" />
-        <link rel="canonical" href={`${SITE_URL}/reset-password`} />
-      </Helmet>
+      <SeoMeta
+        title="Reset Password | ServeTogether"
+        description="Set a new password for your ServeTogether account using your secure reset link."
+        path="/reset-password"
+        noindex
+      />
 
       <div className="w-full max-w-md animate-fade-in">
         <div className="mb-8 text-center">

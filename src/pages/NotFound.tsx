@@ -1,8 +1,6 @@
 import { useLocation } from "react-router-dom";
 import { useEffect } from "react";
-import { Helmet } from 'react-helmet-async';
-
-const SITE_URL = import.meta.env.VITE_SITE_URL || window.location.origin;
+import { SeoMeta } from '@/components/seo/SeoMeta';
 
 const NotFound = () => {
   const location = useLocation();
@@ -24,15 +22,12 @@ const NotFound = () => {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-muted">
-      <Helmet>
-        <title>Page Not Found | ServeTogether</title>
-        <meta
-          name="description"
-          content="The page you were looking for could not be found."
-        />
-        <meta name="robots" content="noindex,follow" />
-        <link rel="canonical" href={`${SITE_URL}/404`} />
-      </Helmet>
+      <SeoMeta
+        title="Page Not Found | ServeTogether"
+        description="The page you were looking for could not be found."
+        path="/404"
+        noindex
+      />
 
       <div className="text-center">
         <h1 className="mb-4 text-4xl font-bold">404</h1>

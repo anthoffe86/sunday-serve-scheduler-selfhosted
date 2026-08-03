@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { Helmet } from 'react-helmet-async';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -9,6 +8,7 @@ import { Loader2, CheckCircle, XCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { usePublicOrgSettings } from '@/hooks/usePublicOrgSettings';
+import { SeoMeta } from '@/components/seo/SeoMeta';
 
 interface InviteTokenData {
   id: string;
@@ -16,8 +16,6 @@ interface InviteTokenData {
   name: string;
   expires_at: string;
 }
-
-const SITE_URL = import.meta.env.VITE_SITE_URL || window.location.origin;
 
 const InviteSignup = () => {
   const [searchParams] = useSearchParams();
@@ -145,15 +143,12 @@ const InviteSignup = () => {
   if (isValidating) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-muted/30">
-        <Helmet>
-          <title>Invitation Signup | ServeTogether</title>
-          <meta
-            name="description"
-            content="Complete your ServeTogether invitation and create your account password."
-          />
-          <meta name="robots" content="noindex,follow" />
-          <link rel="canonical" href={`${SITE_URL}/invite`} />
-        </Helmet>
+        <SeoMeta
+          title="Invitation Signup | ServeTogether"
+          description="Complete your ServeTogether invitation and create your account password."
+          path="/invite"
+          noindex
+        />
 
         <Card className="w-full max-w-md">
           <CardContent className="flex flex-col items-center justify-center py-12">
@@ -168,15 +163,12 @@ const InviteSignup = () => {
   if (error) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-muted/30 p-4">
-        <Helmet>
-          <title>Invitation Signup | ServeTogether</title>
-          <meta
-            name="description"
-            content="Complete your ServeTogether invitation and create your account password."
-          />
-          <meta name="robots" content="noindex,follow" />
-          <link rel="canonical" href={`${SITE_URL}/invite`} />
-        </Helmet>
+        <SeoMeta
+          title="Invitation Signup | ServeTogether"
+          description="Complete your ServeTogether invitation and create your account password."
+          path="/invite"
+          noindex
+        />
 
         <Card className="w-full max-w-md">
           <CardContent className="flex flex-col items-center justify-center py-12 text-center">
@@ -194,15 +186,12 @@ const InviteSignup = () => {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-muted/30 p-4">
-      <Helmet>
-        <title>Invitation Signup | ServeTogether</title>
-        <meta
-          name="description"
-          content="Complete your ServeTogether invitation and create your account password."
-        />
-        <meta name="robots" content="noindex,follow" />
-        <link rel="canonical" href={`${SITE_URL}/invite`} />
-      </Helmet>
+      <SeoMeta
+        title="Invitation Signup | ServeTogether"
+        description="Complete your ServeTogether invitation and create your account password."
+        path="/invite"
+        noindex
+      />
 
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">

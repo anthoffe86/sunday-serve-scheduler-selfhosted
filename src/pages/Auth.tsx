@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Helmet } from 'react-helmet-async';
 import { useAuth } from '@/hooks/useAuth';
 import serveTogetherLogo from '@/assets/servetogether-logo.png';
 import { Button } from '@/components/ui/button';
@@ -10,10 +9,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { toast } from 'sonner';
 import { Loader2 } from 'lucide-react';
 import { z } from 'zod';
+import { SeoMeta } from '@/components/seo/SeoMeta';
 
 const emailSchema = z.string().email('Please enter a valid email address');
 const passwordSchema = z.string().min(8, 'Password must be at least 8 characters');
-const SITE_URL = import.meta.env.VITE_SITE_URL || window.location.origin;
 
 const Auth = () => {
   const { user, isLoading, isSuperAdmin, signIn } = useAuth();
@@ -69,15 +68,12 @@ const Auth = () => {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
-      <Helmet>
-        <title>Sign In | ServeTogether</title>
-        <meta
-          name="description"
-          content="Sign in to your ServeTogether account to manage schedules, swaps, and volunteer availability."
-        />
-        <meta name="robots" content="noindex,follow" />
-        <link rel="canonical" href={`${SITE_URL}/auth`} />
-      </Helmet>
+      <SeoMeta
+        title="Sign In | ServeTogether"
+        description="Sign in to your ServeTogether account to manage schedules, swaps, and volunteer availability."
+        path="/auth"
+        noindex
+      />
 
       <div className="w-full max-w-md animate-fade-in">
         {/* Logo/Header */}

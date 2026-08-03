@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { Helmet } from 'react-helmet-async';
 import { Loader2, CheckCircle, XCircle, AlertCircle, Mail } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -8,8 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
 import { usePublicOrgSettings } from '@/hooks/usePublicOrgSettings';
-
-const SITE_URL = import.meta.env.VITE_SITE_URL || window.location.origin;
+import { SeoMeta } from '@/components/seo/SeoMeta';
 
 const InvitationResponse = () => {
   const [searchParams] = useSearchParams();
@@ -69,15 +67,12 @@ const InvitationResponse = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 to-secondary/5 p-4">
-      <Helmet>
-        <title>Invitation Response | ServeTogether</title>
-        <meta
-          name="description"
-          content="Respond to your ServeTogether invitation by accepting or declining your assignment."
-        />
-        <meta name="robots" content="noindex,follow" />
-        <link rel="canonical" href={`${SITE_URL}/respond-invitation`} />
-      </Helmet>
+      <SeoMeta
+        title="Invitation Response | ServeTogether"
+        description="Respond to your ServeTogether invitation by accepting or declining your assignment."
+        path="/respond-invitation"
+        noindex
+      />
 
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
