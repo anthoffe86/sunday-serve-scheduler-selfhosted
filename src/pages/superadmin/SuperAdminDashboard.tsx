@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Loader2, Shield, UserPlus, RefreshCcw, UserX, Mail, Trash2 } from 'lucide-react';
+import { Loader2, Shield, UserPlus, RefreshCcw, UserX, Mail, Trash2, Building2, Pencil } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -82,6 +82,14 @@ type SupportDataResult = {
   superAdminUserIds?: string[];
 };
 
+type OrganisationResult = {
+  organisation?: Organisation;
+};
+
+type DeleteOrganisationResult = {
+  removedUsersCount?: number;
+};
+
 const getErrorMessage = (error: unknown, fallback: string) => {
   if (error instanceof Error) {
     return error.message;
@@ -104,11 +112,13 @@ const SuperAdminDashboard = () => {
   const [search, setSearch] = useState('');
   const [resetTarget, setResetTarget] = useState<UserRow | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<UserRow | null>(null);
+  const [deleteOrgTarget, setDeleteOrgTarget] = useState<Organisation | null>(null);
 
   const [newUserName, setNewUserName] = useState('');
   const [newUserEmail, setNewUserEmail] = useState('');
   const [newUserOrgId, setNewUserOrgId] = useState('');
   const [newUserRole, setNewUserRole] = useState<'volunteer' | 'admin'>('volunteer');
+  const [newOrgName, setNewOrgName] = useState('');
 
   const invokeSupportAction = useCallback(async (payload: Record<string, unknown>) => {
     const response = (await supabase.functions.invoke('admin-user-management', {
@@ -172,6 +182,15 @@ const SuperAdminDashboard = () => {
       })
       .slice(0, USER_PAGE_SIZE);
   }, [users, search, orgLookup, superAdminUserIds]);
+
+  const orgUserCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const user of users) {
+      const current = counts.get(user.org_id) ?? 0;
+      counts.set(user.org_id, current + 1);
+    }
+    return counts;
+  }, [users]);
 
   const runSupportAction = async (payload: Record<string, unknown>) => {
     setWorking(true);
@@ -331,6 +350,80 @@ const SuperAdminDashboard = () => {
     }
   };
 
+  const handleCreateOrganisation = async () => {
+    const trimmedName = newOrgName.trim();
+    if (!trimmedName) {
+      toast.error('Organisation name is required');
+      return;
+    }
+
+    try {
+      const result = (await runSupportAction({
+        action: 'create-org',
+        data: { name: trimmedName },
+      })) as OrganisationResult | null;
+
+      setNewOrgName('');
+      await fetchData();
+      if (result?.organisation?.id) {
+        setNewUserOrgId(result.organisation.id);
+      }
+      toast.success(`Organisation created: ${result?.organisation?.name ?? trimmedName}`);
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, 'Failed to create organisation'));
+    }
+  };
+
+  const handleRenameOrganisation = async (org: Organisation) => {
+    const nextName = window.prompt('Enter the new organisation name', org.name);
+    const trimmedNextName = nextName?.trim();
+    if (!trimmedNextName || trimmedNextName === org.name) {
+      return;
+    }
+
+    try {
+      await runSupportAction({
+        action: 'update-org-name',
+        data: {
+          orgId: org.id,
+          name: trimmedNextName,
+        },
+      });
+      toast.success('Organisation name updated');
+      await fetchData();
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, 'Failed to rename organisation'));
+    }
+  };
+
+  const handleDeleteOrganisation = async () => {
+    if (!deleteOrgTarget) {
+      return;
+    }
+
+    try {
+      const result = (await runSupportAction({
+        action: 'delete-org',
+        data: {
+          orgId: deleteOrgTarget.id,
+        },
+      })) as DeleteOrganisationResult | null;
+
+      const removedUsersCount = result?.removedUsersCount ?? 0;
+      toast.success(
+        `${deleteOrgTarget.name} was deleted. ${removedUsersCount} user${removedUsersCount === 1 ? '' : 's'} were permanently removed.`
+      );
+
+      setDeleteOrgTarget(null);
+      if (newUserOrgId === deleteOrgTarget.id) {
+        setNewUserOrgId('');
+      }
+      await fetchData();
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, 'Failed to delete organisation'));
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-16">
@@ -373,11 +466,82 @@ const SuperAdminDashboard = () => {
           </CardHeader>
           <CardContent>
             <p className="text-xs text-muted-foreground">
-              Password reset, email update, add user, remove user
+              Password reset, email update, add/remove user, add/edit/remove organisations
             </p>
           </CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Building2 className="h-4 w-4" />
+            Organisation Management
+          </CardTitle>
+          <CardDescription>
+            Create new organisations, rename existing ones, and permanently remove organisations.
+            Deleting an organisation permanently deletes every volunteer/admin account in that
+            organisation before the organisation is removed.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Input
+              value={newOrgName}
+              onChange={(event) => setNewOrgName(event.target.value)}
+              placeholder="New organisation name"
+            />
+            <Button onClick={handleCreateOrganisation} disabled={working}>
+              {working ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UserPlus className="mr-2 h-4 w-4" />}
+              Add Organisation
+            </Button>
+          </div>
+
+          <div className="space-y-2">
+            {organisations.map((org) => {
+              const isDefaultOrg = org.slug === 'default-org';
+              const usersInOrg = orgUserCounts.get(org.id) ?? 0;
+
+              return (
+                <div key={org.id} className="rounded-lg border p-3">
+                  <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                    <div>
+                      <p className="font-medium">{org.name}</p>
+                      <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                        <Badge variant="secondary">{org.slug}</Badge>
+                        {isDefaultOrg && <Badge variant="outline">Protected</Badge>}
+                        <span>{usersInOrg} user{usersInOrg === 1 ? '' : 's'}</span>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={working}
+                        onClick={() => handleRenameOrganisation(org)}
+                      >
+                        <Pencil className="mr-1 h-3.5 w-3.5" />
+                        Rename
+                      </Button>
+
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        disabled={working || isDefaultOrg}
+                        onClick={() => setDeleteOrgTarget(org)}
+                      >
+                        <Trash2 className="mr-1 h-3.5 w-3.5" />
+                        Delete Organisation
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
@@ -607,6 +771,42 @@ const SuperAdminDashboard = () => {
                 </>
               ) : (
                 'Delete Permanently'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={!!deleteOrgTarget}
+        onOpenChange={(open) => !open && !working && setDeleteOrgTarget(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="font-serif">Permanently delete this organisation?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteOrgTarget?.name} and all of its users will be permanently deleted. This removes
+              volunteer/admin sign-in accounts, profiles, assignments, preferences, availability,
+              and related org data. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={working}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(event) => {
+                event.preventDefault();
+                handleDeleteOrganisation();
+              }}
+              disabled={working}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {working ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                'Delete Organisation'
               )}
             </AlertDialogAction>
           </AlertDialogFooter>

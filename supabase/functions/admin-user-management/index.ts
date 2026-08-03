@@ -268,7 +268,7 @@ Deno.serve(async (req) => {
      * point, so failing the whole action would misreport what happened. The
      * super admin can re-send with "Send Reset Email".
      */
-    const sendSetupInvitation = async (email: string, requestedBaseUrl: unknown) => {
+    const sendSetupInvitation = async (email: string, requestedBaseUrl: unknown, orgName?: string) => {
       // The origin is only honoured when allow-listed (see resolveAppOrigin), so
       // a caller cannot point the link at a site they control.
       const appOrigin = resolveAppOrigin(requestedBaseUrl)
@@ -290,12 +290,199 @@ Deno.serve(async (req) => {
         }
       }
 
-      const sendError = await sendAccountSetupEmail({ supabaseAdmin, email, setupLink })
+      const sendError = await sendAccountSetupEmail({ supabaseAdmin, email, setupLink, orgName })
       if (sendError) {
         return { emailed: false, emailError: sendError }
       }
 
       return { emailed: true, emailError: null }
+    }
+
+    const escapeRegExp = (value: string) => {
+      return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    }
+
+    const slugifyOrganisationName = (name: string) => {
+      const normalized = name
+        .normalize('NFKD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .trim()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/(^-|-$)/g, '')
+
+      if (!normalized) {
+        throw new Error('Organisation name must include letters or numbers')
+      }
+
+      return normalized
+    }
+
+    const buildUniqueOrganisationSlug = async (name: string) => {
+      const baseSlug = slugifyOrganisationName(name)
+
+      const { data: slugRows, error: slugError } = await supabaseAdmin
+        .from('organisations')
+        .select('slug')
+        .like('slug', `${baseSlug}%`)
+
+      if (slugError) {
+        throw slugError
+      }
+
+      const existingSlugs = new Set(
+        ((slugRows ?? []) as Array<{ slug?: string | null }>)
+          .map((row) => row.slug)
+          .filter((slug): slug is string => typeof slug === 'string' && slug.length > 0)
+      )
+
+      if (!existingSlugs.has(baseSlug)) {
+        return baseSlug
+      }
+
+      const suffixPattern = new RegExp(`^${escapeRegExp(baseSlug)}-(\\d+)$`)
+      let nextSuffix = 2
+
+      for (const slug of existingSlugs) {
+        const matched = slug.match(suffixPattern)
+        if (!matched) {
+          continue
+        }
+
+        const suffix = Number(matched[1])
+        if (Number.isFinite(suffix) && suffix >= nextSuffix) {
+          nextSuffix = suffix + 1
+        }
+      }
+
+      return `${baseSlug}-${nextSuffix}`
+    }
+
+    const deleteUserPermanently = async (targetUserId: string) => {
+      // A super admin must not be able to delete their own account out from under themselves.
+      if (targetUserId === user.id) {
+        throw new Error('You cannot permanently delete your own account')
+      }
+
+      // Super admin accounts are never deletable through this endpoint.
+      const { data: targetRoleRows, error: targetRoleError } = await supabaseAdmin
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', targetUserId)
+
+      if (targetRoleError) {
+        throw targetRoleError
+      }
+
+      const targetIsSuperAdmin = ((targetRoleRows ?? []) as Array<{ role: string }>)
+        .some((row) => row.role === 'super_admin')
+      if (targetIsSuperAdmin) {
+        throw new Error('Super admin accounts cannot be permanently deleted')
+      }
+
+      // Read the profile before anything is removed: the email is needed to purge invite tokens
+      // (which have no foreign key), and the family group id to tidy up an emptied group.
+      const { data: targetProfile, error: targetProfileError } = await supabaseAdmin
+        .from('profiles')
+        .select('email, family_group_id')
+        .eq('user_id', targetUserId)
+        .maybeSingle()
+
+      if (targetProfileError) {
+        throw targetProfileError
+      }
+
+      const targetFamilyGroupId =
+        (targetProfile as { family_group_id?: string | null } | null)?.family_group_id ?? null
+
+      // Fall back to the auth record for the email so that re-running this action after a partial
+      // failure still purges invite tokens, even though the profile row is already gone.
+      let targetEmail = (targetProfile as { email?: string | null } | null)?.email ?? null
+      if (!targetEmail) {
+        const { data: targetAuthUser } = await supabaseAdmin.auth.admin.getUserById(targetUserId)
+        targetEmail = targetAuthUser?.user?.email ?? null
+      }
+
+      // Every delete below is keyed on user_id alone, never on org_id. A user moved between
+      // organisations by assignExistingUserToOrg keeps rows under the previous org, so an
+      // org-scoped delete would leave data behind.
+      const runStep = async (label: string, step: () => PromiseLike<{ error: unknown }>) => {
+        const { error } = await step()
+        if (error) {
+          console.error(`delete-user-permanently failed at step "${label}"`, error)
+          throw error
+        }
+      }
+
+      // 1. Release swap requests that merely point at the user, so they survive as history.
+      await runStep('swap_requests.to_user_id', () =>
+        supabaseAdmin.from('swap_requests').update({ to_user_id: null }).eq('to_user_id', targetUserId))
+      await runStep('swap_requests.approved_by', () =>
+        supabaseAdmin.from('swap_requests').update({ approved_by: null }).eq('approved_by', targetUserId))
+
+      // 2. Swap requests the user raised go with them.
+      await runStep('swap_requests.from_user_id', () =>
+        supabaseAdmin.from('swap_requests').delete().eq('from_user_id', targetUserId))
+
+      // 3. Event assignments cascade to swap_requests.event_assignment_id and null out
+      //    swap_requests.offered_assignment_id.
+      await runStep('event_assignments', () =>
+        supabaseAdmin.from('event_assignments').delete().eq('volunteer_id', targetUserId))
+
+      // 4. Legacy assignments table, superseded by event_assignments but still present.
+      await runStep('assignments', () =>
+        supabaseAdmin.from('assignments').delete().eq('volunteer_id', targetUserId))
+
+      // 5-6. Provenance columns on records that outlive the user.
+      await runStep('event_templates.created_by', () =>
+        supabaseAdmin.from('event_templates').update({ created_by: null }).eq('created_by', targetUserId))
+      await runStep('family_groups.created_by', () =>
+        supabaseAdmin.from('family_groups').update({ created_by: null }).eq('created_by', targetUserId))
+
+      // 7. invite_tokens has no foreign key at all, so nothing cleans it up automatically, and it
+      //    holds the invitee's name and email.
+      await runStep('invite_tokens.invited_by', () =>
+        supabaseAdmin.from('invite_tokens').delete().eq('invited_by', targetUserId))
+      if (targetEmail) {
+        await runStep('invite_tokens.email', () =>
+          supabaseAdmin.from('invite_tokens').delete().eq('email', targetEmail))
+      }
+
+      // 8-10. Per-user tables. These would cascade from auth.users anyway; doing them explicitly
+      //       keeps the outcome deterministic if the deployed schema has drifted from the
+      //       migrations. profiles must be last: the restrictive tenant RLS policies resolve a
+      //       user's org through it.
+      for (const tableName of ['availability', 'role_preferences', 'service_history', 'user_roles'] as const) {
+        await runStep(tableName, () =>
+          supabaseAdmin.from(tableName).delete().eq('user_id', targetUserId))
+      }
+      await runStep('profiles', () =>
+        supabaseAdmin.from('profiles').delete().eq('user_id', targetUserId))
+
+      // 11. Drop the family group if the deleted user was its last member.
+      if (targetFamilyGroupId) {
+        const { count: remainingMembers, error: familyCountError } = await supabaseAdmin
+          .from('profiles')
+          .select('user_id', { count: 'exact', head: true })
+          .eq('family_group_id', targetFamilyGroupId)
+
+        if (familyCountError) {
+          throw familyCountError
+        }
+
+        if ((remainingMembers ?? 0) === 0) {
+          await runStep('family_groups', () =>
+            supabaseAdmin.from('family_groups').delete().eq('id', targetFamilyGroupId))
+        }
+      }
+
+      // 12. Finally the auth account itself, which also clears identities, sessions and refresh
+      //     tokens. Done last so a partial failure never leaves an orphaned auth user; the action
+      //     is idempotent and can simply be re-run.
+      const { error: authDeleteError } = await supabaseAdmin.auth.admin.deleteUser(targetUserId)
+      if (authDeleteError) {
+        throw authDeleteError
+      }
     }
 
     switch (action) {
@@ -381,6 +568,26 @@ Deno.serve(async (req) => {
           )
         }
 
+        const { data: profileForEmail } = await supabaseAdmin
+          .from('profiles')
+          .select('org_id')
+          .eq('email', targetEmail)
+          .maybeSingle()
+
+        let profileOrgName: string | undefined = undefined
+        const profileOrgId = (profileForEmail as { org_id?: string | null } | null)?.org_id ?? null
+        if (profileOrgId) {
+          const { data: orgForProfile } = await supabaseAdmin
+            .from('organisations')
+            .select('name')
+            .eq('id', profileOrgId)
+            .maybeSingle()
+          const resolvedOrgName = (orgForProfile as { name?: string | null } | null)?.name
+          if (typeof resolvedOrgName === 'string' && resolvedOrgName.trim()) {
+            profileOrgName = resolvedOrgName.trim()
+          }
+        }
+
         // Emailed to the account holder rather than returned to the caller: the
         // reset link is a bearer credential for that account, and sending it
         // leaves a trail instead of allowing a silent takeover.
@@ -389,6 +596,7 @@ Deno.serve(async (req) => {
           email: targetEmail,
           resetLink,
           initiatedByAdmin: true,
+          orgName: profileOrgName,
         })
 
         if (sendError) {
@@ -632,7 +840,15 @@ Deno.serve(async (req) => {
           throw roleInsertError
         }
 
-        const invitation = await sendSetupInvitation(normalizedEmail, data?.baseUrl)
+        const { data: orgData } = await supabaseAdmin
+          .from('organisations')
+          .select('name')
+          .eq('id', orgId)
+          .maybeSingle()
+
+        const targetOrgName = (orgData as { name?: string | null } | null)?.name ?? undefined
+
+        const invitation = await sendSetupInvitation(normalizedEmail, data?.baseUrl, targetOrgName)
 
         console.log(
           `Super admin ${user.id} created a user in org ${orgId} (setup email sent: ${invitation.emailed}).`
@@ -688,6 +904,155 @@ Deno.serve(async (req) => {
         )
       }
 
+      case 'create-org': {
+        ensureSuperAdmin()
+
+        const name = data?.name as string | undefined
+        const normalizedName = name?.trim()
+        if (!normalizedName) {
+          throw new Error('data.name is required')
+        }
+
+        const slug = await buildUniqueOrganisationSlug(normalizedName)
+
+        const { data: createdOrg, error: createOrgError } = await supabaseAdmin
+          .from('organisations')
+          .insert({
+            name: normalizedName,
+            slug,
+            active: true,
+          })
+          .select('id, name, slug, active')
+          .single()
+
+        if (createOrgError) {
+          throw createOrgError
+        }
+
+        return new Response(
+          JSON.stringify({
+            success: true,
+            message: 'Organisation created',
+            organisation: createdOrg,
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
+      case 'update-org-name': {
+        ensureSuperAdmin()
+
+        const orgId = data?.orgId as string | undefined
+        const name = data?.name as string | undefined
+        const normalizedName = name?.trim()
+        if (!orgId || !normalizedName) {
+          throw new Error('data.orgId and data.name are required')
+        }
+
+        const { data: updatedOrg, error: updateOrgError } = await supabaseAdmin
+          .from('organisations')
+          .update({
+            name: normalizedName,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', orgId)
+          .select('id, name, slug, active')
+          .maybeSingle()
+
+        if (updateOrgError) {
+          throw updateOrgError
+        }
+
+        if (!updatedOrg) {
+          throw new Error('Organisation not found')
+        }
+
+        return new Response(
+          JSON.stringify({
+            success: true,
+            message: 'Organisation name updated',
+            organisation: updatedOrg,
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
+      case 'delete-org': {
+        ensureSuperAdmin()
+
+        const orgId = data?.orgId as string | undefined
+        if (!orgId) {
+          throw new Error('data.orgId is required')
+        }
+
+        const { data: targetOrg, error: targetOrgError } = await supabaseAdmin
+          .from('organisations')
+          .select('id, name, slug')
+          .eq('id', orgId)
+          .maybeSingle()
+
+        if (targetOrgError) {
+          throw targetOrgError
+        }
+
+        if (!targetOrg) {
+          throw new Error('Organisation not found')
+        }
+
+        if (targetOrg.slug === 'default-org') {
+          throw new Error('The default organisation cannot be deleted')
+        }
+
+        const { data: orgUsers, error: orgUsersError } = await supabaseAdmin
+          .from('profiles')
+          .select('user_id')
+          .eq('org_id', orgId)
+
+        if (orgUsersError) {
+          throw orgUsersError
+        }
+
+        const targetUserIds = ((orgUsers ?? []) as Array<{ user_id: string | null }>)
+          .map((row) => row.user_id)
+          .filter((userId): userId is string => !!userId)
+
+        for (const targetUserId of targetUserIds) {
+          await deleteUserPermanently(targetUserId)
+        }
+
+        const { count: remainingProfiles, error: remainingProfilesError } = await supabaseAdmin
+          .from('profiles')
+          .select('user_id', { count: 'exact', head: true })
+          .eq('org_id', orgId)
+
+        if (remainingProfilesError) {
+          throw remainingProfilesError
+        }
+
+        if ((remainingProfiles ?? 0) > 0) {
+          throw new Error('Organisation still has users after cleanup')
+        }
+
+        const { error: deleteOrgError } = await supabaseAdmin
+          .from('organisations')
+          .delete()
+          .eq('id', orgId)
+
+        if (deleteOrgError) {
+          throw deleteOrgError
+        }
+
+        return new Response(
+          JSON.stringify({
+            success: true,
+            message: 'Organisation and users permanently deleted',
+            organisationId: orgId,
+            removedUsersCount: targetUserIds.length,
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
       case 'delete-user-permanently': {
         ensureSuperAdmin()
 
@@ -695,131 +1060,7 @@ Deno.serve(async (req) => {
           throw new Error('userId is required')
         }
 
-        // A super admin must not be able to delete their own account out from under themselves.
-        if (userId === user.id) {
-          throw new Error('You cannot permanently delete your own account')
-        }
-
-        // Super admin accounts are never deletable through this endpoint. The dashboard hides the
-        // button for them, but the UI is not the security boundary — this check is.
-        const { data: targetRoleRows, error: targetRoleError } = await supabaseAdmin
-          .from('user_roles')
-          .select('role')
-          .eq('user_id', userId)
-
-        if (targetRoleError) {
-          throw targetRoleError
-        }
-
-        const targetIsSuperAdmin = ((targetRoleRows ?? []) as Array<{ role: string }>)
-          .some((row) => row.role === 'super_admin')
-        if (targetIsSuperAdmin) {
-          throw new Error('Super admin accounts cannot be permanently deleted')
-        }
-
-        // Read the profile before anything is removed: the email is needed to purge invite tokens
-        // (which have no foreign key), and the family group id to tidy up an emptied group.
-        const { data: targetProfile, error: targetProfileError } = await supabaseAdmin
-          .from('profiles')
-          .select('email, family_group_id')
-          .eq('user_id', userId)
-          .maybeSingle()
-
-        if (targetProfileError) {
-          throw targetProfileError
-        }
-
-        const targetFamilyGroupId =
-          (targetProfile as { family_group_id?: string | null } | null)?.family_group_id ?? null
-
-        // Fall back to the auth record for the email so that re-running this action after a partial
-        // failure still purges invite tokens, even though the profile row is already gone.
-        let targetEmail = (targetProfile as { email?: string | null } | null)?.email ?? null
-        if (!targetEmail) {
-          const { data: targetAuthUser } = await supabaseAdmin.auth.admin.getUserById(userId)
-          targetEmail = targetAuthUser?.user?.email ?? null
-        }
-
-        // Every delete below is keyed on user_id alone, never on org_id. A user moved between
-        // organisations by assignExistingUserToOrg keeps rows under the previous org, so an
-        // org-scoped delete would leave data behind.
-        const runStep = async (label: string, step: () => PromiseLike<{ error: unknown }>) => {
-          const { error } = await step()
-          if (error) {
-            console.error(`delete-user-permanently failed at step "${label}"`, error)
-            throw error
-          }
-        }
-
-        // 1. Release swap requests that merely point at the user, so they survive as history.
-        await runStep('swap_requests.to_user_id', () =>
-          supabaseAdmin.from('swap_requests').update({ to_user_id: null }).eq('to_user_id', userId))
-        await runStep('swap_requests.approved_by', () =>
-          supabaseAdmin.from('swap_requests').update({ approved_by: null }).eq('approved_by', userId))
-
-        // 2. Swap requests the user raised go with them.
-        await runStep('swap_requests.from_user_id', () =>
-          supabaseAdmin.from('swap_requests').delete().eq('from_user_id', userId))
-
-        // 3. Event assignments cascade to swap_requests.event_assignment_id and null out
-        //    swap_requests.offered_assignment_id.
-        await runStep('event_assignments', () =>
-          supabaseAdmin.from('event_assignments').delete().eq('volunteer_id', userId))
-
-        // 4. Legacy assignments table, superseded by event_assignments but still present.
-        await runStep('assignments', () =>
-          supabaseAdmin.from('assignments').delete().eq('volunteer_id', userId))
-
-        // 5-6. Provenance columns on records that outlive the user.
-        await runStep('event_templates.created_by', () =>
-          supabaseAdmin.from('event_templates').update({ created_by: null }).eq('created_by', userId))
-        await runStep('family_groups.created_by', () =>
-          supabaseAdmin.from('family_groups').update({ created_by: null }).eq('created_by', userId))
-
-        // 7. invite_tokens has no foreign key at all, so nothing cleans it up automatically, and it
-        //    holds the invitee's name and email.
-        await runStep('invite_tokens.invited_by', () =>
-          supabaseAdmin.from('invite_tokens').delete().eq('invited_by', userId))
-        if (targetEmail) {
-          await runStep('invite_tokens.email', () =>
-            supabaseAdmin.from('invite_tokens').delete().eq('email', targetEmail))
-        }
-
-        // 8-10. Per-user tables. These would cascade from auth.users anyway; doing them explicitly
-        //       keeps the outcome deterministic if the deployed schema has drifted from the
-        //       migrations. profiles must be last: the restrictive tenant RLS policies resolve a
-        //       user's org through it.
-        for (const tableName of ['availability', 'role_preferences', 'service_history', 'user_roles'] as const) {
-          await runStep(tableName, () =>
-            supabaseAdmin.from(tableName).delete().eq('user_id', userId))
-        }
-        await runStep('profiles', () =>
-          supabaseAdmin.from('profiles').delete().eq('user_id', userId))
-
-        // 11. Drop the family group if the deleted user was its last member.
-        if (targetFamilyGroupId) {
-          const { count: remainingMembers, error: familyCountError } = await supabaseAdmin
-            .from('profiles')
-            .select('user_id', { count: 'exact', head: true })
-            .eq('family_group_id', targetFamilyGroupId)
-
-          if (familyCountError) {
-            throw familyCountError
-          }
-
-          if ((remainingMembers ?? 0) === 0) {
-            await runStep('family_groups', () =>
-              supabaseAdmin.from('family_groups').delete().eq('id', targetFamilyGroupId))
-          }
-        }
-
-        // 12. Finally the auth account itself, which also clears identities, sessions and refresh
-        //     tokens. Done last so a partial failure never leaves an orphaned auth user; the action
-        //     is idempotent and can simply be re-run.
-        const { error: authDeleteError } = await supabaseAdmin.auth.admin.deleteUser(userId)
-        if (authDeleteError) {
-          throw authDeleteError
-        }
+        await deleteUserPermanently(userId)
 
         return new Response(
           JSON.stringify({ success: true, message: 'User permanently deleted' }),
