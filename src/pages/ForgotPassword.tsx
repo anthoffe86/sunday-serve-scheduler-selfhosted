@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
 import { supabase } from '@/integrations/supabase/client';
 import serveTogetherLogo from '@/assets/servetogether-logo.png';
 import { Button } from '@/components/ui/button';
@@ -11,6 +12,7 @@ import { Loader2, ArrowLeft } from 'lucide-react';
 import { z } from 'zod';
 
 const emailSchema = z.string().email('Please enter a valid email address');
+const SITE_URL = import.meta.env.VITE_SITE_URL || window.location.origin;
 
 const GENERIC_ERROR = "We couldn't send the reset email. Please try again shortly.";
 
@@ -84,6 +86,16 @@ const ForgotPassword = () => {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
+      <Helmet>
+        <title>Forgot Password | ServeTogether</title>
+        <meta
+          name="description"
+          content="Request a secure password reset link for your ServeTogether account."
+        />
+        <meta name="robots" content="noindex,follow" />
+        <link rel="canonical" href={`${SITE_URL}/forgot-password`} />
+      </Helmet>
+
       <div className="w-full max-w-md animate-fade-in">
         <div className="mb-8 text-center">
           <div className="mx-auto mb-6">

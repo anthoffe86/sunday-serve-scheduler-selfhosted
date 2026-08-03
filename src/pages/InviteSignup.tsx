@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -15,6 +16,8 @@ interface InviteTokenData {
   name: string;
   expires_at: string;
 }
+
+const SITE_URL = import.meta.env.VITE_SITE_URL || window.location.origin;
 
 const InviteSignup = () => {
   const [searchParams] = useSearchParams();
@@ -142,6 +145,16 @@ const InviteSignup = () => {
   if (isValidating) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-muted/30">
+        <Helmet>
+          <title>Invitation Signup | ServeTogether</title>
+          <meta
+            name="description"
+            content="Complete your ServeTogether invitation and create your account password."
+          />
+          <meta name="robots" content="noindex,follow" />
+          <link rel="canonical" href={`${SITE_URL}/invite`} />
+        </Helmet>
+
         <Card className="w-full max-w-md">
           <CardContent className="flex flex-col items-center justify-center py-12">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -155,6 +168,16 @@ const InviteSignup = () => {
   if (error) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-muted/30 p-4">
+        <Helmet>
+          <title>Invitation Signup | ServeTogether</title>
+          <meta
+            name="description"
+            content="Complete your ServeTogether invitation and create your account password."
+          />
+          <meta name="robots" content="noindex,follow" />
+          <link rel="canonical" href={`${SITE_URL}/invite`} />
+        </Helmet>
+
         <Card className="w-full max-w-md">
           <CardContent className="flex flex-col items-center justify-center py-12 text-center">
             <XCircle className="h-12 w-12 text-destructive" />
@@ -171,6 +194,16 @@ const InviteSignup = () => {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-muted/30 p-4">
+      <Helmet>
+        <title>Invitation Signup | ServeTogether</title>
+        <meta
+          name="description"
+          content="Complete your ServeTogether invitation and create your account password."
+        />
+        <meta name="robots" content="noindex,follow" />
+        <link rel="canonical" href={`${SITE_URL}/invite`} />
+      </Helmet>
+
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">

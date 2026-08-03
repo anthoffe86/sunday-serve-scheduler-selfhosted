@@ -261,19 +261,25 @@ const Landing = () => {
     })),
   };
 
+  const socialImageUrl = `${SITE_URL}${mockupDashboardUrl}`;
+
   return (
     <div className="min-h-screen bg-background">
       <Helmet>
         <title>ServeTogether - Volunteer & Church Rota Software</title>
         <meta name="description" content="ServeTogether is volunteer scheduling and church rota software. Build rotas automatically, manage swaps, track availability and notify volunteers - without spreadsheets." />
         <link rel="canonical" href={`${SITE_URL}/`} />
+        <meta property="og:site_name" content="ServeTogether" />
         <meta property="og:title" content="ServeTogether - Volunteer & Church Rota Software" />
         <meta property="og:description" content="Build rotas automatically, manage swaps, track availability and notify volunteers - for churches and volunteer-led organisations." />
         <meta property="og:url" content={`${SITE_URL}/`} />
         <meta property="og:type" content="website" />
+        <meta property="og:image" content={socialImageUrl} />
+        <meta property="og:image:alt" content="ServeTogether dashboard and volunteer scheduling preview" />
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:title" content="ServeTogether - Volunteer & Church Rota Software" />
         <meta name="twitter:description" content="Volunteer scheduling and church rota software for churches, charities and community groups." />
+        <meta name="twitter:image" content={socialImageUrl} />
         <script type="application/ld+json">{JSON.stringify(softwareJsonLd)}</script>
         <script type="application/ld+json">{JSON.stringify(faqJsonLd)}</script>
       </Helmet>
