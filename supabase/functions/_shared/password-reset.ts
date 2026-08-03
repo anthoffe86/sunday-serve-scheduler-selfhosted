@@ -182,8 +182,9 @@ async function sendRecoveryLinkEmail(params: {
   email: string;
   resetLink: string;
   variant: PasswordEmailVariant;
+  orgName?: string;
 }): Promise<string | null> {
-  const { supabaseAdmin, email, resetLink, variant } = params;
+  const { supabaseAdmin, email, resetLink, variant, orgName: explicitOrgName } = params;
 
   if (!resend) {
     console.error("RESEND_API_KEY secret is not set. Cannot send the email.");
@@ -191,7 +192,37 @@ async function sendRecoveryLinkEmail(params: {
   }
 
   const logoUrl = Deno.env.get("SERVETOGETHER_LOGO_URL") || "";
-  const orgName = await getOrgName(supabaseAdmin);
+  const resolveOrgName = async (): Promise<string> => {
+    if (explicitOrgName && explicitOrgName.trim()) {
+      return explicitOrgName.trim();
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+
+    const { data: profile } = await supabaseAdmin
+      .from("profiles")
+      .select("org_id")
+      .eq("email", normalizedEmail)
+      .maybeSingle();
+
+    const profileOrgId = (profile as { org_id?: string | null } | null)?.org_id;
+    if (profileOrgId) {
+      const { data: org } = await supabaseAdmin
+        .from("organisations")
+        .select("name")
+        .eq("id", profileOrgId)
+        .maybeSingle();
+
+      const orgNameFromProfile = (org as { name?: string | null } | null)?.name;
+      if (typeof orgNameFromProfile === "string" && orgNameFromProfile.trim()) {
+        return orgNameFromProfile.trim();
+      }
+    }
+
+    return await getOrgName(supabaseAdmin);
+  };
+
+  const orgName = await resolveOrgName();
   const from = buildOrgFromEmail(orgName);
 
   const subject = variant === "setup"
@@ -227,14 +258,16 @@ export async function sendPasswordResetEmail(params: {
   email: string;
   resetLink: string;
   initiatedByAdmin?: boolean;
+  orgName?: string;
 }): Promise<string | null> {
-  const { supabaseAdmin, email, resetLink, initiatedByAdmin = false } = params;
+  const { supabaseAdmin, email, resetLink, initiatedByAdmin = false, orgName } = params;
 
   return await sendRecoveryLinkEmail({
     supabaseAdmin,
     email,
     resetLink,
     variant: initiatedByAdmin ? "admin" : "self",
+    orgName,
   });
 }
 
@@ -247,13 +280,15 @@ export async function sendAccountSetupEmail(params: {
   supabaseAdmin: SupabaseClient;
   email: string;
   setupLink: string;
+  orgName?: string;
 }): Promise<string | null> {
-  const { supabaseAdmin, email, setupLink } = params;
+  const { supabaseAdmin, email, setupLink, orgName } = params;
 
   return await sendRecoveryLinkEmail({
     supabaseAdmin,
     email,
     resetLink: setupLink,
     variant: "setup",
+    orgName,
   });
 }

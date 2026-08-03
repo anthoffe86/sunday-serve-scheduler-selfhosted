@@ -1,11 +1,13 @@
 import { Bell, Menu, User, LogOut, Shield } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { useAuth } from '@/hooks/useAuth';
 import { useProfile } from '@/hooks/useVolunteerData';
 import { usePublicOrgSettings } from '@/hooks/usePublicOrgSettings';
+import { supabase } from '@/integrations/supabase/client';
 interface AppHeaderProps {
   onMenuClick: () => void;
 }
@@ -16,7 +18,8 @@ export function AppHeader({
     user,
     signOut,
     isAdmin,
-    isSuperAdmin
+    isSuperAdmin,
+    orgId
   } = useAuth();
   const {
     data: profile
@@ -25,8 +28,47 @@ export function AppHeader({
   const navigate = useNavigate();
   const orgName = orgSettings.organisationName;
   const orgShortName = orgSettings.organisationShortName;
-  const headerName = isSuperAdmin ? 'ServeTogether Support' : orgName;
-  const headerShortName = isSuperAdmin ? 'SA' : orgShortName;
+  const {
+    data: currentOrgName
+  } = useQuery({
+    queryKey: ['current-org-name', orgId],
+    queryFn: async () => {
+      if (!orgId) {
+        return null;
+      }
+
+      const { data } = await supabase
+        .from('organisations')
+        .select('name')
+        .eq('id', orgId)
+        .maybeSingle();
+
+      const resolvedName = (data as { name?: string | null } | null)?.name;
+      return typeof resolvedName === 'string' && resolvedName.trim() ? resolvedName.trim() : null;
+    },
+    enabled: !isSuperAdmin && !!orgId,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const deriveShortName = (value: string) => {
+    const chunks = value
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean);
+
+    if (chunks.length === 0) {
+      return orgShortName;
+    }
+
+    if (chunks.length === 1) {
+      return chunks[0].slice(0, 2).toUpperCase();
+    }
+
+    return `${chunks[0][0] ?? ''}${chunks[1][0] ?? ''}`.toUpperCase();
+  };
+
+  const headerName = isSuperAdmin ? 'ServeTogether Support' : (currentOrgName ?? orgName);
+  const headerShortName = isSuperAdmin ? 'SA' : deriveShortName(headerName);
   const subtitle = isSuperAdmin ? 'Super Admin' : 'Volunteer Scheduling';
   const displayName = profile?.name || user?.email?.split('@')[0] || 'User';
   const initials = displayName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
