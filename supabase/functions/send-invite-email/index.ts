@@ -170,7 +170,7 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    const orgName = await getOrgName(supabase);
+    const orgName = await getOrgName(supabase, inviteOrgId);
     const resendFrom = buildOrgFromEmail(orgName);
     const name = invite.name as string;
     const email = invite.email as string;
