@@ -1,6 +1,6 @@
 ﻿import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Helmet } from 'react-helmet-async';
+import { SeoMeta } from '@/components/seo/SeoMeta';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
@@ -206,6 +206,16 @@ const Landing = () => {
       status: 'pending',
     });
 
+    setSubmitting(false);
+    if (error) {
+      console.error(error);
+      toast.error('Something went wrong submitting your enquiry. Please try again.');
+      return;
+    }
+
+    // Only notify once the row is safely stored, so we never email a lead that has
+    // no enquiry record behind it for the super admin to action. Deliberately not
+    // awaited: a Resend outage must not fail the visitor's submission.
     supabase.functions
       .invoke('notify-access-request', {
         body: {
@@ -218,13 +228,6 @@ const Landing = () => {
       .catch(() => {
         // best effort only
       });
-
-    setSubmitting(false);
-    if (error) {
-      console.error(error);
-      toast.error('Something went wrong submitting your enquiry. Please try again.');
-      return;
-    }
 
     setSubmitted(true);
     setForm({ name: '', email: '', organisation_name: '', notes: '' });
@@ -261,23 +264,37 @@ const Landing = () => {
     })),
   };
 
+  const organizationJsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'Organization',
+    name: 'ServeTogether',
+    url: SITE_URL,
+    logo: `${SITE_URL}${logoUrl}`,
+  };
+
+  const websiteJsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'WebSite',
+    name: 'ServeTogether',
+    url: SITE_URL,
+  };
+
+  const socialImageUrl = `${SITE_URL}${mockupDashboardUrl}`;
+
   return (
     <div className="min-h-screen bg-background">
-      <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-primary focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-primary-foreground focus:outline-none">Skip to main content</a>
-      <Helmet>
-        <title>ServeTogether - Volunteer & Church Rota Software</title>
-        <meta name="description" content="ServeTogether is volunteer scheduling and church rota software. Build rotas automatically, manage swaps, track availability and notify volunteers - without spreadsheets." />
-        <link rel="canonical" href={`${SITE_URL}/`} />
-        <meta property="og:title" content="ServeTogether - Volunteer & Church Rota Software" />
-        <meta property="og:description" content="Build rotas automatically, manage swaps, track availability and notify volunteers - for churches and volunteer-led organisations." />
-        <meta property="og:url" content={`${SITE_URL}/`} />
-        <meta property="og:type" content="website" />
-        <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content="ServeTogether - Volunteer & Church Rota Software" />
-        <meta name="twitter:description" content="Volunteer scheduling and church rota software for churches, charities and community groups." />
+      <SeoMeta
+        title="ServeTogether - Volunteer & Church Rota Software"
+        description="ServeTogether is volunteer scheduling and church rota software. Build rotas automatically, manage swaps, track availability and notify volunteers - without spreadsheets."
+        path="/"
+        imageUrl={socialImageUrl}
+        imageAlt="ServeTogether dashboard and volunteer scheduling preview"
+      >
         <script type="application/ld+json">{JSON.stringify(softwareJsonLd)}</script>
         <script type="application/ld+json">{JSON.stringify(faqJsonLd)}</script>
-      </Helmet>
+        <script type="application/ld+json">{JSON.stringify(organizationJsonLd)}</script>
+        <script type="application/ld+json">{JSON.stringify(websiteJsonLd)}</script>
+      </SeoMeta>
 
       <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container mx-auto flex h-20 items-center justify-between px-4">

@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { Resend } from "https://esm.sh/resend@2.0.0";
-import { buildOrgFromEmail, getOrgName } from "../_shared/org-settings.ts";
+import { buildOrgFromEmail, getOrgName, isNotificationEnabled } from "../_shared/org-settings.ts";
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
 const resend = RESEND_API_KEY ? new Resend(RESEND_API_KEY) : null;
@@ -121,18 +121,33 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    // Use service role to check admin status
+    // Use service role for org-scoped reads/writes once the caller is authenticated.
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
-    const orgName = await getOrgName(supabase);
-    const resendFrom = buildOrgFromEmail(orgName);
-    
+
+    const { eventIds, baseUrl }: InvitationRequest = await req.json();
+
+    console.log(`Sending invitations for ${eventIds.length} events`);
+
+    // Fetch events
+    const { data: events, error: eventsError } = await supabase
+      .from('events')
+      .select('id, name, date, start_time, org_id')
+      .in('id', eventIds);
+
+    if (eventsError) throw eventsError;
+
+    // Read the toggle for the organisation these events belong to, so one org
+    // switching invitation emails off does not switch them off for the others.
+    const eventOrgId = (events?.[0] as { org_id?: string | null } | undefined)?.org_id ?? null;
+
     const { data: adminCheck } = await supabase
       .from('user_roles')
       .select('role')
       .eq('user_id', user.id)
       .eq('role', 'admin')
+      .eq('org_id', eventOrgId)
       .maybeSingle();
-    
+
     if (!adminCheck) {
       return new Response(
         JSON.stringify({ error: 'Forbidden: Admin access required' }),
@@ -140,33 +155,15 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    const { eventIds, baseUrl }: InvitationRequest = await req.json();
+    const orgName = await getOrgName(supabase, eventOrgId);
+    const resendFrom = buildOrgFromEmail(orgName);
 
-    console.log(`Sending invitations for ${eventIds.length} events`);
+    const emailsEnabled = await isNotificationEnabled(supabase, "email_on_invitation_send", eventOrgId);
 
-    // Check if invitation emails are enabled
-    const { data: setting, error: settingError } = await supabase
-      .from("system_settings")
-      .select("value")
-      .eq("key", "email_on_invitation_send")
-      .maybeSingle();
-
-    if (settingError) {
-      console.error("Error fetching system setting:", settingError);
-    } else if (setting && (setting.value === false || setting.value === "false")) {
+    if (!emailsEnabled) {
       console.log("Invitation email notifications are disabled. Still updating statuses but not sending emails.");
       // Note: We continue to update assignment statuses to 'invited' but skip email sending
     }
-
-    const emailsEnabled = !setting || (setting.value !== false && setting.value !== "false");
-
-    // Fetch events
-    const { data: events, error: eventsError } = await supabase
-      .from('events')
-      .select('id, name, date, start_time')
-      .in('id', eventIds);
-
-    if (eventsError) throw eventsError;
 
     // Fetch assignments that are in 'proposed' status (ready to be invited)
     const { data: assignments, error: assignmentsError } = await supabase

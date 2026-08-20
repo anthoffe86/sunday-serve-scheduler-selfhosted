@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Loader2, Shield, UserPlus, RefreshCcw, UserX, Mail } from 'lucide-react';
+import { Loader2, Shield, UserPlus, RefreshCcw, UserX, Mail, Trash2, Building2, Pencil } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,6 +12,16 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -32,17 +42,52 @@ type UserRow = {
 
 type FunctionInvokeResult = {
   data: unknown;
-  error: { message?: string } | null;
+  error: { message?: string; context?: Response } | null;
+};
+
+/**
+ * supabase.functions.invoke collapses every non-2xx response into a generic
+ * "non-2xx status code" message, so the function's own error text has to be read
+ * back off the raw Response it hangs on `context`.
+ */
+const readInvokeError = async (
+  error: { message?: string; context?: Response },
+  fallback: string
+): Promise<string> => {
+  const context = error.context;
+  if (context && typeof context.json === 'function') {
+    try {
+      const body = await context.json();
+      if (typeof body?.error === 'string' && body.error) {
+        return body.error;
+      }
+    } catch {
+      // Non-JSON body; fall through.
+    }
+  }
+  return error.message ?? fallback;
 };
 
 type AddUserResult = {
   userId?: string;
+  /** False when no set-password email went out — either it failed, or the account already existed. */
+  emailed?: boolean;
+  emailError?: string | null;
+  emailSkippedReason?: 'existing-account';
 };
 
 type SupportDataResult = {
   organisations?: Organisation[];
   users?: UserRow[];
   superAdminUserIds?: string[];
+};
+
+type OrganisationResult = {
+  organisation?: Organisation;
+};
+
+type DeleteOrganisationResult = {
+  removedUsersCount?: number;
 };
 
 const getErrorMessage = (error: unknown, fallback: string) => {
@@ -65,11 +110,15 @@ const SuperAdminDashboard = () => {
   const [users, setUsers] = useState<UserRow[]>([]);
   const [superAdminUserIds, setSuperAdminUserIds] = useState<string[]>([]);
   const [search, setSearch] = useState('');
+  const [resetTarget, setResetTarget] = useState<UserRow | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<UserRow | null>(null);
+  const [deleteOrgTarget, setDeleteOrgTarget] = useState<Organisation | null>(null);
 
   const [newUserName, setNewUserName] = useState('');
   const [newUserEmail, setNewUserEmail] = useState('');
   const [newUserOrgId, setNewUserOrgId] = useState('');
   const [newUserRole, setNewUserRole] = useState<'volunteer' | 'admin'>('volunteer');
+  const [newOrgName, setNewOrgName] = useState('');
 
   const invokeSupportAction = useCallback(async (payload: Record<string, unknown>) => {
     const response = (await supabase.functions.invoke('admin-user-management', {
@@ -77,7 +126,7 @@ const SuperAdminDashboard = () => {
     })) as FunctionInvokeResult;
 
     if (response.error) {
-      throw new Error(response.error.message ?? 'Support action failed');
+      throw new Error(await readInvokeError(response.error, 'Support action failed'));
     }
 
     return response.data;
@@ -114,12 +163,15 @@ const SuperAdminDashboard = () => {
 
   const filteredUsers = useMemo(() => {
     const term = search.trim().toLowerCase();
+    // Super admins are excluded from this list whether or not a search is active, so the
+    // destructive buttons never render against them. The edge function enforces the same rule.
+    const manageableUsers = users.filter((user) => !superAdminUserIds.includes(user.user_id));
+
     if (!term) {
-      return users.slice(0, USER_PAGE_SIZE);
+      return manageableUsers.slice(0, USER_PAGE_SIZE);
     }
 
-    return users
-      .filter((user) => !superAdminUserIds.includes(user.user_id))
+    return manageableUsers
       .filter((user) => {
         const orgName = orgLookup.get(user.org_id)?.name?.toLowerCase() ?? '';
         return (
@@ -130,6 +182,15 @@ const SuperAdminDashboard = () => {
       })
       .slice(0, USER_PAGE_SIZE);
   }, [users, search, orgLookup, superAdminUserIds]);
+
+  const orgUserCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const user of users) {
+      const current = counts.get(user.org_id) ?? 0;
+      counts.set(user.org_id, current + 1);
+    }
+    return counts;
+  }, [users]);
 
   const runSupportAction = async (payload: Record<string, unknown>) => {
     setWorking(true);
@@ -151,22 +212,40 @@ const SuperAdminDashboard = () => {
     const pendingOrgId = newUserOrgId;
 
     try {
-      const data = await runSupportAction({
+      const data = (await runSupportAction({
         action: 'add-user',
         data: {
           name: pendingName,
           email: pendingEmail,
           orgId: pendingOrgId,
           role: newUserRole,
+          // Lets deploy previews and local dev build links back to themselves.
+          // Only honoured by the function if allow-listed.
+          baseUrl: window.location.origin,
         },
-      });
+      })) as AddUserResult | null;
 
-      toast.success('User added successfully');
+      // A new account is unusable until its owner sets a password, so whether the
+      // email actually went out is the important half of the result.
+      if (data?.emailSkippedReason === 'existing-account') {
+        toast.success(
+          `${pendingEmail} already had an account, so they were just added to the organisation. No email was sent — they keep their existing password.`
+        );
+      } else if (data?.emailed) {
+        toast.success(`User added. An email has been sent to ${pendingEmail} to set their password.`);
+      } else {
+        toast.warning(
+          data?.emailError
+            ? `User added, but the set-password email failed: ${data.emailError} Use "Send Reset Email" to try again.`
+            : 'User added, but the set-password email could not be sent. Use "Send Reset Email" to try again.'
+        );
+      }
+
       setNewUserName('');
       setNewUserEmail('');
       await fetchData();
       setUsers((currentUsers) => {
-        const addedUserId = (data as AddUserResult | null)?.userId;
+        const addedUserId = data?.userId;
         if (!addedUserId) {
           return currentUsers;
         }
@@ -192,21 +271,25 @@ const SuperAdminDashboard = () => {
     }
   };
 
-  const handleResetPassword = async (email: string) => {
+  const handleResetPassword = async () => {
+    if (!resetTarget) {
+      return;
+    }
+
+    const { email } = resetTarget;
+
     try {
-      const data = await runSupportAction({
+      // Sends the same branded reset email as the self-service
+      // /forgot-password flow. The link goes to the account holder, not back to
+      // this dashboard, so a reset always leaves a trail in their inbox.
+      await runSupportAction({
         action: 'reset-password',
-        data: { email },
+        data: { email, baseUrl: window.location.origin },
       });
-      const resetLink = (data as { resetLink?: string } | null)?.resetLink;
-      if (resetLink) {
-        await navigator.clipboard.writeText(resetLink);
-        toast.success('Password reset link copied to clipboard');
-      } else {
-        toast.success('Password reset action completed');
-      }
+      toast.success(`Password reset email sent to ${email}`);
+      setResetTarget(null);
     } catch (error: unknown) {
-      toast.error(getErrorMessage(error, 'Failed to reset password'));
+      toast.error(getErrorMessage(error, 'Failed to send password reset email'));
     }
   };
 
@@ -244,6 +327,100 @@ const SuperAdminDashboard = () => {
       await fetchData();
     } catch (error: unknown) {
       toast.error(getErrorMessage(error, 'Failed to remove user'));
+    }
+  };
+
+  const handleDeleteUserPermanently = async () => {
+    if (!deleteTarget) {
+      return;
+    }
+
+    const { user_id: userId, name } = deleteTarget;
+
+    try {
+      await runSupportAction({
+        action: 'delete-user-permanently',
+        userId,
+      });
+      toast.success(`${name} and all their data were permanently deleted`);
+      setDeleteTarget(null);
+      await fetchData();
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, 'Failed to permanently delete user'));
+    }
+  };
+
+  const handleCreateOrganisation = async () => {
+    const trimmedName = newOrgName.trim();
+    if (!trimmedName) {
+      toast.error('Organisation name is required');
+      return;
+    }
+
+    try {
+      const result = (await runSupportAction({
+        action: 'create-org',
+        data: { name: trimmedName },
+      })) as OrganisationResult | null;
+
+      setNewOrgName('');
+      await fetchData();
+      if (result?.organisation?.id) {
+        setNewUserOrgId(result.organisation.id);
+      }
+      toast.success(`Organisation created: ${result?.organisation?.name ?? trimmedName}`);
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, 'Failed to create organisation'));
+    }
+  };
+
+  const handleRenameOrganisation = async (org: Organisation) => {
+    const nextName = window.prompt('Enter the new organisation name', org.name);
+    const trimmedNextName = nextName?.trim();
+    if (!trimmedNextName || trimmedNextName === org.name) {
+      return;
+    }
+
+    try {
+      await runSupportAction({
+        action: 'update-org-name',
+        data: {
+          orgId: org.id,
+          name: trimmedNextName,
+        },
+      });
+      toast.success('Organisation name updated');
+      await fetchData();
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, 'Failed to rename organisation'));
+    }
+  };
+
+  const handleDeleteOrganisation = async () => {
+    if (!deleteOrgTarget) {
+      return;
+    }
+
+    try {
+      const result = (await runSupportAction({
+        action: 'delete-org',
+        data: {
+          orgId: deleteOrgTarget.id,
+        },
+      })) as DeleteOrganisationResult | null;
+
+      const removedUsersCount = result?.removedUsersCount ?? 0;
+      toast.success(
+        `${deleteOrgTarget.name} was deleted. ${removedUsersCount} user${removedUsersCount === 1 ? '' : 's'} were permanently removed.`
+      );
+
+      setDeleteOrgTarget(null);
+      if (newUserOrgId === deleteOrgTarget.id) {
+        setNewUserOrgId('');
+      }
+      await fetchData();
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, 'Failed to delete organisation'));
     }
   };
 
@@ -289,7 +466,7 @@ const SuperAdminDashboard = () => {
           </CardHeader>
           <CardContent>
             <p className="text-xs text-muted-foreground">
-              Password reset, email update, add user, remove user
+              Password reset, email update, add/remove user, add/edit/remove organisations
             </p>
           </CardContent>
         </Card>
@@ -298,10 +475,85 @@ const SuperAdminDashboard = () => {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
+            <Building2 className="h-4 w-4" />
+            Organisation Management
+          </CardTitle>
+          <CardDescription>
+            Create new organisations, rename existing ones, and permanently remove organisations.
+            Deleting an organisation permanently deletes every volunteer/admin account in that
+            organisation before the organisation is removed.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Input
+              value={newOrgName}
+              onChange={(event) => setNewOrgName(event.target.value)}
+              placeholder="New organisation name"
+            />
+            <Button onClick={handleCreateOrganisation} disabled={working}>
+              {working ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UserPlus className="mr-2 h-4 w-4" />}
+              Add Organisation
+            </Button>
+          </div>
+
+          <div className="space-y-2">
+            {organisations.map((org) => {
+              const isDefaultOrg = org.slug === 'default-org';
+              const usersInOrg = orgUserCounts.get(org.id) ?? 0;
+
+              return (
+                <div key={org.id} className="rounded-lg border p-3">
+                  <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                    <div>
+                      <p className="font-medium">{org.name}</p>
+                      <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                        <Badge variant="secondary">{org.slug}</Badge>
+                        {isDefaultOrg && <Badge variant="outline">Protected</Badge>}
+                        <span>{usersInOrg} user{usersInOrg === 1 ? '' : 's'}</span>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={working}
+                        onClick={() => handleRenameOrganisation(org)}
+                      >
+                        <Pencil className="mr-1 h-3.5 w-3.5" />
+                        Rename
+                      </Button>
+
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        disabled={working || isDefaultOrg}
+                        onClick={() => setDeleteOrgTarget(org)}
+                      >
+                        <Trash2 className="mr-1 h-3.5 w-3.5" />
+                        Delete Organisation
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
             <UserPlus className="h-4 w-4" />
             Add User To Organisation
           </CardTitle>
-          <CardDescription>Create a new auth user, profile, and role in one action.</CardDescription>
+          <CardDescription>
+            Creates the auth user, profile, and role in one action, then emails them a link to set
+            their own password. The link expires in 1 hour; after that they can use "Forgot
+            password?" on the sign-in page.
+          </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-2">
           <div className="space-y-2">
@@ -400,10 +652,10 @@ const SuperAdminDashboard = () => {
                         size="sm"
                         variant="outline"
                         disabled={working}
-                        onClick={() => handleResetPassword(user.email)}
+                        onClick={() => setResetTarget(user)}
                       >
                         <RefreshCcw className="mr-1 h-3.5 w-3.5" />
-                        Reset Password
+                        Send Reset Email
                       </Button>
                       <Button
                         size="sm"
@@ -423,6 +675,15 @@ const SuperAdminDashboard = () => {
                         <UserX className="mr-1 h-3.5 w-3.5" />
                         Remove User
                       </Button>
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        disabled={working}
+                        onClick={() => setDeleteTarget(user)}
+                      >
+                        <Trash2 className="mr-1 h-3.5 w-3.5" />
+                        Delete Permanently
+                      </Button>
                     </div>
                   </div>
                 </div>
@@ -435,6 +696,122 @@ const SuperAdminDashboard = () => {
           </div>
         </CardContent>
       </Card>
+
+      <AlertDialog
+        open={!!resetTarget}
+        onOpenChange={(open) => !open && !working && setResetTarget(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="font-serif">Send password reset email?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {resetTarget?.name} will receive an email at{' '}
+              <span className="font-medium text-foreground">{resetTarget?.email}</span> with a link
+              to set a new password. The link expires in 1 hour and can only be used once. Their
+              current password keeps working until they use it.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={working}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(event) => {
+                // Keep the dialog mounted while the request is in flight so the
+                // button can show progress; handleResetPassword closes it.
+                event.preventDefault();
+                handleResetPassword();
+              }}
+              disabled={working}
+            >
+              {working ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Sending...
+                </>
+              ) : (
+                'Send Reset Email'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => !open && !working && setDeleteTarget(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="font-serif">Permanently delete this user?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteTarget?.name} (
+              <span className="font-medium text-foreground">{deleteTarget?.email}</span>) and all of
+              their data will be erased: every event assignment past and future, availability, role
+              preferences, swap requests, service history and their profile. Their sign-in account is
+              deleted, so they can no longer log in and the email address becomes available for a new
+              account. This cannot be undone — use Remove User instead if you only want to deactivate
+              them.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={working}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(event) => {
+                // Keep the dialog mounted while the request is in flight so the
+                // button can show progress; handleDeleteUserPermanently closes it.
+                event.preventDefault();
+                handleDeleteUserPermanently();
+              }}
+              disabled={working}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {working ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                'Delete Permanently'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={!!deleteOrgTarget}
+        onOpenChange={(open) => !open && !working && setDeleteOrgTarget(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="font-serif">Permanently delete this organisation?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteOrgTarget?.name} and all of its users will be permanently deleted. This removes
+              volunteer/admin sign-in accounts, profiles, assignments, preferences, availability,
+              and related org data. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={working}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(event) => {
+                event.preventDefault();
+                handleDeleteOrganisation();
+              }}
+              disabled={working}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {working ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                'Delete Organisation'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

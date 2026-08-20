@@ -50,10 +50,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(session);
       setUser(session?.user ?? null);
       setIsLoading(false);
-      
+
       if (session?.user) {
         checkRoleStatus(session.user.id);
       }
+    }).catch((error) => {
+      // A rejection here (e.g. a browser that denies storage to the document)
+      // must still clear the loading flag, or every guarded route is stuck on a
+      // spinner forever instead of falling through to the sign-in page.
+      console.error('Failed to read the existing session:', error);
+      setIsLoading(false);
     });
 
     return () => subscription.unsubscribe();

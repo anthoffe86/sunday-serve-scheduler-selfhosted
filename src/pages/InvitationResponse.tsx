@@ -7,6 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
 import { usePublicOrgSettings } from '@/hooks/usePublicOrgSettings';
+import { SeoMeta } from '@/components/seo/SeoMeta';
 
 const InvitationResponse = () => {
   const [searchParams] = useSearchParams();
@@ -66,6 +67,13 @@ const InvitationResponse = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 to-secondary/5 p-4">
+      <SeoMeta
+        title="Invitation Response | ServeTogether"
+        description="Respond to your ServeTogether invitation by accepting or declining your assignment."
+        path="/respond-invitation"
+        noindex
+      />
+
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           {status === 'loading' && (

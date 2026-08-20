@@ -23,6 +23,12 @@ This project uses one repository with strict branch controls.
    - `git checkout -b feature/your-change`
 2. Develop and test against non-production Supabase project.
 3. Run preflight checks and deploy to non-production:
+   - run this to make sure all ref's are set
+         ```powershell
+         $env:SUPABASE_PROJECT_REF_NONPROD="sonuenajksrpndzffzzj"
+         $env:SUPABASE_PROJECT_REF_PROD="yudsjgwfzsmiassafdwr"
+         Remove-Item Env:SUPABASE_ACCESS_TOKEN -ErrorAction SilentlyContinue
+         ```
    - `npm run preflight:nonprod`
    - `npm run deploy:migrations:nonprod` (if schema changed)
    - `npm run deploy:functions:nonprod` (if edge functions changed)

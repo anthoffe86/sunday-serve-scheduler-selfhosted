@@ -9,8 +9,29 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { toast } from 'sonner';
 import { Loader2, ArrowLeft } from 'lucide-react';
 import { z } from 'zod';
+import { SeoMeta } from '@/components/seo/SeoMeta';
 
 const emailSchema = z.string().email('Please enter a valid email address');
+
+const GENERIC_ERROR = "We couldn't send the reset email. Please try again shortly.";
+
+/**
+ * supabase.functions.invoke surfaces non-2xx responses as an error whose
+ * `context` is the raw Response, so the function's JSON message has to be read
+ * back off it.
+ */
+async function readFunctionError(error: unknown): Promise<string> {
+  const context = (error as { context?: Response })?.context;
+  if (context && typeof context.json === 'function') {
+    try {
+      const body = await context.json();
+      if (typeof body?.error === 'string' && body.error) return body.error;
+    } catch {
+      // Non-JSON body; fall through to the generic message.
+    }
+  }
+  return GENERIC_ERROR;
+}
 
 const ForgotPassword = () => {
   const navigate = useNavigate();
@@ -31,20 +52,46 @@ const ForgotPassword = () => {
     }
 
     setIsSubmitting(true);
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/reset-password`,
-    });
-    setIsSubmitting(false);
 
-    if (error) {
-      toast.error(error.message);
-    } else {
+    try {
+      // Sent via our own edge function (Resend) rather than supabase.auth
+      // .resetPasswordForEmail, so the link is built from the server-side
+      // APP_BASE_URL instead of the Supabase project's Site URL.
+      const { data, error } = await supabase.functions.invoke('send-password-reset', {
+        body: { email: email.trim().toLowerCase(), baseUrl: window.location.origin },
+      });
+
+      if (error) {
+        // Only configuration/transport failures reach here; the function
+        // deliberately returns success whether or not the address is registered.
+        const message = await readFunctionError(error);
+        toast.error(message);
+        return;
+      }
+
+      if (data?.error) {
+        toast.error(data.error);
+        return;
+      }
+
       setEmailSent(true);
+    } catch (err) {
+      console.error('Password reset request failed:', err);
+      toast.error(GENERIC_ERROR);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
+      <SeoMeta
+        title="Forgot Password | ServeTogether"
+        description="Request a secure password reset link for your ServeTogether account."
+        path="/forgot-password"
+        noindex
+      />
+
       <div className="w-full max-w-md animate-fade-in">
         <div className="mb-8 text-center">
           <div className="mx-auto mb-6">

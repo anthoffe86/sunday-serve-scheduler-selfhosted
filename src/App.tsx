@@ -22,8 +22,8 @@ import AdminEvents from "./pages/admin/Events";
 import AdminEventDetail from "./pages/admin/EventDetail";
 import AdminSwapManagement from "./pages/admin/SwapManagement";
 import AdminSettings from "./pages/admin/AdminSettings";
-import AccessRequests from "./pages/admin/AccessRequests";
 import SuperAdminDashboard from "./pages/superadmin/SuperAdminDashboard";
+import Enquiries from "./pages/superadmin/Enquiries";
 import Auth from "./pages/Auth";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
@@ -135,14 +135,6 @@ const App = () => (
                 }
               />
               <Route
-                path="/admin/access-requests"
-                element={
-                  <ProtectedRoute requireOrgAdmin>
-                    <AccessRequests />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
                 path="/admin/settings"
                 element={
                   <ProtectedRoute requireOrgAdmin>
@@ -156,6 +148,14 @@ const App = () => (
                 element={
                   <ProtectedRoute requireSuperAdmin>
                     <SuperAdminDashboard />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/super-admin/enquiries"
+                element={
+                  <ProtectedRoute requireSuperAdmin>
+                    <Enquiries />
                   </ProtectedRoute>
                 }
               />
