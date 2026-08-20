@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -43,6 +44,7 @@ import {
   Download,
   KeyRound,
   ListChecks,
+  Menu,
 } from 'lucide-react';
 
 const SITE_URL = import.meta.env.VITE_SITE_URL || window.location.origin;
@@ -54,7 +56,7 @@ const featureGroups = [
     features: [
       { icon: Wand2, name: 'Auto-scheduler', desc: 'Builds rotas automatically while respecting every volunteer\'s role preferences and recorded availability.' },
       { icon: ListChecks, name: 'Event templates', desc: 'Define recurring services or shifts once - weekly, fortnightly or monthly - and generate events in bulk.' },
-      { icon: CalendarCheck, name: 'Draft -> Publish workflow', desc: 'Plan in private, send invitations, then publish to lock the rota and notify confirmed volunteers.' },
+      { icon: CalendarCheck, name: 'Draft → Publish workflow', desc: 'Plan in private, send invitations, then publish to lock the rota and notify confirmed volunteers.' },
       { icon: LayoutDashboard, name: 'Confidence metrics', desc: 'Dashboard shows fully-staffed, ready-to-publish and at-risk events so you always know what needs attention.' },
     ],
   },
@@ -124,7 +126,7 @@ const audiences = [
   { icon: Utensils, name: 'Foodbanks & community groups', desc: 'Keep weekly sessions covered with reliable rotas and easy swaps.' },
   { icon: GraduationCap, name: 'Schools & PTAs', desc: 'Fairs, parents\' evenings, fundraisers - anything that needs a volunteer rota.' },
   { icon: Trophy, name: 'Clubs & sports teams', desc: 'Marshals, coaches, refreshments, set-up crews - keep it organised end to end.' },
-  { icon: Building2, name: 'Any volunteer-led team', desc: 'If you run a rota, ServeTogether will save you time. Built generic, used widely.' },
+  { icon: Building2, name: 'Any volunteer-led team', desc: 'If you run a rota, ServeTogether will save you time. Built for churches, designed for any volunteer team.' },
 ];
 
 const howItWorks = [
@@ -177,6 +179,7 @@ const requestSchema = z.object({
 });
 
 const Landing = () => {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [form, setForm] = useState({
@@ -260,6 +263,7 @@ const Landing = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-primary focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-primary-foreground focus:outline-none">Skip to main content</a>
       <Helmet>
         <title>ServeTogether - Volunteer & Church Rota Software</title>
         <meta name="description" content="ServeTogether is volunteer scheduling and church rota software. Build rotas automatically, manage swaps, track availability and notify volunteers - without spreadsheets." />
@@ -280,7 +284,7 @@ const Landing = () => {
           <Link to="/" className="flex items-center gap-2">
             <img src={logoUrl} alt="ServeTogether - volunteer scheduling for churches and organisations" className="h-12 w-auto md:h-14" />
           </Link>
-          <nav className="hidden items-center gap-6 text-sm font-medium md:flex">
+          <nav aria-label="Main navigation" className="hidden items-center gap-6 text-sm font-medium md:flex">
             <a href="#features" className="text-muted-foreground transition-colors hover:text-foreground">Features</a>
             <a href="#how-it-works" className="text-muted-foreground transition-colors hover:text-foreground">How it works</a>
             <a href="#who-its-for" className="text-muted-foreground transition-colors hover:text-foreground">Who it is for</a>
@@ -289,14 +293,34 @@ const Landing = () => {
           <div className="flex items-center gap-2">
             <Button asChild variant="ghost" className="hidden sm:inline-flex"><a href="#request-info-demo">Request info & demo</a></Button>
             <Button asChild><Link to="/auth">Sign in<ArrowRight className="ml-2 h-4 w-4" /></Link></Button>
+            <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="icon" className="md:hidden" aria-label="Open menu">
+                  <Menu className="h-5 w-5" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="right" className="w-72" aria-describedby={undefined}>
+                <SheetTitle className="sr-only">Navigation</SheetTitle>
+                <nav aria-label="Mobile navigation" className="flex flex-col gap-1 pt-4">
+                  <a href="#features" className="rounded-lg px-3 py-2.5 text-base font-medium text-foreground transition-colors hover:bg-secondary" onClick={() => setMobileMenuOpen(false)}>Features</a>
+                  <a href="#how-it-works" className="rounded-lg px-3 py-2.5 text-base font-medium text-foreground transition-colors hover:bg-secondary" onClick={() => setMobileMenuOpen(false)}>How it works</a>
+                  <a href="#who-its-for" className="rounded-lg px-3 py-2.5 text-base font-medium text-foreground transition-colors hover:bg-secondary" onClick={() => setMobileMenuOpen(false)}>Who it is for</a>
+                  <a href="#faq" className="rounded-lg px-3 py-2.5 text-base font-medium text-foreground transition-colors hover:bg-secondary" onClick={() => setMobileMenuOpen(false)}>FAQ</a>
+                  <div className="mt-4 border-t pt-4">
+                    <Button asChild className="w-full" onClick={() => setMobileMenuOpen(false)}>
+                      <a href="#request-info-demo">Request info &amp; demo</a>
+                    </Button>
+                  </div>
+                </nav>
+              </SheetContent>
+            </Sheet>
           </div>
         </div>
       </header>
 
-      <section className="relative overflow-hidden border-b bg-gradient-to-b from-primary/5 to-background py-20 md:py-28">
+      <section id="main-content" className="relative overflow-hidden border-b bg-gradient-to-b from-primary/5 to-background py-20 md:py-28">
         <div className="container mx-auto px-4 text-center">
           <div className="mx-auto max-w-4xl">
-            <img src={logoUrl} alt="ServeTogether logo" className="mx-auto mb-10 h-32 w-auto md:h-40 lg:h-48" />
             <h1 className="font-serif text-4xl font-bold tracking-tight md:text-5xl lg:text-6xl">Volunteer & church rota software<span className="block text-primary">that runs itself</span></h1>
             <p className="mx-auto mt-6 max-w-2xl text-lg text-muted-foreground md:text-xl">ServeTogether helps churches, charities and volunteer-led organisations build rotas, manage swaps, track availability and notify their teams - automatically, and without spreadsheets.</p>
             <div className="mt-10 flex flex-col gap-4 sm:flex-row sm:justify-center">
@@ -315,7 +339,7 @@ const Landing = () => {
             />
           </div>
         </div>
-        <div className="absolute -top-24 left-1/2 h-96 w-96 -translate-x-1/2 rounded-full bg-primary/10 blur-3xl" />
+        <div className="absolute -top-24 left-1/2 h-96 w-96 -translate-x-1/2 rounded-full bg-primary/10 blur-3xl" aria-hidden="true" />
       </section>
 
       <section id="features" className="py-20">
@@ -404,11 +428,11 @@ const Landing = () => {
 
           </div>
 
-          {/* Remaining features: Communications, Admin tools, Security */}
+          {/* Remaining features: Communications and Admin tools */}
           <div className="mt-24 border-t pt-20">
-            <h3 className="mb-12 text-center font-serif text-2xl font-bold">And much more</h3>
-            <div className="grid gap-10 md:grid-cols-3">
-              {featureGroups.slice(3).map((group) => (
+            <h3 className="mb-12 text-center font-serif text-2xl font-bold">Also included</h3>
+            <div className="grid gap-10 md:grid-cols-2">
+              {featureGroups.slice(3, 5).map((group) => (
                 <div key={group.title}>
                   <div className="mb-5 flex items-center gap-3">
                     <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary"><group.icon className="h-4 w-4" /></div>
@@ -432,17 +456,40 @@ const Landing = () => {
         </div>
       </section>
 
-      <section id="how-it-works" className="border-y bg-muted/50 py-20"><div className="container mx-auto px-4"><div className="mx-auto max-w-2xl text-center"><h2 className="font-serif text-3xl font-bold md:text-4xl">How it works</h2><p className="mt-4 text-muted-foreground">Four steps from sign-up to a published, fairly-built rota.</p></div><div className="mx-auto mt-12 grid max-w-5xl gap-6 md:grid-cols-2 lg:grid-cols-4">{howItWorks.map((s) => (<div key={s.step} className="rounded-2xl border-2 bg-background p-6"><div className="font-serif text-3xl font-bold text-primary">{s.step}</div><h3 className="mt-3 font-serif text-lg font-semibold">{s.title}</h3><p className="mt-2 text-sm text-muted-foreground">{s.desc}</p></div>))}</div></div></section>
+      <section id="how-it-works" className="border-y bg-muted/50 py-20"><div className="container mx-auto px-4"><div className="mx-auto max-w-2xl text-center"><h2 className="font-serif text-3xl font-bold md:text-4xl">How it works</h2><p className="mt-4 text-muted-foreground">Four steps from sign-up to a published, fairly-built rota.</p></div><div className="mx-auto mt-12 grid max-w-5xl gap-6 md:grid-cols-2 lg:grid-cols-4">{howItWorks.map((s) => (<div key={s.step} className="rounded-2xl border-2 bg-background p-6"><div className="font-serif text-3xl font-bold text-accent">{s.step}</div><h3 className="mt-3 font-serif text-lg font-semibold">{s.title}</h3><p className="mt-2 text-sm text-muted-foreground">{s.desc}</p></div>))}</div></div></section>
 
       <section id="who-its-for" className="py-20"><div className="container mx-auto px-4"><div className="mx-auto max-w-2xl text-center"><h2 className="font-serif text-3xl font-bold md:text-4xl">Who it is for</h2><p className="mt-4 text-muted-foreground">Built first for churches. Used by any organisation that runs on volunteers.</p></div><div className="mt-12 grid gap-6 md:grid-cols-2 lg:grid-cols-3">{audiences.map((a) => (<Card key={a.name} className="border-2"><CardContent className="pt-6"><div className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary"><a.icon className="h-5 w-5" /></div><h3 className="font-serif text-lg font-semibold">{a.name}</h3><p className="mt-2 text-sm text-muted-foreground">{a.desc}</p></CardContent></Card>))}</div></div></section>
 
-      <section className="border-y bg-muted/50 py-20"><div className="container mx-auto px-4"><div className="grid gap-12 lg:grid-cols-2 lg:items-center"><div><h2 className="font-serif text-3xl font-bold md:text-4xl">Why ServeTogether?</h2><p className="mt-4 text-muted-foreground">Built for the people who actually run the rota. Whether you are a church administrator, a charity coordinator or a community group lead, ServeTogether takes the admin off your plate so you can focus on the work itself.</p><ul className="mt-8 space-y-3">{benefits.map((benefit) => (<li key={benefit} className="flex items-start gap-3"><CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-primary" /><span>{benefit}</span></li>))}</ul></div><div className="rounded-2xl border-2 bg-background p-8 shadow-lg"><div className="space-y-6"><div className="flex items-start gap-4"><div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary"><Users className="h-6 w-6" /></div><div><p className="font-semibold">For volunteers</p><p className="text-sm text-muted-foreground">See your schedule, mark availability, accept invitations and request swaps - all from your phone.</p></div></div><div className="flex items-start gap-4"><div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary"><Shield className="h-6 w-6" /></div><div><p className="font-semibold">For coordinators</p><p className="text-sm text-muted-foreground">Build events from templates, auto-schedule, send invitations, monitor confidence and publish in a click.</p></div></div><div className="flex items-start gap-4"><div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary"><Bell className="h-6 w-6" /></div><div><p className="font-semibold">Always in sync</p><p className="text-sm text-muted-foreground">Email notifications and personal calendar feeds keep every volunteer in the loop, automatically.</p></div></div></div></div></div></div></section>
+      <section className="border-y bg-muted/50 py-20"><div className="container mx-auto px-4"><div className="grid gap-12 lg:grid-cols-2 lg:items-center"><div><h2 className="font-serif text-3xl font-bold md:text-4xl">Why ServeTogether?</h2><p className="mt-4 text-muted-foreground">Built for the people who actually run the rota. Whether you are a church administrator, a charity coordinator or a community group lead, ServeTogether takes the admin off your plate so you can focus on the work itself.</p><ul className="mt-8 space-y-3">{benefits.map((benefit) => (<li key={benefit} className="flex items-start gap-3"><CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-accent" /><span>{benefit}</span></li>))}</ul></div><div className="rounded-2xl border-2 bg-background p-8 shadow-lg"><div className="space-y-6"><div className="flex items-start gap-4"><div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary"><Users className="h-6 w-6" /></div><div><p className="font-semibold">For volunteers</p><p className="text-sm text-muted-foreground">See your schedule, mark availability, accept invitations and request swaps - all from your phone.</p></div></div><div className="flex items-start gap-4"><div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary"><Shield className="h-6 w-6" /></div><div><p className="font-semibold">For coordinators</p><p className="text-sm text-muted-foreground">Build events from templates, auto-schedule, send invitations, monitor confidence and publish in a click.</p></div></div><div className="flex items-start gap-4"><div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary"><Bell className="h-6 w-6" /></div><div><p className="font-semibold">Always in sync</p><p className="text-sm text-muted-foreground">Email notifications and personal calendar feeds keep every volunteer in the loop, automatically.</p></div></div></div></div></div></div></section>
+
+      <section className="border-t bg-primary/5 py-16">
+        <div className="container mx-auto px-4">
+          <div className="mx-auto max-w-2xl text-center">
+            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
+              <Shield className="h-6 w-6" />
+            </div>
+            <h2 className="font-serif text-2xl font-bold md:text-3xl">Your volunteers&apos; data stays safe</h2>
+            <p className="mt-4 text-muted-foreground">Privacy is built into the product, not bolted on. Invite-only access, row-level data isolation, and rotating personal tokens keep every volunteer&apos;s information exactly where it belongs.</p>
+          </div>
+          <div className="mx-auto mt-10 grid max-w-3xl gap-6 sm:grid-cols-3">
+            {featureGroups[5].features.map((f) => (
+              <div key={f.name} className="flex flex-col items-center gap-3 rounded-xl border bg-background p-6 text-center shadow-sm">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary">
+                  <f.icon className="h-5 w-5" />
+                </div>
+                <p className="font-semibold">{f.name}</p>
+                <p className="text-sm text-muted-foreground">{f.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
 
       <section id="faq" className="py-20"><div className="container mx-auto px-4"><div className="mx-auto max-w-3xl"><div className="text-center"><h2 className="font-serif text-3xl font-bold md:text-4xl">Frequently asked questions</h2><p className="mt-4 text-muted-foreground">Quick answers about how ServeTogether works.</p></div><Accordion type="single" collapsible className="mt-10">{faqs.map((f, i) => (<AccordionItem key={i} value={`item-${i}`}><AccordionTrigger className="text-left font-serif text-base">{f.q}</AccordionTrigger><AccordionContent className="text-muted-foreground">{f.a}</AccordionContent></AccordionItem>))}</Accordion></div></div></section>
 
-      <section id="request-info-demo" className="border-t bg-muted/50 py-20"><div className="container mx-auto px-4"><div className="mx-auto max-w-2xl"><div className="text-center"><h2 className="font-serif text-3xl font-bold md:text-4xl">Request info & demo</h2><p className="mt-4 text-muted-foreground">Tell us about your church or organisation and we will be in touch to arrange a demo and collect the details needed for onboarding.</p></div><Card className="mt-10 border-2"><CardContent className="pt-6">{submitted ? (<div className="py-8 text-center"><CheckCircle2 className="mx-auto h-12 w-12 text-primary" /><h3 className="mt-4 font-serif text-xl font-semibold">Thanks - we have received your enquiry</h3><p className="mt-2 text-muted-foreground">We will be in touch by email shortly with more information and next steps.</p><Button variant="outline" className="mt-6" onClick={() => setSubmitted(false)}>Send another</Button></div>) : (<form onSubmit={handleSubmit} className="space-y-4"><div className="grid gap-4 sm:grid-cols-2"><div className="space-y-2"><Label htmlFor="ra-name">Your name</Label><Input id="ra-name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required /></div><div className="space-y-2"><Label htmlFor="ra-email">Email</Label><Input id="ra-email" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required /></div></div><div className="space-y-2"><Label htmlFor="ra-org">Organisation name</Label><Input id="ra-org" placeholder="e.g. St Matthew's Church, North Park Foodbank" value={form.organisation_name} onChange={(e) => setForm({ ...form, organisation_name: e.target.value })} required /></div><div className="space-y-2"><Label htmlFor="ra-notes">Anything we should know? (optional)</Label><Textarea id="ra-notes" rows={4} placeholder="Team size, kind of rota, preferred demo times, any specific needs..." value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></div><Button type="submit" className="w-full" disabled={submitting}>{submitting ? (<><Loader2 className="mr-2 h-4 w-4 animate-spin" />Sending...</>) : ('Request info & demo')}</Button></form>)}</CardContent></Card></div></div></section>
+      <section id="request-info-demo" className="border-t bg-muted/50 py-20"><div className="container mx-auto px-4"><div className="mx-auto max-w-2xl"><div className="text-center"><h2 className="font-serif text-3xl font-bold md:text-4xl">Request info & demo</h2><p className="mt-4 text-muted-foreground">Tell us about your church or organisation and we will be in touch to arrange a demo and collect the details needed for onboarding.</p></div><Card className="mt-10 border-2"><CardContent className="pt-6">{submitted ? (<div className="py-8 text-center"><CheckCircle2 className="mx-auto h-12 w-12 text-primary" /><h3 className="mt-4 font-serif text-xl font-semibold">Thanks - we have received your enquiry</h3><p className="mt-2 text-muted-foreground">We will be in touch by email shortly with more information and next steps.</p><Button variant="outline" className="mt-6" onClick={() => setSubmitted(false)}>Submit a new enquiry</Button></div>) : (<form onSubmit={handleSubmit} className="space-y-4"><div className="grid gap-4 sm:grid-cols-2"><div className="space-y-2"><Label htmlFor="ra-name">Your name</Label><Input id="ra-name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required /></div><div className="space-y-2"><Label htmlFor="ra-email">Email</Label><Input id="ra-email" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required /></div></div><div className="space-y-2"><Label htmlFor="ra-org">Organisation name</Label><Input id="ra-org" placeholder="e.g. St Matthew's Church, North Park Foodbank" value={form.organisation_name} onChange={(e) => setForm({ ...form, organisation_name: e.target.value })} required /></div><div className="space-y-2"><Label htmlFor="ra-notes">Anything we should know? (optional)</Label><Textarea id="ra-notes" rows={4} placeholder="Team size, kind of rota, preferred demo times, any specific needs..." value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></div><Button type="submit" className="w-full" disabled={submitting}>{submitting ? (<><Loader2 className="mr-2 h-4 w-4 animate-spin" />Sending...</>) : ('Request info & demo')}</Button></form>)}</CardContent></Card></div></div></section>
 
-      <footer className="border-t py-10"><div className="container mx-auto flex flex-col items-center justify-between gap-4 px-4 text-sm text-muted-foreground sm:flex-row"><div className="flex items-center gap-3"><img src={logoUrl} alt="ServeTogether" className="h-8 w-auto" /><span>&copy; {new Date().getFullYear()} ServeTogether. All rights reserved.</span></div><div className="flex items-center gap-5"><a href="#features" className="hover:text-foreground">Features</a><a href="#how-it-works" className="hover:text-foreground">How it works</a><a href="#faq" className="hover:text-foreground">FAQ</a><Link to="/auth" className="hover:text-foreground">Sign in</Link></div></div></footer>
+      <footer className="border-t py-10"><div className="container mx-auto flex flex-col items-center justify-between gap-4 px-4 text-sm text-muted-foreground sm:flex-row"><div className="flex items-center gap-3"><img src={logoUrl} alt="ServeTogether" className="h-8 w-auto" /><span>&copy; {new Date().getFullYear()} ServeTogether. All rights reserved.</span></div><div className="flex items-center gap-5"><a href="#features" className="hover:text-foreground">Features</a><a href="#how-it-works" className="hover:text-foreground">How it works</a><a href="#who-its-for" className="hover:text-foreground">Who it is for</a><a href="#faq" className="hover:text-foreground">FAQ</a><Link to="/auth" className="hover:text-foreground">Sign in</Link></div></div></footer>
     </div>
   );
 };

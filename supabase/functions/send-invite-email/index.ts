@@ -39,6 +39,7 @@ interface InviteEmailRequest {
   name: string;
   email: string;
   inviteLink: string;
+  invitedRole?: 'volunteer' | 'admin';
 }
 
 const handler = async (req: Request): Promise<Response> => {
@@ -87,14 +88,15 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log("Proceeding with invite email...");
 
-    const { name, email, inviteLink }: InviteEmailRequest = await req.json();
+    const { name, email, inviteLink, invitedRole }: InviteEmailRequest = await req.json();
+    const roleLabel = invitedRole === 'admin' ? 'organisation admin' : 'volunteer';
 
     console.log(`Sending invite email to ${email} for ${name}`);
 
     const emailResponse = await resend.emails.send({
       from: resendFrom,
       to: [email],
-      subject: `You've been invited to join ${orgName} as a volunteer`,
+      subject: `You've been invited to join ${orgName} as an ${roleLabel}`,
       html: `
         <!DOCTYPE html>
         <html>
@@ -111,7 +113,7 @@ const handler = async (req: Request): Promise<Response> => {
             <p style="font-size: 16px; margin-bottom: 20px;">Hello <strong>${escapeHtml(name)}</strong>,</p>
             
             <p style="font-size: 16px; margin-bottom: 20px;">
-              You've been invited to join ${orgName} as a volunteer. We use this platform to help manage the volunteer rota.
+              You've been invited to join ${orgName} as an ${roleLabel}. We use this platform to help manage the volunteer rota.
             </p>
             
             <p style="font-size: 16px; margin-bottom: 25px;">

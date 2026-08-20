@@ -16,6 +16,21 @@ type AuthUserCandidate = {
   identities?: AuthIdentityCandidate[] | null
 }
 
+const normalizeBaseUrl = (baseUrl: string) => {
+  try {
+    const parsed = new URL(baseUrl)
+    if (!['http:', 'https:'].includes(parsed.protocol)) {
+      return null
+    }
+    parsed.pathname = ''
+    parsed.search = ''
+    parsed.hash = ''
+    return parsed.toString().replace(/\/+$/, '')
+  } catch {
+    return null
+  }
+}
+
 Deno.serve(async (req) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
@@ -393,6 +408,7 @@ Deno.serve(async (req) => {
         const name = data?.name as string | undefined
         const orgId = data?.orgId as string | undefined
         const role = (data?.role as string | undefined) ?? 'volunteer'
+        const baseUrl = data?.baseUrl as string | undefined
 
         if (!email || !name || !orgId) {
           throw new Error('data.email, data.name, and data.orgId are required')
@@ -446,6 +462,64 @@ Deno.serve(async (req) => {
             orgId,
             role,
           })
+        }
+
+        if (role === 'admin') {
+          const normalizedBaseUrl = normalizeBaseUrl(baseUrl ?? '')
+          if (!normalizedBaseUrl) {
+            throw new Error('A valid data.baseUrl is required when inviting a new admin user')
+          }
+
+          const { error: staleInviteError } = await supabaseAdmin
+            .from('invite_tokens')
+            .delete()
+            .eq('email', normalizedEmail)
+            .is('used_at', null)
+
+          if (staleInviteError) {
+            throw staleInviteError
+          }
+
+          const { data: inviteToken, error: inviteTokenError } = await supabaseAdmin
+            .from('invite_tokens')
+            .insert({
+              name,
+              email: normalizedEmail,
+              invited_by: user.id,
+              org_id: orgId,
+              invited_role: 'admin',
+            })
+            .select('token')
+            .single()
+
+          if (inviteTokenError || !inviteToken?.token) {
+            throw inviteTokenError ?? new Error('Failed to create admin invitation')
+          }
+
+          const inviteLink = `${normalizedBaseUrl}/invite?token=${inviteToken.token}`
+
+          const { error: emailError } = await supabaseAdmin.functions.invoke('send-invite-email', {
+            body: {
+              name,
+              email: normalizedEmail,
+              inviteLink,
+              invitedRole: 'admin',
+            },
+          })
+
+          if (emailError) {
+            throw new Error(`Admin invitation created but email delivery failed: ${emailError.message ?? 'Unknown email error'}`)
+          }
+
+          return new Response(
+            JSON.stringify({
+              success: true,
+              message: 'Admin invitation sent',
+              invited: true,
+              inviteLink,
+            }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
         }
 
         const temporaryPassword = `${crypto.randomUUID()}Aa1!`
