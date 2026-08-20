@@ -15,7 +15,7 @@ export default {
   	extend: {
   		fontFamily: {
   			serif: [
-  				'Merriweather',
+  				'Lora',
   				'ui-serif',
   				'Georgia',
   				'Cambria',
@@ -24,6 +24,7 @@ export default {
   				'serif'
   			],
   			sans: [
+  				'Nunito Sans',
   				'ui-sans-serif',
   				'system-ui',
   				'sans-serif',

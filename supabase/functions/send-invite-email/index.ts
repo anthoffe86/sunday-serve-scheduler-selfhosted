@@ -40,10 +40,10 @@ function escapeUrl(url: string): string {
 }
 
 interface InviteEmailRequest {
-  /** The invite_tokens.token created by the admin. Everything else is read from that row. */
-  token: string;
-  /** Suggested origin for the link; only honoured when allow-listed. */
-  baseUrl?: string;
+  name: string;
+  email: string;
+  inviteLink: string;
+  invitedRole?: 'volunteer' | 'admin';
 }
 
 const handler = async (req: Request): Promise<Response> => {
@@ -170,17 +170,15 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    const orgName = await getOrgName(supabase, inviteOrgId);
-    const resendFrom = buildOrgFromEmail(orgName);
-    const name = invite.name as string;
-    const email = invite.email as string;
+    const { name, email, inviteLink, invitedRole }: InviteEmailRequest = await req.json();
+    const roleLabel = invitedRole === 'admin' ? 'organisation admin' : 'volunteer';
 
     console.log(`Sending invite email for org ${inviteOrgId}`);
 
     const emailResponse = await resend.emails.send({
       from: resendFrom,
       to: [email],
-      subject: `You've been invited to join ${orgName} as a volunteer`,
+      subject: `You've been invited to join ${orgName} as an ${roleLabel}`,
       html: `
         <!DOCTYPE html>
         <html>
@@ -197,7 +195,7 @@ const handler = async (req: Request): Promise<Response> => {
             <p style="font-size: 16px; margin-bottom: 20px;">Hello <strong>${escapeHtml(name)}</strong>,</p>
 
             <p style="font-size: 16px; margin-bottom: 20px;">
-              You've been invited to join ${escapeHtml(orgName)} as a volunteer. We use this platform to help manage the volunteer rota.
+              You've been invited to join ${orgName} as an ${roleLabel}. We use this platform to help manage the volunteer rota.
             </p>
 
             <p style="font-size: 16px; margin-bottom: 25px;">
