@@ -397,7 +397,8 @@ const AdminEventDetail = () => {
       }
     } catch (error) {
       console.error('Auto-schedule error:', error);
-      toast.error('Failed to auto-schedule volunteers');
+      const message = error instanceof Error ? error.message : 'Failed to auto-schedule volunteers';
+      toast.error(message);
     }
   };
 
