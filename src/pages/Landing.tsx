@@ -310,6 +310,7 @@ const Landing = () => {
           <div className="flex items-center gap-2">
             <Button asChild variant="ghost" className="hidden sm:inline-flex"><a href="#request-information">Get further information</a></Button>
             <Button asChild><Link to="/auth">Sign in<ArrowRight className="ml-2 h-4 w-4" /></Link></Button>
+            <Button asChild variant="outline" className="hidden sm:inline-flex"><Link to="/sandbox">Try Demo</Link></Button>
             <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
               <SheetTrigger asChild>
                 <Button variant="ghost" size="icon" className="md:hidden" aria-label="Open menu">
@@ -323,9 +324,12 @@ const Landing = () => {
                   <a href="#how-it-works" className="rounded-lg px-3 py-2.5 text-base font-medium text-foreground transition-colors hover:bg-secondary" onClick={() => setMobileMenuOpen(false)}>How it works</a>
                   <a href="#who-its-for" className="rounded-lg px-3 py-2.5 text-base font-medium text-foreground transition-colors hover:bg-secondary" onClick={() => setMobileMenuOpen(false)}>Who it is for</a>
                   <a href="#faq" className="rounded-lg px-3 py-2.5 text-base font-medium text-foreground transition-colors hover:bg-secondary" onClick={() => setMobileMenuOpen(false)}>FAQ</a>
-                  <div className="mt-4 border-t pt-4">
+                  <div className="mt-4 flex flex-col gap-2 border-t pt-4">
                     <Button asChild className="w-full" onClick={() => setMobileMenuOpen(false)}>
                       <a href="#request-information">Get further information</a>
+                    </Button>
+                    <Button asChild variant="outline" className="w-full" onClick={() => setMobileMenuOpen(false)}>
+                      <Link to="/sandbox">Try Demo</Link>
                     </Button>
                   </div>
                 </nav>
@@ -342,7 +346,7 @@ const Landing = () => {
             <p className="mx-auto mt-6 max-w-2xl text-lg text-muted-foreground md:text-xl">ServeTogether helps churches, charities and volunteer-led organisations build rotas, manage swaps, track availability and notify their teams - automatically, and without spreadsheets.</p>
             <div className="mt-10 flex flex-col gap-4 sm:flex-row sm:justify-center">
               <Button asChild size="lg" className="text-base"><a href="#request-information">Get further information<ArrowRight className="ml-2 h-5 w-5" /></a></Button>
-              <Button asChild size="lg" variant="outline" className="text-base"><Link to="/auth">Sign in to your account</Link></Button>
+              <Button asChild size="lg" variant="outline" className="text-base"><Link to="/sandbox">Try Demo</Link></Button>
             </div>
             <p className="mt-6 text-sm text-muted-foreground">Invite-only · Mobile-friendly · Built for churches, designed for any volunteer team</p>
           </div>

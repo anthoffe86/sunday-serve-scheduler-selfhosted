@@ -66,13 +66,17 @@ function UrlNormalizer() {
   return null;
 }
 
+// AuthProvider must live INSIDE BrowserRouter. Sandbox mode is derived from the
+// current path, so the provider has to re-render on client-side navigation --
+// outside the router it never does, and entering /sandbox via a <Link> leaves
+// auth in live mode with no user, which makes ProtectedRoute redirect-loop.
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <AuthProvider>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
+    <TooltipProvider>
+      <Toaster />
+      <Sonner />
+      <BrowserRouter>
+        <AuthProvider>
           <UrlNormalizer />
           <Routes>
             {/* Public routes - accessible without authentication */}
@@ -246,9 +250,9 @@ const App = () => (
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>
-        </BrowserRouter>
-      </TooltipProvider>
-    </AuthProvider>
+        </AuthProvider>
+      </BrowserRouter>
+    </TooltipProvider>
   </QueryClientProvider>
 );
 

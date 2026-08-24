@@ -13,6 +13,7 @@ import {
     useUpdateOrgNotificationSetting,
 } from "@/hooks/useOrgNotificationSettings";
 import { Navigate } from "react-router-dom";
+import { withSandboxPath } from "@/sandbox/mode";
 
 const AdminSettings = () => {
     const { isAdmin, isLoading: authLoading } = useAuth();
@@ -57,7 +58,7 @@ const AdminSettings = () => {
     }
 
     if (!isAdmin) {
-        return <Navigate to="/" replace />;
+        return <Navigate to={withSandboxPath('/')} replace />;
     }
 
     const getSettingValue = (key: string) => {

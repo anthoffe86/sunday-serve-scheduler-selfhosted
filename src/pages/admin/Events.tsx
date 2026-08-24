@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/hooks/useAuth';
 import { Navigate, useNavigate } from 'react-router-dom';
+import { withSandboxPath } from '@/sandbox/mode';
 import { 
   useEventTemplates, 
   useEvents,
@@ -110,7 +111,7 @@ const AdminEvents = () => {
   }
 
   if (!isAdmin) {
-    return <Navigate to="/" replace />;
+    return <Navigate to={withSandboxPath('/')} replace />;
   }
 
   return (
@@ -159,7 +160,7 @@ const AdminEvents = () => {
                   "cursor-pointer hover:shadow-md transition-all",
                   !template.active && "opacity-60"
                 )}
-                onClick={() => navigate(`/admin/events/${template.id}`)}
+                onClick={() => navigate(withSandboxPath(`/admin/events/${template.id}`))}
               >
                 <CardContent className="p-0">
                   <div className="flex items-stretch">

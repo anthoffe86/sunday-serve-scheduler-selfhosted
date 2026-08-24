@@ -1,4 +1,6 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useRef, useState, ReactNode } from 'react';
+import { useLocation } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { isSandboxMode } from '@/sandbox/mode';
@@ -25,7 +27,13 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const sandboxActive = isSandboxMode();
+  // Read the path from the router rather than window.location so entering or
+  // leaving /sandbox re-renders this provider and re-runs the effect below.
+  // Reading window.location directly meant a client-side <Link> into /sandbox
+  // left the provider stuck in live mode with no user, and every guarded
+  // sandbox route redirect-looped instead of rendering.
+  const { pathname } = useLocation();
+  const sandboxActive = isSandboxMode(pathname);
   const sandboxContext = sandboxActive ? getSandboxAuthContext() : null;
 
   const [user, setUser] = useState<User | null>(sandboxContext?.user ?? null);
@@ -34,6 +42,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isAdmin, setIsAdmin] = useState(sandboxContext?.isAdmin ?? false);
   const [isSuperAdmin, setIsSuperAdmin] = useState(sandboxContext?.isSuperAdmin ?? false);
   const [orgId, setOrgId] = useState<string | null>(sandboxContext?.orgId ?? null);
+
+  // Live and sandbox reads share query keys ('profiles', 'events', ...), so
+  // crossing the boundary would otherwise serve one mode's cached rows to the
+  // other -- e.g. a signed-in admin clicking through to the demo would see
+  // their real organisation's data. Drop the cache on each crossing, but not on
+  // the initial mount, where clearing would cancel the first render's queries.
+  const queryClient = useQueryClient();
+  const lastSandboxState = useRef(sandboxActive);
+  useEffect(() => {
+    if (lastSandboxState.current === sandboxActive) {
+      return;
+    }
+    lastSandboxState.current = sandboxActive;
+    queryClient.clear();
+  }, [sandboxActive, queryClient]);
 
   useEffect(() => {
     if (sandboxActive) {
@@ -173,17 +196,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setOrgId(null);
   };
 
+  // In sandbox mode the persona is resolved synchronously from local state, so
+  // publish it during render instead of waiting for the effect above. Otherwise
+  // the first render after navigating into /sandbox still reports the live
+  // (empty) session and the guarded route bounces before the effect can sync.
+  const resolved = sandboxActive && sandboxContext
+    ? {
+        user: sandboxContext.user,
+        session: null,
+        isLoading: false,
+        isAdmin: sandboxContext.isAdmin,
+        isSuperAdmin: sandboxContext.isSuperAdmin,
+        orgId: sandboxContext.orgId,
+      }
+    : { user, session, isLoading, isAdmin, isSuperAdmin, orgId };
+
   return (
-    <AuthContext.Provider value={{ 
-      user, 
-      session, 
-      isLoading, 
-      isAdmin,
-      isSuperAdmin,
-      orgId,
-      signUp, 
-      signIn, 
-      signOut 
+    <AuthContext.Provider value={{
+      ...resolved,
+      signUp,
+      signIn,
+      signOut
     }}>
       {children}
     </AuthContext.Provider>

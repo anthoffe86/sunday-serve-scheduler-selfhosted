@@ -9,6 +9,7 @@ import { useEvents, useEventTemplates, calculateScheduleConfidence } from "@/hoo
 import { useSwapRequests } from "@/hooks/useSwapRequests";
 import { useAuth } from "@/hooks/useAuth";
 import { Link, Navigate } from "react-router-dom";
+import { withSandboxPath } from "@/sandbox/mode";
 import { useMemo } from "react";
 import { isAfter, startOfToday, parseISO } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -68,7 +69,7 @@ const AdminDashboard = () => {
   }
 
   if (!isAdmin) {
-    return <Navigate to="/" replace />;
+    return <Navigate to={withSandboxPath('/')} replace />;
   }
 
 
@@ -109,7 +110,7 @@ const AdminDashboard = () => {
           <CardContent className="space-y-4">
             <p className="text-xs sm:text-sm text-muted-foreground">Manage Volunteers.</p>
             <Button variant="outline" asChild className="w-full">
-              <Link to="/admin/volunteers">Manage Volunteers</Link>
+              <Link to={withSandboxPath('/admin/volunteers')}>Manage Volunteers</Link>
             </Button>
           </CardContent>
         </Card>
@@ -124,7 +125,7 @@ const AdminDashboard = () => {
           <CardContent className="space-y-4">
             <p className="text-xs sm:text-sm text-muted-foreground">Review and edit generated schedules.</p>
             <Button variant="outline" asChild className="w-full">
-              <Link to="/admin/schedule">Edit Schedules</Link>
+              <Link to={withSandboxPath('/admin/schedule')}>Edit Schedules</Link>
             </Button>
           </CardContent>
         </Card>
@@ -146,7 +147,7 @@ const AdminDashboard = () => {
               {templateConfidence.map(({ template, eventCount, required, confirmed, invited, proposed, declined, unfilled, confidencePercent }) => (
                 <Link 
                   key={template.id} 
-                  to={`/admin/events/${template.id}`}
+                  to={withSandboxPath(`/admin/events/${template.id}`)}
                   className="block"
                 >
                   <div className={cn(
@@ -251,7 +252,7 @@ const AdminDashboard = () => {
             <p className="text-center text-muted-foreground py-4 text-sm">No volunteers yet</p>
           )}
           <Button variant="ghost" asChild className="mt-4 w-full text-sm">
-            <Link to="/admin/volunteers">View All Volunteers →</Link>
+            <Link to={withSandboxPath('/admin/volunteers')}>View All Volunteers →</Link>
           </Button>
         </CardContent>
       </Card>
