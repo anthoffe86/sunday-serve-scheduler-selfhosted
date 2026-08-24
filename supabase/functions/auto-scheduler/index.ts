@@ -311,8 +311,13 @@ Deno.serve(async (req) => {
 
     // Track GLOBAL assignment counts for fair distribution (across ALL events being scheduled)
     const globalAssignmentCounts = new Map<string, number>();
+    const lastAssignedPick = new Map<string, number>();
+    let pickCounter = 0;
     // Initialize all valid volunteers with 0
-    validProfiles.forEach(p => globalAssignmentCounts.set(p.user_id, 0));
+    validProfiles.forEach(p => {
+      globalAssignmentCounts.set(p.user_id, 0);
+      lastAssignedPick.set(p.user_id, -1);
+    });
     // Add existing assignments
     sanitizedExistingAssignments.forEach(ea => {
       globalAssignmentCounts.set(ea.volunteer_id, (globalAssignmentCounts.get(ea.volunteer_id) || 0) + 1);
@@ -443,6 +448,7 @@ Deno.serve(async (req) => {
         const eligibleVolunteers: { 
           userId: string; 
           assignmentCount: number;
+          lastAssignedIndex: number;
           preferenceScore: number; 
           hasFamilyOnDate: boolean;
           availableFamilyCount: number;
@@ -479,6 +485,7 @@ Deno.serve(async (req) => {
           }
 
           const assignmentCount = globalAssignmentCounts.get(userId) || 0;
+          const lastAssignedIndex = lastAssignedPick.get(userId) ?? -1;
           const preferenceScore = getRolePreferenceScore(userId, role.role);
 
           // Check if any family member is already assigned to this date
@@ -502,6 +509,7 @@ Deno.serve(async (req) => {
           eligibleVolunteers.push({ 
             userId, 
             assignmentCount,
+            lastAssignedIndex,
             preferenceScore, 
             hasFamilyOnDate,
             availableFamilyCount,
@@ -544,6 +552,7 @@ Deno.serve(async (req) => {
             return {
               ...v,
               assignmentCount: globalAssignmentCounts.get(v.userId) || 0,
+              lastAssignedIndex: lastAssignedPick.get(v.userId) ?? -1,
               familyLoad,
             };
           });
@@ -553,6 +562,11 @@ Deno.serve(async (req) => {
 
           // Sort within tier by family grouping first, then avoid splits, then familyLoad, then role preference
           tier.sort((a, b) => {
+            // Among equally-loaded volunteers, rotate selections in round-robin order.
+            if (a.lastAssignedIndex !== b.lastAssignedIndex) {
+              return a.lastAssignedIndex - b.lastAssignedIndex;
+            }
+
             const familyScoreA = (a.hasFamilyOnDate ? 100 : 0) + a.availableFamilyCount;
             const familyScoreB = (b.hasFamilyOnDate ? 100 : 0) + b.availableFamilyCount;
             if (familyScoreA !== familyScoreB) return familyScoreB - familyScoreA;
@@ -584,6 +598,7 @@ Deno.serve(async (req) => {
 
           // Update global assignment count
           globalAssignmentCounts.set(volunteer.userId, (globalAssignmentCounts.get(volunteer.userId) || 0) + 1);
+          lastAssignedPick.set(volunteer.userId, pickCounter++);
 
           // Update family assignment count
           familyAssignmentCounts.set(volunteer.familyKey, (familyAssignmentCounts.get(volunteer.familyKey) || 0) + 1);
