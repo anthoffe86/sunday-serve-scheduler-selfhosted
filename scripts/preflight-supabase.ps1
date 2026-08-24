@@ -13,17 +13,32 @@ param(
     [string]$ProdProjectRef = ""
 )
 
-function Assert-SupabaseAuth {
+function Get-AccessibleProjectRefs {
     $token = [Environment]::GetEnvironmentVariable("SUPABASE_ACCESS_TOKEN")
-    if (-not [string]::IsNullOrWhiteSpace($token)) {
-        return
+    $projectsJson = npx supabase projects list --output json 2>&1 | Out-String
+    if ($LASTEXITCODE -ne 0) {
+        if (-not [string]::IsNullOrWhiteSpace($token)) {
+            throw "Supabase authentication failed with SUPABASE_ACCESS_TOKEN. Confirm the token is a valid sbp_ personal access token with access to your project. CLI output: $projectsJson"
+        }
+
+        throw "Missing Supabase authentication. Set SUPABASE_ACCESS_TOKEN or run 'supabase login' with an sbp_ personal access token. CLI output: $projectsJson"
     }
 
-    # If no token env var is set, allow authenticated CLI sessions from `supabase login`.
-    npx supabase projects list --output json *> $null
-    if ($LASTEXITCODE -ne 0) {
-        throw "Missing Supabase authentication. Set SUPABASE_ACCESS_TOKEN or run 'supabase login' with an sbp_ personal access token."
+    try {
+        $projects = $projectsJson | ConvertFrom-Json
     }
+    catch {
+        throw "Unable to parse 'supabase projects list' output. Re-run with --debug. Raw output: $projectsJson"
+    }
+
+    $refs = @()
+    foreach ($project in ($projects | Where-Object { $_ -ne $null })) {
+        if ($project.id) {
+            $refs += [string]$project.id
+        }
+    }
+
+    return $refs
 }
 
 function Get-OptionalProjectIdFromEnvFile {
@@ -68,7 +83,13 @@ if ($NonProdProjectRef -eq $ProdProjectRef) {
     throw "Non-production and production project refs are identical. They must be different."
 }
 
-Assert-SupabaseAuth
+$accessibleRefs = Get-AccessibleProjectRefs
+
+$targetProjectRef = if ($Environment -eq "prod") { $ProdProjectRef } else { $NonProdProjectRef }
+if ($accessibleRefs -notcontains $targetProjectRef) {
+    $knownRefs = if ($accessibleRefs.Count -gt 0) { $accessibleRefs -join ", " } else { "(none)" }
+    throw "Authenticated Supabase account cannot access target project ref '$targetProjectRef'. Accessible project refs for current auth: $knownRefs. Re-authenticate with the correct Supabase account or set SUPABASE_ACCESS_TOKEN to an sbp_ token that has access to this project."
+}
 
 $rootEnvProjectRef = Get-OptionalProjectIdFromEnvFile -Path ".env"
 $devEnvProjectRef = Get-OptionalProjectIdFromEnvFile -Path ".env.development"

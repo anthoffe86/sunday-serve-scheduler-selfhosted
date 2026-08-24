@@ -63,14 +63,14 @@ if ([string]::IsNullOrWhiteSpace($DatabasePassword)) {
 }
 
 if ([string]::IsNullOrWhiteSpace($DatabasePassword)) {
-    npx supabase link --project-ref $projectRef
+    $linkOutput = npx supabase link --project-ref $projectRef 2>&1 | Out-String
 }
 else {
-    npx supabase link --project-ref $projectRef --password $DatabasePassword
+    $linkOutput = npx supabase link --project-ref $projectRef --password $DatabasePassword 2>&1 | Out-String
 }
 
 if ($LASTEXITCODE -ne 0) {
-    throw "Failed to link Supabase project '$projectRef'."
+    throw "Failed to link Supabase project '$projectRef'. Ensure the authenticated Supabase account has access to this project, then retry. CLI output: $linkOutput"
 }
 
 npx supabase db push --linked --include-all

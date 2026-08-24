@@ -17,6 +17,7 @@ interface Event {
   date: string;
   name: string;
   status: string;
+  org_id: string;
 }
 
 interface Availability {
@@ -110,7 +111,7 @@ Deno.serve(async (req) => {
     // Get events to schedule
     let eventsQuery = supabase
       .from('events')
-      .select('id, date, name, status')
+      .select('id, date, name, status, org_id')
       .eq('status', 'draft')
       .order('date', { ascending: true });
 
@@ -295,7 +296,7 @@ Deno.serve(async (req) => {
     });
 
     const newAssignments: AssignmentResult[] = [];
-    const assignmentsToInsert: { event_id: string; volunteer_id: string; role: string }[] = [];
+    const assignmentsToInsert: { event_id: string; volunteer_id: string; role: string; org_id: string }[] = [];
 
     // Helper: Check if volunteer is available on a date
     const isAvailable = (userId: string, date: string): boolean => {
@@ -307,17 +308,18 @@ Deno.serve(async (req) => {
       return userAvail !== false;
     };
 
-    // Helper: Check if volunteer has the role in their preferences (STRICT)
+    // Helper: Check if volunteer can serve a role.
+    // If no preferences are configured, treat all roles as valid.
     const hasRolePreference = (userId: string, role: string): boolean => {
       const prefs = rolePrefsMap.get(userId);
-      if (!prefs || prefs.length === 0) return false; // No preferences = cannot be assigned
+      if (!prefs || prefs.length === 0) return true;
       return prefs.some(p => p.role === role);
     };
 
     // Helper: Get volunteer's preference score for a role (lower is better)
     const getRolePreferenceScore = (userId: string, role: string): number => {
       const prefs = rolePrefsMap.get(userId);
-      if (!prefs || prefs.length === 0) return 100; // No preferences = not eligible anyway
+      if (!prefs || prefs.length === 0) return 100;
       const pref = prefs.find(p => p.role === role);
       return pref ? pref.preference_order : 100;
     };
@@ -389,7 +391,7 @@ Deno.serve(async (req) => {
           // Skip if not active
           if (!profile.active) continue;
 
-          // STRICT: Skip if volunteer doesn't have this role in their preferences
+          // Volunteers with no preferences are eligible for all roles.
           if (!hasRolePreference(userId, role.role)) {
             continue;
           }
@@ -519,6 +521,7 @@ Deno.serve(async (req) => {
             event_id: event.id,
             volunteer_id: volunteer.userId,
             role: role.role,
+            org_id: event.org_id,
           });
 
           newAssignments.push({

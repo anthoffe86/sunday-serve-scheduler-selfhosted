@@ -896,7 +896,22 @@ export function useAutoSchedule() {
         body: data,
       });
 
-      if (error) throw error;
+      if (error) {
+        let detailedMessage = error.message;
+        const contextResponse = (error as { context?: Response }).context;
+        if (contextResponse) {
+          try {
+            const errorPayload = await contextResponse.json();
+            if (errorPayload?.error) {
+              detailedMessage = errorPayload.error;
+            }
+          } catch {
+            // Keep original message when response body is not JSON.
+          }
+        }
+
+        throw new Error(detailedMessage);
+      }
       if (result.error) throw new Error(result.error);
 
       return result as {
