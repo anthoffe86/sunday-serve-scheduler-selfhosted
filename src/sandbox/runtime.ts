@@ -150,7 +150,10 @@ interface SandboxState {
 }
 
 const STORAGE_KEY = 'serveTogether.sandbox.v1';
-const STATE_VERSION = 1;
+// Bump on every seed shape change so existing sandbox sessions in localStorage
+// reseed instead of keeping stale data. v2: 23-volunteer roster.
+// v3: upcoming services published so volunteer dashboards aren't empty.
+const STATE_VERSION = 3;
 
 const listeners = new Set<() => void>();
 
@@ -184,6 +187,21 @@ function buildSeed(): SandboxState {
     { id: 'sbx_vol_6', name: 'Quinn Harper', email: 'quinn@sandbox.local', role: 'volunteer' as SandboxRole },
     { id: 'sbx_vol_7', name: 'Avery Hart', email: 'avery@sandbox.local', role: 'volunteer' as SandboxRole },
     { id: 'sbx_vol_8', name: 'Skyler King', email: 'skyler@sandbox.local', role: 'volunteer' as SandboxRole },
+    { id: 'sbx_vol_9', name: 'Harper Nolan', email: 'harper@sandbox.local', role: 'volunteer' as SandboxRole },
+    { id: 'sbx_vol_10', name: 'Rowan Chase', email: 'rowan@sandbox.local', role: 'volunteer' as SandboxRole },
+    { id: 'sbx_vol_11', name: 'Emerson Vale', email: 'emerson@sandbox.local', role: 'volunteer' as SandboxRole },
+    { id: 'sbx_vol_12', name: 'Sawyer Reid', email: 'sawyer@sandbox.local', role: 'volunteer' as SandboxRole },
+    { id: 'sbx_vol_13', name: 'Peyton Marsh', email: 'peyton@sandbox.local', role: 'volunteer' as SandboxRole },
+    { id: 'sbx_vol_14', name: 'Dakota Frost', email: 'dakota@sandbox.local', role: 'volunteer' as SandboxRole },
+    { id: 'sbx_vol_15', name: 'Reese Calloway', email: 'reese@sandbox.local', role: 'volunteer' as SandboxRole },
+    { id: 'sbx_vol_16', name: 'Finley Archer', email: 'finley@sandbox.local', role: 'volunteer' as SandboxRole },
+    { id: 'sbx_vol_17', name: 'Marlow Sinclair', email: 'marlow@sandbox.local', role: 'volunteer' as SandboxRole },
+    { id: 'sbx_vol_18', name: 'Blake Ferris', email: 'blake@sandbox.local', role: 'volunteer' as SandboxRole },
+    { id: 'sbx_vol_19', name: 'Rory Alderton', email: 'rory@sandbox.local', role: 'volunteer' as SandboxRole },
+    { id: 'sbx_vol_20', name: 'Sasha Lindqvist', email: 'sasha@sandbox.local', role: 'volunteer' as SandboxRole },
+    { id: 'sbx_vol_21', name: 'Noel Brambly', email: 'noel@sandbox.local', role: 'volunteer' as SandboxRole },
+    { id: 'sbx_vol_22', name: 'Indigo Waverly', email: 'indigo@sandbox.local', role: 'volunteer' as SandboxRole },
+    { id: 'sbx_vol_23', name: 'Kit Danforth', email: 'kit@sandbox.local', role: 'volunteer' as SandboxRole },
   ];
 
   const profiles: SandboxProfile[] = users.map((u) => ({
@@ -208,6 +226,19 @@ function buildSeed(): SandboxState {
     sbx_vol_6: ['intercessions', 'reader'],
     sbx_vol_7: ['collection', 'sidesman-standard'],
     // sbx_vol_8 intentionally has no preferences, which should mean all roles are valid.
+    sbx_vol_9: ['sidesman-sound', 'sidesman-standard'],
+    sbx_vol_10: ['reader', 'intercessions'],
+    sbx_vol_11: ['collection', 'sidesman-welcome'],
+    sbx_vol_12: ['sidesman-standard', 'sidesman-sound', 'collection'],
+    sbx_vol_13: ['intercessions', 'sidesman-welcome'],
+    sbx_vol_14: ['reader', 'collection'],
+    sbx_vol_15: ['sidesman-welcome', 'sidesman-sound'],
+    sbx_vol_16: ['collection', 'intercessions'],
+    sbx_vol_17: ['sidesman-standard', 'reader'],
+    sbx_vol_18: ['sidesman-sound', 'intercessions', 'reader'],
+    // sbx_vol_19 through sbx_vol_23 are left preference-free (all roles valid) so
+    // every role always has surplus candidates and the auto-scheduler can fill
+    // every slot even when several volunteers are unavailable.
   };
 
   Object.entries(preferenceLayouts).forEach(([userId, roles]) => {
@@ -253,16 +284,21 @@ function buildSeed(): SandboxState {
   const eventRoles: SandboxEventRole[] = [];
   const eventAssignments: SandboxEventAssignment[] = [];
 
+  // Weeks -2 and -1 are past services; weeks 0-2 are published upcoming services so
+  // volunteer dashboards (which only show published events from today onward) have
+  // something to display. Weeks 3-7 stay unassigned drafts for auto-scheduler demos.
+  const PUBLISHED_THROUGH_WEEK = 2;
+
   for (let i = -2; i < 8; i += 1) {
     const serviceDate = format(addWeeks(start, i), 'yyyy-MM-dd');
     const eventId = makeId('event');
-    const status: EventStatus = i < 0 ? 'published' : 'draft';
+    const status: EventStatus = i <= PUBLISHED_THROUGH_WEEK ? 'published' : 'draft';
 
     events.push({
       id: eventId,
       template_id: templateId,
       name: 'Sunday Morning Service',
-      subheading: i < 0 ? 'Published service' : 'Upcoming service',
+      subheading: i < 0 ? 'Past service' : status === 'published' ? 'Published service' : 'Upcoming service',
       date: serviceDate,
       start_time: '10:00:00',
       status,
@@ -285,14 +321,39 @@ function buildSeed(): SandboxState {
 
   const publishedEvents = events.filter((e) => e.status === 'published');
   const volunteerIds = users.filter((u) => u.role === 'volunteer').map((u) => u.id);
-  let pick = 0;
+
+  // Volunteers with no stated preferences can serve in any role.
+  const canServe = (volunteerId: string, role: string) => {
+    const prefs = rolePreferences.filter((p) => p.user_id === volunteerId);
+    return prefs.length === 0 || prefs.some((p) => p.role === role);
+  };
+
+  const seedNameOf = (volunteerId: string) => users.find((u) => u.id === volunteerId)?.name ?? '';
+  const seedCounts = new Map<string, number>(volunteerIds.map((id) => [id, 0]));
 
   publishedEvents.forEach((event) => {
     const rolesForEvent = eventRoles.filter((r) => r.event_id === event.id);
+    const usedInEvent = new Set<string>();
+
     rolesForEvent.forEach((r) => {
       for (let i = 0; i < r.quantity; i += 1) {
-        const volunteerId = volunteerIds[pick % volunteerIds.length];
-        pick += 1;
+        // Least-served volunteer first (ties broken by name for a deterministic
+        // seed) so every persona ends up with a visible assignment. Candidates must
+        // match the role and not already be serving elsewhere in this event.
+        const volunteerId = volunteerIds
+          .filter((candidate) => !usedInEvent.has(candidate) && canServe(candidate, r.role))
+          .sort(
+            (a, b) =>
+              (seedCounts.get(a) ?? 0) - (seedCounts.get(b) ?? 0) ||
+              seedNameOf(a).localeCompare(seedNameOf(b))
+          )[0];
+
+        if (!volunteerId) {
+          continue;
+        }
+
+        usedInEvent.add(volunteerId);
+        seedCounts.set(volunteerId, (seedCounts.get(volunteerId) ?? 0) + 1);
         eventAssignments.push({
           id: makeId('assignment'),
           org_id: orgId,
