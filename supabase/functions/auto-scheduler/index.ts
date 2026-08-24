@@ -24,12 +24,14 @@ interface Availability {
   user_id: string;
   date: string;
   available: boolean;
+  org_id: string;
 }
 
 interface RolePreference {
   user_id: string;
   role: string;
   preference_order: number;
+  org_id: string;
 }
 
 interface Profile {
@@ -37,9 +39,17 @@ interface Profile {
   name: string;
   active: boolean;
   family_group_id: string | null;
+  org_id: string;
+}
+
+interface UserRole {
+  user_id: string;
+  role: string;
+  org_id: string;
 }
 
 interface ExistingAssignment {
+  id: string;
   event_id: string;
   volunteer_id: string;
   role: string;
@@ -145,10 +155,13 @@ Deno.serve(async (req) => {
     // Get all existing assignments for these events
     const { data: existingAssignments, error: existingError } = await supabase
       .from('event_assignments')
-      .select('event_id, volunteer_id, role')
+      .select('id, event_id, volunteer_id, role')
       .in('event_id', eventIds_list);
 
     if (existingError) throw existingError;
+
+    // Restrict all candidate data to the org(s) of the target events.
+    const eventOrgIds = [...new Set(events.map(e => e.org_id))];
 
     // Get all dates we need availability for
     const eventDates = [...new Set(events.map(e => e.date))];
@@ -156,16 +169,35 @@ Deno.serve(async (req) => {
     // Get all availability for these dates
     const { data: availability, error: availError } = await supabase
       .from('availability')
-      .select('user_id, date, available')
-      .in('date', eventDates);
+      .select('user_id, date, available, org_id')
+      .in('date', eventDates)
+      .in('org_id', eventOrgIds);
 
     if (availError) throw availError;
 
     // Get all active profiles with family groups
     const { data: profiles, error: profilesError } = await supabase
       .from('profiles')
-      .select('user_id, name, active, family_group_id')
-      .eq('active', true);
+      .select('user_id, name, active, family_group_id, org_id')
+      .eq('active', true)
+      .in('org_id', eventOrgIds);
+    // Get users who are explicitly volunteers in target orgs.
+    const { data: volunteerRoles, error: volunteerRolesError } = await supabase
+      .from('user_roles')
+      .select('user_id, role, org_id')
+      .eq('role', 'volunteer')
+      .in('org_id', eventOrgIds);
+
+    if (volunteerRolesError) throw volunteerRolesError;
+
+    const volunteerUserIdsByOrg = new Map<string, Set<string>>();
+    (volunteerRoles || []).forEach((ur: UserRole) => {
+      if (!volunteerUserIdsByOrg.has(ur.org_id)) {
+        volunteerUserIdsByOrg.set(ur.org_id, new Set());
+      }
+      volunteerUserIdsByOrg.get(ur.org_id)!.add(ur.user_id);
+    });
+
 
     if (profilesError) throw profilesError;
 
@@ -197,13 +229,17 @@ Deno.serve(async (req) => {
       validProfileUserIds = new Set((validUsers || []).map((u: { id: string }) => u.id));
     }
     
-    const validProfiles = (profiles || []).filter(p => validProfileUserIds.has(p.user_id));
-    console.log(`Filtered to ${validProfiles.length} profiles with valid auth.users entries (from ${profiles?.length || 0} total)`);
+    const validProfiles = (profiles || []).filter((p: Profile) => {
+      if (!validProfileUserIds.has(p.user_id)) return false;
+      return volunteerUserIdsByOrg.get(p.org_id)?.has(p.user_id) === true;
+    });
+    console.log(`Filtered to ${validProfiles.length} active volunteer profiles with valid auth.users entries (from ${profiles?.length || 0} org-scoped profiles)`);
 
     // Get all role preferences
     const { data: rolePreferences, error: prefsError } = await supabase
       .from('role_preferences')
-      .select('user_id, role, preference_order')
+      .select('user_id, role, preference_order, org_id')
+      .in('org_id', eventOrgIds)
       .order('preference_order', { ascending: true });
 
     if (prefsError) throw prefsError;
@@ -222,6 +258,35 @@ Deno.serve(async (req) => {
       rolePrefsMap.get(rp.user_id)!.push(rp);
     });
 
+    const eventsById = new Map(events.map(e => [e.id, e]));
+    const invalidExistingAssignmentIds = (existingAssignments || [])
+      .filter((ea: ExistingAssignment) => {
+        const event = eventsById.get(ea.event_id);
+        if (!event) return true;
+
+        const profile = profileMap.get(ea.volunteer_id);
+        if (!profile) return true;
+
+        if (profile.org_id !== event.org_id) return true;
+
+        return volunteerUserIdsByOrg.get(event.org_id)?.has(ea.volunteer_id) !== true;
+      })
+      .map((ea: ExistingAssignment) => ea.id);
+
+    if (invalidExistingAssignmentIds.length > 0) {
+      console.log(`Removing ${invalidExistingAssignmentIds.length} invalid existing assignments from draft events`);
+      const { error: cleanupInvalidError } = await supabase
+        .from('event_assignments')
+        .delete()
+        .in('id', invalidExistingAssignmentIds);
+
+      if (cleanupInvalidError) throw cleanupInvalidError;
+    }
+
+    const sanitizedExistingAssignments = (existingAssignments || []).filter(
+      (ea: ExistingAssignment) => !invalidExistingAssignmentIds.includes(ea.id)
+    );
+
     // Build availability map: date -> user_id -> available
     const availabilityMap = new Map<string, Map<string, boolean>>();
     (availability || []).forEach(a => {
@@ -233,7 +298,7 @@ Deno.serve(async (req) => {
 
     // Build existing assignments map: event_id -> role -> volunteer_ids
     const existingAssignmentsMap = new Map<string, Map<string, Set<string>>>();
-    (existingAssignments || []).forEach(ea => {
+    sanitizedExistingAssignments.forEach(ea => {
       if (!existingAssignmentsMap.has(ea.event_id)) {
         existingAssignmentsMap.set(ea.event_id, new Map());
       }
@@ -249,14 +314,14 @@ Deno.serve(async (req) => {
     // Initialize all valid volunteers with 0
     validProfiles.forEach(p => globalAssignmentCounts.set(p.user_id, 0));
     // Add existing assignments
-    (existingAssignments || []).forEach(ea => {
+    sanitizedExistingAssignments.forEach(ea => {
       globalAssignmentCounts.set(ea.volunteer_id, (globalAssignmentCounts.get(ea.volunteer_id) || 0) + 1);
     });
 
     // Track which volunteers are assigned to which dates (for family grouping)
     const dateAssignments = new Map<string, Set<string>>();
     events.forEach(e => dateAssignments.set(e.date, new Set()));
-    (existingAssignments || []).forEach(ea => {
+    sanitizedExistingAssignments.forEach(ea => {
       const event = events.find(e => e.id === ea.event_id);
       if (event) {
         dateAssignments.get(event.date)!.add(ea.volunteer_id);
@@ -290,7 +355,7 @@ Deno.serve(async (req) => {
     // init
     validProfiles.forEach(p => familyAssignmentCounts.set(getFamilyKey(p.user_id), 0));
     // add existing
-    (existingAssignments || []).forEach(ea => {
+    sanitizedExistingAssignments.forEach(ea => {
       const key = getFamilyKey(ea.volunteer_id);
       familyAssignmentCounts.set(key, (familyAssignmentCounts.get(key) || 0) + 1);
     });
@@ -390,6 +455,12 @@ Deno.serve(async (req) => {
         for (const [userId, profile] of profileMap.entries()) {
           // Skip if not active
           if (!profile.active) continue;
+
+          // Volunteer must belong to same org as the event.
+          if (profile.org_id !== event.org_id) continue;
+
+          // Volunteer must have volunteer role in this org.
+          if (volunteerUserIdsByOrg.get(event.org_id)?.has(userId) !== true) continue;
 
           // Volunteers with no preferences are eligible for all roles.
           if (!hasRolePreference(userId, role.role)) {
