@@ -1,6 +1,7 @@
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { Loader2 } from 'lucide-react';
+import { isSandboxMode } from '@/sandbox/mode';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -25,7 +26,7 @@ export function ProtectedRoute({
   }
 
   if (!user) {
-    return <Navigate to="/auth" replace />;
+    return <Navigate to={isSandboxMode() ? '/sandbox' : '/auth'} replace />;
   }
 
   // Super admins are confined to their own area. Match the whole /super-admin
@@ -40,11 +41,11 @@ export function ProtectedRoute({
   }
 
   if (requireSuperAdmin && !isSuperAdmin) {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to={isSandboxMode() ? '/sandbox/dashboard' : '/dashboard'} replace />;
   }
 
   if (requireOrgAdmin && (!isAdmin || isSuperAdmin)) {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to={isSandboxMode() ? '/sandbox/dashboard' : '/dashboard'} replace />;
   }
 
   return <>{children}</>;

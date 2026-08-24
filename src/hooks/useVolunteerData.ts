@@ -3,6 +3,18 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import type { Database } from '@/integrations/supabase/types';
+import { isSandboxMode } from '@/sandbox/mode';
+import {
+  getAvailability,
+  getAvailabilityForDate,
+  getProfile,
+  getProfiles as getSandboxProfiles,
+  getRolePreferences,
+  removeAvailability,
+  setRolePreferences,
+  updateProfile,
+  upsertAvailability,
+} from '@/sandbox/runtime';
 
 type ServiceRole = Database['public']['Enums']['service_role'];
 
@@ -67,11 +79,16 @@ export interface SwapRequest {
 // Profile hooks
 export function useProfile() {
   const { user } = useAuth();
+  const sandboxActive = isSandboxMode();
   
   return useQuery({
     queryKey: ['profile', user?.id],
     queryFn: async () => {
       if (!user) return null;
+
+      if (sandboxActive) {
+        return getProfile(user.id) as Profile | null;
+      }
       
       const { data, error } = await supabase
         .from('profiles')
@@ -87,9 +104,15 @@ export function useProfile() {
 }
 
 export function useProfiles() {
+  const sandboxActive = isSandboxMode();
+
   return useQuery({
     queryKey: ['profiles'],
     queryFn: async () => {
+      if (sandboxActive) {
+        return getSandboxProfiles() as Profile[];
+      }
+
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
@@ -102,9 +125,15 @@ export function useProfiles() {
 }
 
 export function useAllProfiles() {
+  const sandboxActive = isSandboxMode();
+
   return useQuery({
     queryKey: ['profiles', 'all'],
     queryFn: async () => {
+      if (sandboxActive) {
+        return getSandboxProfiles() as Profile[];
+      }
+
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
@@ -119,10 +148,15 @@ export function useAllProfiles() {
 export function useUpdateProfile() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const sandboxActive = isSandboxMode();
   
   return useMutation({
     mutationFn: async (updates: Partial<Profile>) => {
       if (!user) throw new Error('Not authenticated');
+
+      if (sandboxActive) {
+        return updateProfile(user.id, updates as Partial<Parameters<typeof updateProfile>[1]>) as Profile | null;
+      }
       
       const { data, error } = await supabase
         .from('profiles')
@@ -148,9 +182,14 @@ export function useUpdateProfile() {
 // Admin profile update (can update any user)
 export function useAdminUpdateProfile() {
   const queryClient = useQueryClient();
+  const sandboxActive = isSandboxMode();
   
   return useMutation({
     mutationFn: async ({ userId, updates }: { userId: string; updates: Partial<Profile> }) => {
+      if (sandboxActive) {
+        return updateProfile(userId, updates as Partial<Parameters<typeof updateProfile>[1]>) as Profile | null;
+      }
+
       const { data, error } = await supabase
         .from('profiles')
         .update(updates)
@@ -174,9 +213,15 @@ export function useAdminUpdateProfile() {
 
 // Family groups hooks
 export function useFamilyGroups() {
+  const sandboxActive = isSandboxMode();
+
   return useQuery({
     queryKey: ['family-groups'],
     queryFn: async () => {
+      if (sandboxActive) {
+        return [] as FamilyGroup[];
+      }
+
       const { data, error } = await supabase
         .from('family_groups')
         .select('*')
@@ -191,10 +236,20 @@ export function useFamilyGroups() {
 export function useCreateFamilyGroup() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const sandboxActive = isSandboxMode();
   
   return useMutation({
     mutationFn: async (name: string) => {
       if (!user) throw new Error('Not authenticated');
+
+      if (sandboxActive) {
+        return {
+          id: `sandbox-family-${Date.now()}`,
+          name,
+          created_by: user.id,
+          created_at: new Date().toISOString(),
+        };
+      }
       
       const { data, error } = await supabase
         .from('family_groups')
@@ -218,11 +273,16 @@ export function useCreateFamilyGroup() {
 // Role preferences hooks
 export function useRolePreferences() {
   const { user } = useAuth();
+  const sandboxActive = isSandboxMode();
   
   return useQuery({
     queryKey: ['role-preferences', user?.id],
     queryFn: async () => {
       if (!user) return [];
+
+      if (sandboxActive) {
+        return getRolePreferences(user.id) as RolePreference[];
+      }
       
       const { data, error } = await supabase
         .from('role_preferences')
@@ -238,10 +298,16 @@ export function useRolePreferences() {
 }
 
 export function useUserRolePreferences(userId?: string) {
+  const sandboxActive = isSandboxMode();
+
   return useQuery({
     queryKey: ['role-preferences', userId],
     queryFn: async () => {
       if (!userId) return [];
+
+      if (sandboxActive) {
+        return getRolePreferences(userId) as RolePreference[];
+      }
       
       const { data, error } = await supabase
         .from('role_preferences')
@@ -259,10 +325,16 @@ export function useUserRolePreferences(userId?: string) {
 export function useUpdateRolePreferences() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const sandboxActive = isSandboxMode();
   
   return useMutation({
     mutationFn: async (preferences: { role: ServiceRole; preference_order: number }[]) => {
       if (!user) throw new Error('Not authenticated');
+
+      if (sandboxActive) {
+        setRolePreferences(user.id, preferences);
+        return;
+      }
       
       // Delete existing preferences
       await supabase
@@ -296,11 +368,16 @@ export function useUpdateRolePreferences() {
 // Availability hooks
 export function useAvailability() {
   const { user } = useAuth();
+  const sandboxActive = isSandboxMode();
   
   return useQuery({
     queryKey: ['availability', user?.id],
     queryFn: async () => {
       if (!user) return [];
+
+      if (sandboxActive) {
+        return getAvailability(user.id) as Availability[];
+      }
       
       const { data, error } = await supabase
         .from('availability')
@@ -316,10 +393,16 @@ export function useAvailability() {
 
 // Admin hook to get availability for a specific user
 export function useUserAvailability(userId?: string) {
+  const sandboxActive = isSandboxMode();
+
   return useQuery({
     queryKey: ['availability', userId],
     queryFn: async () => {
       if (!userId) return [];
+
+      if (sandboxActive) {
+        return getAvailability(userId) as Availability[];
+      }
       
       const { data, error } = await supabase
         .from('availability')
@@ -335,10 +418,16 @@ export function useUserAvailability(userId?: string) {
 
 // Fetch all availability records for a specific date (for admin assignment)
 export function useAvailabilityForDate(date: string) {
+  const sandboxActive = isSandboxMode();
+
   return useQuery({
     queryKey: ['availability-for-date', date],
     queryFn: async () => {
       if (!date) return [];
+
+      if (sandboxActive) {
+        return getAvailabilityForDate(date) as Availability[];
+      }
       
       const { data, error } = await supabase
         .from('availability')
@@ -355,10 +444,16 @@ export function useAvailabilityForDate(date: string) {
 export function useToggleAvailability() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const sandboxActive = isSandboxMode();
   
   return useMutation({
     mutationFn: async ({ date, available }: { date: string; available: boolean }) => {
       if (!user) throw new Error('Not authenticated');
+
+      if (sandboxActive) {
+        upsertAvailability(user.id, date, available);
+        return;
+      }
       
       // Use upsert to handle both insert and update
       const { error } = await supabase
@@ -385,9 +480,15 @@ export function useToggleAvailability() {
 // Admin hook to update availability for any user
 export function useAdminToggleAvailability() {
   const queryClient = useQueryClient();
+  const sandboxActive = isSandboxMode();
   
   return useMutation({
     mutationFn: async ({ userId, date, available }: { userId: string; date: string; available: boolean }) => {
+      if (sandboxActive) {
+        upsertAvailability(userId, date, available);
+        return;
+      }
+
       // Use upsert to handle both insert and update
       const { error } = await supabase
         .from('availability')
@@ -414,9 +515,15 @@ export function useAdminToggleAvailability() {
 // Admin hook to delete availability for a user on a specific date
 export function useAdminDeleteAvailability() {
   const queryClient = useQueryClient();
+  const sandboxActive = isSandboxMode();
   
   return useMutation({
     mutationFn: async ({ userId, date }: { userId: string; date: string }) => {
+      if (sandboxActive) {
+        removeAvailability(userId, date);
+        return;
+      }
+
       const { error } = await supabase
         .from('availability')
         .delete()

@@ -1,5 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { isSandboxMode } from '@/sandbox/mode';
+import { getPublicOrgSettings, subscribeSandboxState } from '@/sandbox/runtime';
+import { useSyncExternalStore } from 'react';
 
 interface PublicOrgSettings {
   organisationName: string;
@@ -11,6 +14,20 @@ interface PublicOrgSettings {
  * Works without authentication (relies on the anon RLS policy added in the rebrand migration).
  */
 export function usePublicOrgSettings(): { data: PublicOrgSettings; isLoading: boolean } {
+  const sandboxActive = isSandboxMode();
+  useSyncExternalStore(
+    sandboxActive ? subscribeSandboxState : () => () => undefined,
+    () => (sandboxActive ? JSON.stringify(getPublicOrgSettings()) : ''),
+    () => ''
+  );
+
+  if (sandboxActive) {
+    return {
+      data: getPublicOrgSettings(),
+      isLoading: false,
+    };
+  }
+
   const { data, isLoading } = useQuery({
     queryKey: ['public-org-settings'],
     queryFn: async () => {

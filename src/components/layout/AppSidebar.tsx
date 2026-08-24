@@ -16,6 +16,7 @@ import {
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
+import { withSandboxPath } from '@/sandbox/mode';
 
 interface AppSidebarProps {
   isOpen: boolean;
@@ -42,16 +43,17 @@ const adminNav = [
 
 const superAdminNav = [
   { to: '/super-admin', icon: Shield, label: 'Super Admin' },
-  { to: '/super-admin/enquiries', icon: ClipboardList, label: 'Info & Demo Enquiries' },
+  { to: '/super-admin/enquiries', icon: ClipboardList, label: 'Further Information Enquiries' },
 ];
 
 function NavItem({ to, icon: Icon, label, onClick }: { to: string; icon: typeof Home; label: string; onClick?: () => void }) {
   const location = useLocation();
-  const isActive = location.pathname === to;
+  const resolvedTo = withSandboxPath(to);
+  const isActive = location.pathname === resolvedTo;
 
   return (
     <NavLink
-      to={to}
+      to={resolvedTo}
       onClick={onClick}
       className={cn(
         'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',

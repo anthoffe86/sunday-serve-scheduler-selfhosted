@@ -3,7 +3,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useEffect } from "react";
-import { BrowserRouter, Routes, Route, useLocation, useNavigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AppLayout } from "@/components/layout/AppLayout";
@@ -30,6 +30,18 @@ import ResetPassword from "./pages/ResetPassword";
 import InviteSignup from "./pages/InviteSignup";
 import NotFound from "./pages/NotFound";
 const queryClient = new QueryClient();
+
+const withPrefix = (prefix: string, path: string) => {
+  if (!prefix) {
+    return path;
+  }
+
+  if (path === '/') {
+    return prefix;
+  }
+
+  return `${prefix}${path}`;
+};
 
 function UrlNormalizer() {
   const location = useLocation();
@@ -156,6 +168,78 @@ const App = () => (
                 element={
                   <ProtectedRoute requireSuperAdmin>
                     <Enquiries />
+                  </ProtectedRoute>
+                }
+              />
+            </Route>
+
+            {/* Sandbox routes - browser-only, local persistence */}
+            <Route path="/sandbox" element={<Navigate to="/sandbox/dashboard" replace />} />
+            <Route element={
+              <ProtectedRoute>
+                <AppLayout />
+              </ProtectedRoute>
+            }>
+              <Route path={withPrefix('/sandbox', '/dashboard')} element={<Dashboard />} />
+              <Route path={withPrefix('/sandbox', '/schedule')} element={<Schedule />} />
+              <Route path={withPrefix('/sandbox', '/availability')} element={<Availability />} />
+              <Route path={withPrefix('/sandbox', '/swaps')} element={<Swaps />} />
+              <Route path={withPrefix('/sandbox', '/invitations')} element={<Invitations />} />
+              <Route path={withPrefix('/sandbox', '/profile')} element={<Profile />} />
+
+              <Route
+                path={withPrefix('/sandbox', '/admin')}
+                element={
+                  <ProtectedRoute requireOrgAdmin>
+                    <AdminDashboard />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path={withPrefix('/sandbox', '/admin/volunteers')}
+                element={
+                  <ProtectedRoute requireOrgAdmin>
+                    <VolunteerManagement />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path={withPrefix('/sandbox', '/admin/schedule')}
+                element={
+                  <ProtectedRoute requireOrgAdmin>
+                    <AdminSchedule />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path={withPrefix('/sandbox', '/admin/events')}
+                element={
+                  <ProtectedRoute requireOrgAdmin>
+                    <AdminEvents />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path={withPrefix('/sandbox', '/admin/events/:eventId')}
+                element={
+                  <ProtectedRoute requireOrgAdmin>
+                    <AdminEventDetail />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path={withPrefix('/sandbox', '/admin/swaps')}
+                element={
+                  <ProtectedRoute requireOrgAdmin>
+                    <AdminSwapManagement />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path={withPrefix('/sandbox', '/admin/settings')}
+                element={
+                  <ProtectedRoute requireOrgAdmin>
+                    <AdminSettings />
                   </ProtectedRoute>
                 }
               />

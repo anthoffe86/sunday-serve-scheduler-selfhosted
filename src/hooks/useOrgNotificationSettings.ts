@@ -2,6 +2,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/components/ui/use-toast';
 import { useAuth } from '@/hooks/useAuth';
+import { isSandboxMode } from '@/sandbox/mode';
+import { getOrgNotificationSettings, updateOrgNotificationSetting } from '@/sandbox/runtime';
 
 export const NOTIFICATION_SETTING_KEYS = [
     'email_on_invite',
@@ -30,11 +32,16 @@ export type NotificationOverrides = Partial<Record<NotificationSettingKey, boole
  */
 export function useOrgNotificationSettings() {
     const { orgId } = useAuth();
+    const sandboxActive = isSandboxMode();
 
     return useQuery({
         queryKey: ['org-notification-settings', orgId],
         enabled: !!orgId,
         queryFn: async (): Promise<NotificationOverrides> => {
+            if (sandboxActive) {
+                return getOrgNotificationSettings() as NotificationOverrides;
+            }
+
             const { data, error } = await supabase
                 .from('org_notification_settings')
                 .select('key, enabled');
@@ -53,11 +60,17 @@ export function useOrgNotificationSettings() {
 export function useUpdateOrgNotificationSetting() {
     const queryClient = useQueryClient();
     const { orgId } = useAuth();
+    const sandboxActive = isSandboxMode();
 
     return useMutation({
         mutationFn: async ({ key, enabled }: { key: NotificationSettingKey; enabled: boolean }) => {
             if (!orgId) {
                 throw new Error('No organisation is associated with your account.');
+            }
+
+            if (sandboxActive) {
+                updateOrgNotificationSetting(key, enabled);
+                return;
             }
 
             // org_id is written explicitly and checked again by RLS, which only

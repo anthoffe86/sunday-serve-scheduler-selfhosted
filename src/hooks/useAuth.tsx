@@ -1,6 +1,14 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
+import { isSandboxMode } from '@/sandbox/mode';
+import {
+  getSandboxAuthContext,
+  sandboxSignIn,
+  sandboxSignOut,
+  sandboxSignUp,
+  subscribeSandboxState,
+} from '@/sandbox/runtime';
 
 interface AuthContextType {
   user: User | null;
@@ -17,14 +25,33 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const sandboxActive = isSandboxMode();
+  const sandboxContext = sandboxActive ? getSandboxAuthContext() : null;
+
+  const [user, setUser] = useState<User | null>(sandboxContext?.user ?? null);
   const [session, setSession] = useState<Session | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
-  const [orgId, setOrgId] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(!sandboxActive);
+  const [isAdmin, setIsAdmin] = useState(sandboxContext?.isAdmin ?? false);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(sandboxContext?.isSuperAdmin ?? false);
+  const [orgId, setOrgId] = useState<string | null>(sandboxContext?.orgId ?? null);
 
   useEffect(() => {
+    if (sandboxActive) {
+      const syncSandboxAuth = () => {
+        const current = getSandboxAuthContext();
+        setSession(null);
+        setUser(current.user);
+        setIsAdmin(current.isAdmin);
+        setIsSuperAdmin(current.isSuperAdmin);
+        setOrgId(current.orgId);
+        setIsLoading(false);
+      };
+
+      syncSandboxAuth();
+      const unsubscribe = subscribeSandboxState(syncSandboxAuth);
+      return unsubscribe;
+    }
+
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
@@ -63,7 +90,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [sandboxActive]);
 
   const checkRoleStatus = async (userId: string) => {
     const { data, error } = await supabase
@@ -101,6 +128,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signUp = async (email: string, password: string, name: string) => {
+    if (sandboxActive) {
+      return sandboxSignUp(email, password, name);
+    }
+
     const redirectUrl = `${window.location.origin}/`;
     
     const { error } = await supabase.auth.signUp({
@@ -116,6 +147,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signIn = async (email: string, password: string) => {
+    if (sandboxActive) {
+      return sandboxSignIn(email);
+    }
+
     const { error } = await supabase.auth.signInWithPassword({
       email,
       password,
@@ -125,6 +160,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signOut = async () => {
+    if (sandboxActive) {
+      await sandboxSignOut();
+      return;
+    }
+
     await supabase.auth.signOut();
     setUser(null);
     setSession(null);

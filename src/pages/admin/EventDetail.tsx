@@ -58,6 +58,7 @@ import { DAYS_OF_WEEK } from '@/hooks/useEventScheduler';
 import { EditEventDialog } from '@/components/admin/EditEventDialog';
 import { EditEventTemplateDialog } from '@/components/admin/EditEventTemplateDialog';
 import { toast } from 'sonner';
+import { isSandboxMode } from '@/sandbox/mode';
 
 const AdminEventDetail = () => {
   const { eventId } = useParams<{ eventId: string }>();
@@ -350,6 +351,12 @@ const AdminEventDetail = () => {
         status: 'published',
         sendNotifications: false // We'll send our own notifications below
       });
+
+      if (isSandboxMode()) {
+        toast.success(`Published ${result.count} event${result.count !== 1 ? 's' : ''} in sandbox`);
+        setPublishConfirmOpen(false);
+        return;
+      }
       
       // Then send "schedule confirmed" emails to all volunteers with confirmed assignments
       const { data, error: notificationError } = await supabase.functions.invoke('send-event-notification', {

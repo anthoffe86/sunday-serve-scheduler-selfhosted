@@ -92,9 +92,9 @@ const Enquiries = () => {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="font-serif text-2xl sm:text-3xl font-bold">Info & Demo Enquiries</h1>
+        <h1 className="font-serif text-2xl sm:text-3xl font-bold">Further Information Enquiries</h1>
         <p className="text-sm sm:text-base text-muted-foreground">
-          Organisations that want more information and a demo. Review what was submitted and remove enquiries once they are no longer needed.
+          Organisations that requested further information. Review what was submitted and remove enquiries once they are no longer needed.
         </p>
       </div>
 
@@ -102,7 +102,7 @@ const Enquiries = () => {
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-16 text-center">
             <ClipboardList className="h-12 w-12 text-muted-foreground mb-4" />
-            <p className="font-medium">No info/demo enquiries yet</p>
+            <p className="font-medium">No further-information enquiries yet</p>
             <p className="text-sm text-muted-foreground mt-1">
               Enquiries submitted from the landing page will appear here.
             </p>

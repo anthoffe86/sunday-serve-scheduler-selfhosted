@@ -56,7 +56,7 @@ const featureGroups = [
     features: [
       { icon: Wand2, name: 'Auto-scheduler', desc: 'Builds rotas automatically while respecting every volunteer\'s role preferences and recorded availability.' },
       { icon: ListChecks, name: 'Event templates', desc: 'Define recurring services or shifts once - weekly, fortnightly or monthly - and generate events in bulk.' },
-      { icon: CalendarCheck, name: 'Draft → Publish workflow', desc: 'Plan in private, send invitations, then publish to lock the rota and notify confirmed volunteers.' },
+      { icon: CalendarCheck, name: 'Draft ? Publish workflow', desc: 'Plan in private, send invitations, then publish to lock the rota and notify confirmed volunteers.' },
       { icon: LayoutDashboard, name: 'Confidence metrics', desc: 'Dashboard shows fully-staffed, ready-to-publish and at-risk events so you always know what needs attention.' },
     ],
   },
@@ -159,7 +159,7 @@ const faqs = [
   },
   {
     q: 'How do I get started?',
-    a: 'Request more information and a demo using the form on this page. We will then collect your onboarding details so we can set up your branding, roles and templates correctly from day one.',
+    a: 'Share your details using the form on this page and we will be in touch with further information and next steps for onboarding.',
   },
   {
     q: 'Can I export the rota for printing?',
@@ -308,7 +308,7 @@ const Landing = () => {
             <a href="#faq" className="text-muted-foreground transition-colors hover:text-foreground">FAQ</a>
           </nav>
           <div className="flex items-center gap-2">
-            <Button asChild variant="ghost" className="hidden sm:inline-flex"><a href="#request-info-demo">Request info & demo</a></Button>
+            <Button asChild variant="ghost" className="hidden sm:inline-flex"><a href="#request-information">Get further information</a></Button>
             <Button asChild><Link to="/auth">Sign in<ArrowRight className="ml-2 h-4 w-4" /></Link></Button>
             <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
               <SheetTrigger asChild>
@@ -325,7 +325,7 @@ const Landing = () => {
                   <a href="#faq" className="rounded-lg px-3 py-2.5 text-base font-medium text-foreground transition-colors hover:bg-secondary" onClick={() => setMobileMenuOpen(false)}>FAQ</a>
                   <div className="mt-4 border-t pt-4">
                     <Button asChild className="w-full" onClick={() => setMobileMenuOpen(false)}>
-                      <a href="#request-info-demo">Request info &amp; demo</a>
+                      <a href="#request-information">Get further information</a>
                     </Button>
                   </div>
                 </nav>
@@ -341,7 +341,7 @@ const Landing = () => {
             <h1 className="font-serif text-4xl font-bold tracking-tight md:text-5xl lg:text-6xl">Volunteer & church rota software<span className="block text-primary">that runs itself</span></h1>
             <p className="mx-auto mt-6 max-w-2xl text-lg text-muted-foreground md:text-xl">ServeTogether helps churches, charities and volunteer-led organisations build rotas, manage swaps, track availability and notify their teams - automatically, and without spreadsheets.</p>
             <div className="mt-10 flex flex-col gap-4 sm:flex-row sm:justify-center">
-              <Button asChild size="lg" className="text-base"><a href="#request-info-demo">Request info & demo<ArrowRight className="ml-2 h-5 w-5" /></a></Button>
+              <Button asChild size="lg" className="text-base"><a href="#request-information">Get further information<ArrowRight className="ml-2 h-5 w-5" /></a></Button>
               <Button asChild size="lg" variant="outline" className="text-base"><Link to="/auth">Sign in to your account</Link></Button>
             </div>
             <p className="mt-6 text-sm text-muted-foreground">Invite-only · Mobile-friendly · Built for churches, designed for any volunteer team</p>
@@ -504,7 +504,7 @@ const Landing = () => {
 
       <section id="faq" className="py-20"><div className="container mx-auto px-4"><div className="mx-auto max-w-3xl"><div className="text-center"><h2 className="font-serif text-3xl font-bold md:text-4xl">Frequently asked questions</h2><p className="mt-4 text-muted-foreground">Quick answers about how ServeTogether works.</p></div><Accordion type="single" collapsible className="mt-10">{faqs.map((f, i) => (<AccordionItem key={i} value={`item-${i}`}><AccordionTrigger className="text-left font-serif text-base">{f.q}</AccordionTrigger><AccordionContent className="text-muted-foreground">{f.a}</AccordionContent></AccordionItem>))}</Accordion></div></div></section>
 
-      <section id="request-info-demo" className="border-t bg-muted/50 py-20"><div className="container mx-auto px-4"><div className="mx-auto max-w-2xl"><div className="text-center"><h2 className="font-serif text-3xl font-bold md:text-4xl">Request info & demo</h2><p className="mt-4 text-muted-foreground">Tell us about your church or organisation and we will be in touch to arrange a demo and collect the details needed for onboarding.</p></div><Card className="mt-10 border-2"><CardContent className="pt-6">{submitted ? (<div className="py-8 text-center"><CheckCircle2 className="mx-auto h-12 w-12 text-primary" /><h3 className="mt-4 font-serif text-xl font-semibold">Thanks - we have received your enquiry</h3><p className="mt-2 text-muted-foreground">We will be in touch by email shortly with more information and next steps.</p><Button variant="outline" className="mt-6" onClick={() => setSubmitted(false)}>Submit a new enquiry</Button></div>) : (<form onSubmit={handleSubmit} className="space-y-4"><div className="grid gap-4 sm:grid-cols-2"><div className="space-y-2"><Label htmlFor="ra-name">Your name</Label><Input id="ra-name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required /></div><div className="space-y-2"><Label htmlFor="ra-email">Email</Label><Input id="ra-email" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required /></div></div><div className="space-y-2"><Label htmlFor="ra-org">Organisation name</Label><Input id="ra-org" placeholder="e.g. St Matthew's Church, North Park Foodbank" value={form.organisation_name} onChange={(e) => setForm({ ...form, organisation_name: e.target.value })} required /></div><div className="space-y-2"><Label htmlFor="ra-notes">Anything we should know? (optional)</Label><Textarea id="ra-notes" rows={4} placeholder="Team size, kind of rota, preferred demo times, any specific needs..." value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></div><Button type="submit" className="w-full" disabled={submitting}>{submitting ? (<><Loader2 className="mr-2 h-4 w-4 animate-spin" />Sending...</>) : ('Request info & demo')}</Button></form>)}</CardContent></Card></div></div></section>
+      <section id="request-information" className="border-t bg-muted/50 py-20"><div className="container mx-auto px-4"><div className="mx-auto max-w-2xl"><div className="text-center"><h2 className="font-serif text-3xl font-bold md:text-4xl">Get further information</h2><p className="mt-4 text-muted-foreground">Tell us about your church or organisation and we will be in touch with further information and the details needed for onboarding.</p></div><Card className="mt-10 border-2"><CardContent className="pt-6">{submitted ? (<div className="py-8 text-center"><CheckCircle2 className="mx-auto h-12 w-12 text-primary" /><h3 className="mt-4 font-serif text-xl font-semibold">Thanks - we have received your enquiry</h3><p className="mt-2 text-muted-foreground">We will be in touch by email shortly with more information and next steps.</p><Button variant="outline" className="mt-6" onClick={() => setSubmitted(false)}>Submit a new enquiry</Button></div>) : (<form onSubmit={handleSubmit} className="space-y-4"><div className="grid gap-4 sm:grid-cols-2"><div className="space-y-2"><Label htmlFor="ra-name">Your name</Label><Input id="ra-name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required /></div><div className="space-y-2"><Label htmlFor="ra-email">Email</Label><Input id="ra-email" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required /></div></div><div className="space-y-2"><Label htmlFor="ra-org">Organisation name</Label><Input id="ra-org" placeholder="e.g. St Matthew's Church, North Park Foodbank" value={form.organisation_name} onChange={(e) => setForm({ ...form, organisation_name: e.target.value })} required /></div><div className="space-y-2"><Label htmlFor="ra-notes">Anything we should know? (optional)</Label><Textarea id="ra-notes" rows={4} placeholder="Team size, kind of rota, preferred contact times, any specific needs..." value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></div><Button type="submit" className="w-full" disabled={submitting}>{submitting ? (<><Loader2 className="mr-2 h-4 w-4 animate-spin" />Sending...</>) : ('Get further information')}</Button></form>)}</CardContent></Card></div></div></section>
 
       <footer className="border-t py-10"><div className="container mx-auto flex flex-col items-center justify-between gap-4 px-4 text-sm text-muted-foreground sm:flex-row"><div className="flex items-center gap-3"><img src={logoUrl} alt="ServeTogether" className="h-8 w-auto" /><span>&copy; {new Date().getFullYear()} ServeTogether. All rights reserved.</span></div><div className="flex items-center gap-5"><a href="#features" className="hover:text-foreground">Features</a><a href="#how-it-works" className="hover:text-foreground">How it works</a><a href="#who-its-for" className="hover:text-foreground">Who it is for</a><a href="#faq" className="hover:text-foreground">FAQ</a><Link to="/auth" className="hover:text-foreground">Sign in</Link></div></div></footer>
     </div>
@@ -512,3 +512,5 @@ const Landing = () => {
 };
 
 export default Landing;
+
+
