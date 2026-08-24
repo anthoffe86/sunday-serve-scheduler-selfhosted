@@ -42,6 +42,7 @@ import { EditEventDialog } from "@/components/admin/EditEventDialog";
 import { ScheduleTableView } from "@/components/admin/ScheduleTableView";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Link } from "react-router-dom";
+import { withSandboxPath } from "@/sandbox/mode";
 import { toast } from "sonner";
 import {
   AlertDialog,
@@ -143,7 +144,7 @@ const AdminSchedule = () => {
   }
 
   if (!isAdmin) {
-    return <Navigate to="/" replace />;
+    return <Navigate to={withSandboxPath('/')} replace />;
   }
 
   const formatTime = (time: string) => {
@@ -215,7 +216,7 @@ const AdminSchedule = () => {
             monthLabel={format(currentMonth, "MMMM yyyy")}
           />
           <Button asChild variant="outline" className="flex-1 sm:flex-initial gap-2">
-            <Link to="/admin/events">
+            <Link to={withSandboxPath('/admin/events')}>
               <Plus className="h-4 w-4" />
               Manage Events
             </Link>
@@ -345,7 +346,7 @@ const AdminSchedule = () => {
                 No events scheduled for {format(currentMonth, "MMMM yyyy")}.
               </p>
               <Button asChild className="gap-2">
-                <Link to="/admin/events">
+                <Link to={withSandboxPath('/admin/events')}>
                   <Plus className="h-4 w-4" />
                   Create Event
                 </Link>

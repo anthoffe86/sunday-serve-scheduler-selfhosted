@@ -3,6 +3,26 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 import { addDays, addWeeks, format, getDay, nextDay, parseISO, isBefore, isAfter } from 'date-fns';
 import type { Database } from '@/integrations/supabase/types';
+import { isSandboxMode } from '@/sandbox/mode';
+import {
+  assignVolunteer as sandboxAssignVolunteer,
+  batchUpdateAssignments as sandboxBatchUpdateAssignments,
+  bulkDeleteEvents as sandboxBulkDeleteEvents,
+  bulkUpdateEventStatus as sandboxBulkUpdateEventStatus,
+  createEventTemplate as sandboxCreateEventTemplate,
+  deleteEvent as sandboxDeleteEvent,
+  deleteEventTemplate as sandboxDeleteEventTemplate,
+  generateEvents as sandboxGenerateEvents,
+  getEventTemplates as sandboxGetEventTemplates,
+  getEvents as sandboxGetEvents,
+  respondToInvitation as sandboxRespondToInvitation,
+  removeAssignment as sandboxRemoveAssignment,
+  runAutoSchedule,
+  sendInvitations as sandboxSendInvitations,
+  updateEvent as sandboxUpdateEvent,
+  updateEventRoles as sandboxUpdateEventRoles,
+  updateEventTemplate as sandboxUpdateEventTemplate,
+} from '@/sandbox/runtime';
 
 type ServiceRole = Database['public']['Enums']['service_role'];
 
@@ -90,9 +110,15 @@ export const DAYS_OF_WEEK = [
 
 // Hook: Fetch all event templates with their roles
 export function useEventTemplates() {
+  const sandboxActive = isSandboxMode();
+
   return useQuery({
     queryKey: ['event-templates'],
     queryFn: async () => {
+      if (sandboxActive) {
+        return sandboxGetEventTemplates() as EventTemplateWithRoles[];
+      }
+
       const { data: templates, error: templatesError } = await supabase
         .from('event_templates')
         .select('*')
@@ -122,6 +148,7 @@ export function useEventTemplates() {
 export function useCreateEventTemplate() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const sandboxActive = isSandboxMode();
 
   return useMutation({
     mutationFn: async (data: {
@@ -138,6 +165,15 @@ export function useCreateEventTemplate() {
       roles: { role: string; quantity: number }[];
     }) => {
       const { roles, ...templateData } = data;
+
+      if (sandboxActive) {
+        const templateId = sandboxCreateEventTemplate({
+          ...templateData,
+          created_by: user?.id ?? null,
+          roles,
+        });
+        return { id: templateId };
+      }
 
       const { data: template, error: templateError } = await supabase
         .from('event_templates')
@@ -175,6 +211,7 @@ export function useCreateEventTemplate() {
 // Hook: Update event template
 export function useUpdateEventTemplate() {
   const queryClient = useQueryClient();
+  const sandboxActive = isSandboxMode();
 
   return useMutation({
     mutationFn: async (data: {
@@ -192,6 +229,11 @@ export function useUpdateEventTemplate() {
       syncToEvents?: boolean; // Whether to sync changes to existing draft events
     }) => {
       const { id, roles, syncToEvents = true, ...updateData } = data;
+
+      if (sandboxActive) {
+        sandboxUpdateEventTemplate({ id, ...updateData, roles, syncToEvents });
+        return { id };
+      }
 
       // Update template
       const { error: templateError } = await supabase
@@ -307,9 +349,15 @@ export function useUpdateEventTemplate() {
 // Hook: Delete event template
 export function useDeleteEventTemplate() {
   const queryClient = useQueryClient();
+  const sandboxActive = isSandboxMode();
 
   return useMutation({
     mutationFn: async (id: string) => {
+      if (sandboxActive) {
+        sandboxDeleteEventTemplate(id);
+        return { id };
+      }
+
       // First, get all events for this template
       const { data: events } = await supabase
         .from('events')
@@ -362,9 +410,15 @@ export function useDeleteEventTemplate() {
 
 // Hook: Fetch all events with details
 export function useEvents(options?: { startDate?: string; endDate?: string; status?: string }) {
+  const sandboxActive = isSandboxMode();
+
   return useQuery({
     queryKey: ['events', options],
     queryFn: async () => {
+      if (sandboxActive) {
+        return sandboxGetEvents(options) as EventWithDetails[];
+      }
+
       let query = supabase
         .from('events')
         .select('*')
@@ -426,6 +480,7 @@ export function useEvents(options?: { startDate?: string; endDate?: string; stat
 // Hook: Generate events from templates
 export function useGenerateEvents() {
   const queryClient = useQueryClient();
+  const sandboxActive = isSandboxMode();
 
   return useMutation({
     mutationFn: async (data: {
@@ -434,6 +489,11 @@ export function useGenerateEvents() {
       endDate?: string;
       count?: number;
     }) => {
+      if (sandboxActive) {
+        const ids = sandboxGenerateEvents(data);
+        return ids.map((id) => ({ id }));
+      }
+
       // Fetch template with roles
       const { data: template, error: templateError } = await supabase
         .from('event_templates')
@@ -513,6 +573,7 @@ export function useGenerateEvents() {
 // Hook: Update event
 export function useUpdateEvent() {
   const queryClient = useQueryClient();
+  const sandboxActive = isSandboxMode();
 
   return useMutation({
     mutationFn: async (data: {
@@ -526,6 +587,11 @@ export function useUpdateEvent() {
       reading?: string | null;
     }) => {
       const { id, ...updateData } = data;
+
+      if (sandboxActive) {
+        sandboxUpdateEvent({ id, ...updateData });
+        return { id };
+      }
 
       const { error } = await supabase
         .from('events')
@@ -544,9 +610,15 @@ export function useUpdateEvent() {
 // Hook: Delete event
 export function useDeleteEvent() {
   const queryClient = useQueryClient();
+  const sandboxActive = isSandboxMode();
 
   return useMutation({
     mutationFn: async (id: string) => {
+      if (sandboxActive) {
+        sandboxDeleteEvent(id);
+        return { id };
+      }
+
       // First delete all assignments for this event (in case CASCADE doesn't work)
       const { error: assignmentError } = await supabase
         .from('event_assignments')
@@ -575,9 +647,15 @@ export function useDeleteEvent() {
 // Hook: Bulk delete events
 export function useBulkDeleteEvents() {
   const queryClient = useQueryClient();
+  const sandboxActive = isSandboxMode();
 
   return useMutation({
     mutationFn: async (ids: string[]) => {
+      if (sandboxActive) {
+        sandboxBulkDeleteEvents(ids);
+        return { ids };
+      }
+
       // First delete all assignments for these events
       const { error: assignmentError } = await supabase
         .from('event_assignments')
@@ -606,6 +684,7 @@ export function useBulkDeleteEvents() {
 // Hook: Assign volunteer to event
 export function useAssignVolunteer() {
   const queryClient = useQueryClient();
+  const sandboxActive = isSandboxMode();
 
   return useMutation({
     mutationFn: async (data: {
@@ -613,6 +692,11 @@ export function useAssignVolunteer() {
       role: string;
       volunteer_id: string;
     }) => {
+      if (sandboxActive) {
+        const assignmentId = sandboxAssignVolunteer(data);
+        return { id: assignmentId };
+      }
+
       const { data: assignment, error } = await supabase
         .from('event_assignments')
         .insert({
@@ -635,9 +719,15 @@ export function useAssignVolunteer() {
 // Hook: Remove volunteer assignment
 export function useRemoveAssignment() {
   const queryClient = useQueryClient();
+  const sandboxActive = isSandboxMode();
 
   return useMutation({
     mutationFn: async (id: string) => {
+      if (sandboxActive) {
+        sandboxRemoveAssignment(id);
+        return { id };
+      }
+
       const { error } = await supabase
         .from('event_assignments')
         .delete()
@@ -655,6 +745,7 @@ export function useRemoveAssignment() {
 // Hook: Batch update assignments (Add/Remove)
 export function useBatchUpdateAssignments() {
   const queryClient = useQueryClient();
+  const sandboxActive = isSandboxMode();
 
   return useMutation({
     mutationFn: async (data: {
@@ -663,6 +754,11 @@ export function useBatchUpdateAssignments() {
       toRemove: string[];
       eventStatus?: string; // Pass event status to determine assignment status
     }) => {
+      if (sandboxActive) {
+        sandboxBatchUpdateAssignments(data);
+        return { success: true };
+      }
+
       const { eventId, toAdd, toRemove, eventStatus } = data;
       const errors = [];
 
@@ -711,9 +807,15 @@ export function useBatchUpdateAssignments() {
 // Hook: Bulk update event status
 export function useBulkUpdateEventStatus() {
   const queryClient = useQueryClient();
+  const sandboxActive = isSandboxMode();
 
   return useMutation({
     mutationFn: async (data: { eventIds: string[]; status: 'draft' | 'published' | 'cancelled'; sendNotifications?: boolean }) => {
+      if (sandboxActive) {
+        sandboxBulkUpdateEventStatus(data.eventIds, data.status);
+        return { count: data.eventIds.length, emailsSent: 0, emailError: false };
+      }
+
       const { error } = await supabase
         .from('events')
         .update({ status: data.status })
@@ -757,8 +859,18 @@ export function useBulkUpdateEventStatus() {
 
 // Hook: Send event notifications (legacy - for backward compatibility)
 export function useSendEventNotifications() {
+  const sandboxActive = isSandboxMode();
+
   return useMutation({
     mutationFn: async (data: { eventIds: string[] }) => {
+      if (sandboxActive) {
+        return {
+          success: true,
+          emailsSent: 0,
+          totalVolunteers: 0,
+        };
+      }
+
       const { data: result, error } = await supabase.functions.invoke('send-event-notification', {
         body: {
           eventIds: data.eventIds,
@@ -782,9 +894,14 @@ export function useSendEventNotifications() {
 // Hook: Send invitations to volunteers (new invitation-based workflow)
 export function useSendInvitations() {
   const queryClient = useQueryClient();
+  const sandboxActive = isSandboxMode();
 
   return useMutation({
     mutationFn: async (data: { eventIds: string[] }) => {
+      if (sandboxActive) {
+        return sandboxSendInvitations(data.eventIds);
+      }
+
       const { data: result, error } = await supabase.functions.invoke('send-invitations', {
         body: {
           eventIds: data.eventIds,
@@ -812,9 +929,14 @@ export function useSendInvitations() {
 // Hook: Respond to an invitation (for in-app response)
 export function useRespondToInvitation() {
   const queryClient = useQueryClient();
+  const sandboxActive = isSandboxMode();
 
   return useMutation({
     mutationFn: async (data: { token: string; action: 'accept' | 'decline'; declineReason?: string }) => {
+      if (sandboxActive) {
+        return sandboxRespondToInvitation(data);
+      }
+
       const { data: result, error } = await supabase.functions.invoke('respond-invitation', {
         body: data,
       });
@@ -889,9 +1011,14 @@ export function calculateScheduleConfidence(
 // Hook: Auto-schedule volunteers for events
 export function useAutoSchedule() {
   const queryClient = useQueryClient();
+  const sandboxActive = isSandboxMode();
 
   return useMutation({
     mutationFn: async (data: { templateId?: string; eventIds?: string[] }) => {
+      if (sandboxActive) {
+        return runAutoSchedule(data);
+      }
+
       const { data: result, error } = await supabase.functions.invoke('auto-scheduler', {
         body: data,
       });
@@ -936,6 +1063,7 @@ export function useAutoSchedule() {
 // Hook: Update event roles (for individual event customization)
 export function useUpdateEventRoles() {
   const queryClient = useQueryClient();
+  const sandboxActive = isSandboxMode();
 
   return useMutation({
     mutationFn: async (data: {
@@ -943,6 +1071,11 @@ export function useUpdateEventRoles() {
       roles: { role: string; quantity: number }[];
     }) => {
       const { eventId, roles } = data;
+
+      if (sandboxActive) {
+        sandboxUpdateEventRoles(eventId, roles);
+        return { eventId };
+      }
 
       // Delete existing roles for this event
       const { error: deleteError } = await supabase

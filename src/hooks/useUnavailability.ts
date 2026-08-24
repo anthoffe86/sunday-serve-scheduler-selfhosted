@@ -2,15 +2,23 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
+import { isSandboxMode } from '@/sandbox/mode';
+import { removeAvailability, updateAvailabilityNotes, upsertAvailabilityMany } from '@/sandbox/runtime';
 
 // Hook to add multiple unavailable dates at once
 export function useAddUnavailableDates() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const sandboxActive = isSandboxMode();
 
   return useMutation({
     mutationFn: async ({ dates, notes }: { dates: string[]; notes?: string }) => {
       if (!user) throw new Error('Not authenticated');
+
+      if (sandboxActive) {
+        upsertAvailabilityMany(user.id, dates, false, notes);
+        return;
+      }
 
       // Insert all dates as unavailable
       const records = dates.map(date => ({
@@ -44,10 +52,16 @@ export function useAddUnavailableDates() {
 export function useRemoveUnavailableDate() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const sandboxActive = isSandboxMode();
 
   return useMutation({
     mutationFn: async (date: string) => {
       if (!user) throw new Error('Not authenticated');
+
+      if (sandboxActive) {
+        removeAvailability(user.id, date);
+        return;
+      }
 
       const { error } = await supabase
         .from('availability')
@@ -70,10 +84,16 @@ export function useRemoveUnavailableDate() {
 export function useUpdateUnavailableDate() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const sandboxActive = isSandboxMode();
 
   return useMutation({
     mutationFn: async ({ date, notes }: { date: string; notes?: string }) => {
       if (!user) throw new Error('Not authenticated');
+
+      if (sandboxActive) {
+        updateAvailabilityNotes(user.id, date, notes);
+        return;
+      }
 
       const { error } = await supabase
         .from('availability')

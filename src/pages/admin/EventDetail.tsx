@@ -58,6 +58,7 @@ import { DAYS_OF_WEEK } from '@/hooks/useEventScheduler';
 import { EditEventDialog } from '@/components/admin/EditEventDialog';
 import { EditEventTemplateDialog } from '@/components/admin/EditEventTemplateDialog';
 import { toast } from 'sonner';
+import { isSandboxMode, withSandboxPath } from '@/sandbox/mode';
 
 const AdminEventDetail = () => {
   const { eventId } = useParams<{ eventId: string }>();
@@ -350,6 +351,12 @@ const AdminEventDetail = () => {
         status: 'published',
         sendNotifications: false // We'll send our own notifications below
       });
+
+      if (isSandboxMode()) {
+        toast.success(`Published ${result.count} event${result.count !== 1 ? 's' : ''} in sandbox`);
+        setPublishConfirmOpen(false);
+        return;
+      }
       
       // Then send "schedule confirmed" emails to all volunteers with confirmed assignments
       const { data, error: notificationError } = await supabase.functions.invoke('send-event-notification', {
@@ -379,7 +386,7 @@ const AdminEventDetail = () => {
     try {
       await deleteTemplate.mutateAsync(template.id);
       toast.success('Event deleted');
-      navigate('/admin/events');
+      navigate(withSandboxPath('/admin/events'));
     } catch (error) {
       toast.error('Failed to delete event');
     }
@@ -419,13 +426,13 @@ const AdminEventDetail = () => {
   }
 
   if (!isAdmin) {
-    return <Navigate to="/" replace />;
+    return <Navigate to={withSandboxPath('/')} replace />;
   }
 
   if (!template) {
     return (
       <div className="space-y-6">
-        <Button variant="ghost" onClick={() => navigate('/admin/events')} className="gap-2">
+        <Button variant="ghost" onClick={() => navigate(withSandboxPath('/admin/events'))} className="gap-2">
           <ArrowLeft className="h-4 w-4" />
           Back to Events
         </Button>
@@ -445,7 +452,7 @@ const AdminEventDetail = () => {
   return (
     <div className="space-y-6">
       {/* Back button */}
-      <Button variant="ghost" onClick={() => navigate('/admin/events')} className="gap-2 -ml-2">
+      <Button variant="ghost" onClick={() => navigate(withSandboxPath('/admin/events'))} className="gap-2 -ml-2">
         <ArrowLeft className="h-4 w-4" />
         Back to Events
       </Button>

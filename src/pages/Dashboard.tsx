@@ -15,6 +15,7 @@ import { VolunteerEventDetailDialog } from '@/components/VolunteerEventDetailDia
 import { useAuth } from '@/hooks/useAuth';
 import { useProfile } from '@/hooks/useVolunteerData';
 import { useEvents } from '@/hooks/useEventScheduler';
+import { withSandboxPath } from '@/sandbox/mode';
 import { cn } from '@/lib/utils';
 
 const Dashboard = () => {
@@ -74,7 +75,7 @@ const Dashboard = () => {
             Your Upcoming Services
           </h2>
           <Button variant="ghost" size="sm" asChild>
-            <Link to="/schedule">View All</Link>
+            <Link to={withSandboxPath('/schedule')}>View All</Link>
           </Button>
         </div>
 
@@ -174,7 +175,7 @@ const Dashboard = () => {
                 Check back soon or update your availability.
               </p>
               <Button asChild>
-                <Link to="/availability">Update Availability</Link>
+                <Link to={withSandboxPath('/availability')}>Update Availability</Link>
               </Button>
             </CardContent>
           </Card>
@@ -195,7 +196,7 @@ const Dashboard = () => {
               Let us know which Sundays you're available to serve.
             </p>
             <Button asChild>
-              <Link to="/availability">Update Availability</Link>
+              <Link to={withSandboxPath('/availability')}>Update Availability</Link>
             </Button>
           </CardContent>
         </Card>

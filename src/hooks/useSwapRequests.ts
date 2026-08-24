@@ -2,6 +2,17 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
+import { isSandboxMode } from '@/sandbox/mode';
+import {
+  acceptSwapRequest,
+  cancelSwapRequest,
+  confirmSwap,
+  createSwapRequest,
+  getExistingSwapRequest,
+  getSwapRequests as getSandboxSwapRequests,
+  getUserAssignmentsForSwap,
+  offerSwap,
+} from '@/sandbox/runtime';
 
 export interface SwapRequest {
   id: string;
@@ -40,11 +51,16 @@ export interface SwapRequestWithDetails extends SwapRequest {
 // Fetch all swap requests visible to the current user
 export function useSwapRequests() {
   const { user } = useAuth();
+  const sandboxActive = isSandboxMode();
 
   return useQuery({
     queryKey: ['swap-requests', user?.id],
     queryFn: async () => {
       if (!user) return [];
+
+      if (sandboxActive) {
+        return getSandboxSwapRequests() as SwapRequestWithDetails[];
+      }
 
       // Get swap requests
       const { data: swapRequests, error } = await supabase
@@ -150,6 +166,7 @@ export function useSwapRequests() {
 export function useCreateSwapRequest() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const sandboxActive = isSandboxMode();
 
   return useMutation({
     mutationFn: async ({
@@ -160,6 +177,15 @@ export function useCreateSwapRequest() {
       notes?: string;
     }) => {
       if (!user) throw new Error('Not authenticated');
+
+      if (sandboxActive) {
+        const swapRequestId = createSwapRequest({
+          eventAssignmentId,
+          notes,
+          fromUserId: user.id,
+        });
+        return { id: swapRequestId };
+      }
 
       // Create the swap request
       const { data: swapRequest, error } = await supabase
@@ -213,9 +239,18 @@ export function useCreateSwapRequest() {
 // Accept a swap request (legacy - direct takeover without offering an assignment)
 export function useAcceptSwapRequest() {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const sandboxActive = isSandboxMode();
 
   return useMutation({
     mutationFn: async (swapRequestId: string) => {
+      if (!user) throw new Error('Not authenticated');
+
+      if (sandboxActive) {
+        await acceptSwapRequest({ swapRequestId, currentUserId: user.id });
+        return { success: true, eventId: '', eventAssignmentId: '', newVolunteerId: user.id };
+      }
+
       const { data: result, error } = await supabase.functions.invoke('accept-swap-request', {
         body: {
           swapRequestId,
@@ -242,6 +277,8 @@ export function useAcceptSwapRequest() {
 // Offer your assignment in exchange for a swap (new two-step flow)
 export function useOfferSwap() {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const sandboxActive = isSandboxMode();
 
   return useMutation({
     mutationFn: async ({
@@ -251,6 +288,13 @@ export function useOfferSwap() {
       swapRequestId: string;
       offeredAssignmentId: string;
     }) => {
+      if (!user) throw new Error('Not authenticated');
+
+      if (sandboxActive) {
+        await offerSwap({ swapRequestId, offeredAssignmentId, currentUserId: user.id });
+        return { success: true, swapRequestId, offeredAssignmentId };
+      }
+
       const { data: result, error } = await supabase.functions.invoke('offer-swap', {
         body: {
           swapRequestId,
@@ -278,6 +322,8 @@ export function useOfferSwap() {
 // Confirm or reject a swap offer (original requester responds)
 export function useConfirmSwap() {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const sandboxActive = isSandboxMode();
 
   return useMutation({
     mutationFn: async ({
@@ -287,6 +333,12 @@ export function useConfirmSwap() {
       swapRequestId: string;
       accept: boolean;
     }) => {
+      if (!user) throw new Error('Not authenticated');
+
+      if (sandboxActive) {
+        return confirmSwap({ swapRequestId, accept, currentUserId: user.id });
+      }
+
       const { data: result, error } = await supabase.functions.invoke('confirm-swap', {
         body: {
           swapRequestId,
@@ -336,10 +388,16 @@ export function useDeclineSwapRequest() {
 export function useCancelSwapRequest() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const sandboxActive = isSandboxMode();
 
   return useMutation({
     mutationFn: async (swapRequestId: string) => {
       if (!user) throw new Error('Not authenticated');
+
+      if (sandboxActive) {
+        cancelSwapRequest({ swapRequestId, currentUserId: user.id });
+        return { success: true };
+      }
 
       const { error } = await supabase
         .from('swap_requests')
@@ -363,11 +421,16 @@ export function useCancelSwapRequest() {
 // Check if user already has a pending swap request for an assignment
 export function useExistingSwapRequest(eventAssignmentId?: string) {
   const { user } = useAuth();
+  const sandboxActive = isSandboxMode();
 
   return useQuery({
     queryKey: ['existing-swap-request', eventAssignmentId, user?.id],
     queryFn: async () => {
       if (!user || !eventAssignmentId) return null;
+
+      if (sandboxActive) {
+        return getExistingSwapRequest({ eventAssignmentId, currentUserId: user.id });
+      }
 
       const { data, error } = await supabase
         .from('swap_requests')
@@ -387,11 +450,16 @@ export function useExistingSwapRequest(eventAssignmentId?: string) {
 // Fetch user's assignments for offering in swaps
 export function useUserAssignmentsForSwap() {
   const { user } = useAuth();
+  const sandboxActive = isSandboxMode();
 
   return useQuery({
     queryKey: ['user-assignments-for-swap', user?.id],
     queryFn: async () => {
       if (!user) return [];
+
+      if (sandboxActive) {
+        return getUserAssignmentsForSwap(user.id);
+      }
 
       const today = new Date().toISOString().split('T')[0];
 

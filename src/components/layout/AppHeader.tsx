@@ -8,6 +8,10 @@ import { useAuth } from '@/hooks/useAuth';
 import { useProfile } from '@/hooks/useVolunteerData';
 import { usePublicOrgSettings } from '@/hooks/usePublicOrgSettings';
 import { supabase } from '@/integrations/supabase/client';
+import { withSandboxPath, isSandboxMode } from '@/sandbox/mode';
+import { useSandboxActions, useSandboxPersonas } from '@/sandbox/useSandboxRuntime';
+import { toast } from 'sonner';
+import { getSandboxOrgById } from '@/sandbox/runtime';
 interface AppHeaderProps {
   onMenuClick: () => void;
 }
@@ -35,6 +39,10 @@ export function AppHeader({
     queryFn: async () => {
       if (!orgId) {
         return null;
+      }
+
+      if (isSandboxMode()) {
+        return getSandboxOrgById(orgId)?.name ?? null;
       }
 
       const { data } = await supabase
@@ -72,9 +80,23 @@ export function AppHeader({
   const subtitle = isSuperAdmin ? 'Super Admin' : 'Volunteer Scheduling';
   const displayName = profile?.name || user?.email?.split('@')[0] || 'User';
   const initials = displayName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+  const sandboxEnabled = isSandboxMode();
+  const personas = useSandboxPersonas();
+  const { setPersona, reset } = useSandboxActions();
+
   const handleSignOut = async () => {
     await signOut();
-    navigate('/auth');
+    navigate(isSandboxMode() ? '/sandbox/dashboard' : '/auth');
+  };
+
+  const handlePersonaSwitch = (userId: string) => {
+    setPersona(userId);
+    toast.success('Switched sandbox persona');
+  };
+
+  const handleResetSandbox = () => {
+    reset();
+    toast.success('Sandbox data reset to default seed');
   };
   return <header className="sticky top-0 z-50 w-full border-b bg-card/80 backdrop-blur-sm">
       <div className="flex h-16 items-center gap-4 px-4 md:px-6">
@@ -98,6 +120,12 @@ export function AppHeader({
             <Shield className="h-3 w-3" />
             {isSuperAdmin ? 'Super Admin' : 'Admin'}
           </div>}
+
+        {sandboxEnabled && (
+          <div className="hidden items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900 md:flex">
+            Sandbox
+          </div>
+        )}
 
         {!isSuperAdmin && <Button variant="ghost" size="icon" className="relative">
             <Bell className="h-5 w-5" />
@@ -127,12 +155,28 @@ export function AppHeader({
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             {!isSuperAdmin && <>
-                <DropdownMenuItem onClick={() => navigate('/profile')}>
+                <DropdownMenuItem onClick={() => navigate(withSandboxPath('/profile'))}>
                   <User className="mr-2 h-4 w-4" />
                   My Profile
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
               </>}
+            {sandboxEnabled && (
+              <>
+                <DropdownMenuLabel className="text-xs uppercase tracking-wide text-muted-foreground">
+                  Switch Persona
+                </DropdownMenuLabel>
+                {personas.map((persona) => (
+                  <DropdownMenuItem key={persona.userId} onClick={() => handlePersonaSwitch(persona.userId)}>
+                    {persona.name} ({persona.role})
+                  </DropdownMenuItem>
+                ))}
+                <DropdownMenuItem onClick={handleResetSandbox}>
+                  Reset Sandbox Data
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+              </>
+            )}
             <DropdownMenuItem onClick={handleSignOut} className="text-destructive">
               <LogOut className="mr-2 h-4 w-4" />
               Sign Out

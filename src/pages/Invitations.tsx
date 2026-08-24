@@ -22,6 +22,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { isSandboxMode } from '@/sandbox/mode';
+import { getPendingInvitations } from '@/sandbox/runtime';
 
 const Invitations = () => {
   const { user, isLoading: authLoading } = useAuth();
@@ -34,6 +36,10 @@ const Invitations = () => {
      queryKey: ['pending-invitations', user?.id],
      queryFn: async () => {
        if (!user?.id) return [];
+
+       if (isSandboxMode()) {
+         return getPendingInvitations(user.id);
+       }
        
        console.log('[Invitations] Fetching pending invitations for user:', user.id);
        

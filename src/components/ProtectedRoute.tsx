@@ -1,6 +1,7 @@
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { Loader2 } from 'lucide-react';
+import { isSandboxMode } from '@/sandbox/mode';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -15,16 +16,26 @@ export function ProtectedRoute({
 }: ProtectedRouteProps) {
   const location = useLocation();
   const { user, isLoading, isAdmin, isSuperAdmin } = useAuth();
+  const sandboxActive = isSandboxMode(location.pathname);
+
+  const spinner = (
+    <div className="flex min-h-screen items-center justify-center bg-background">
+      <Loader2 className="h-8 w-8 animate-spin text-primary" />
+    </div>
+  );
 
   if (isLoading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
+    return spinner;
   }
 
   if (!user) {
+    // Sandbox mode always resolves a local persona, so a missing user here only
+    // means the auth context has not caught up yet. Redirecting would ping-pong
+    // /sandbox <-> /sandbox/dashboard forever and render a blank page, so hold
+    // on the spinner and let the next render through.
+    if (sandboxActive) {
+      return spinner;
+    }
     return <Navigate to="/auth" replace />;
   }
 
@@ -40,11 +51,11 @@ export function ProtectedRoute({
   }
 
   if (requireSuperAdmin && !isSuperAdmin) {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to={sandboxActive ? '/sandbox/dashboard' : '/dashboard'} replace />;
   }
 
   if (requireOrgAdmin && (!isAdmin || isSuperAdmin)) {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to={sandboxActive ? '/sandbox/dashboard' : '/dashboard'} replace />;
   }
 
   return <>{children}</>;
